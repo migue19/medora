@@ -2,6 +2,136 @@
 
 Agenda y reservas de citas médicas en línea para clínicas y consultorios (SaaS multi-clínica). Monorepo npm con Next.js 16 / React 19 (PWA), NestJS 11, Prisma 6 y PostgreSQL 17. Node.js 24 LTS recomendado. Mismo stack y criterios de seguridad que Tavixo.
 
+## Plan por sprints
+
+Objetivo: llegar a la funcionalidad de una plataforma tipo Doctoralia sobre una base SaaS para clínicas. Primero se consolida la operación de cada clínica (sprints 1 a 5). Después vienen la captación de pacientes, los pagos y la telemedicina (6 a 9) y por último el expediente, la facturación y las integraciones (10 a 14). Cada sprint deja una versión desplegable, con migraciones aditivas, pruebas de integración y su propio `SPRINTn_RESULTS.md`.
+
+| Sprint | Tema | Estado |
+|---|---|---|
+| 1 | Base, autenticación, agenda y reservas en línea | ✅ Entregado |
+| 2 | Correo, verificación de cuenta y recuperación de contraseña | Pendiente |
+| 3 | Recordatorios y confirmación de asistencia (WhatsApp y correo) | Pendiente |
+| 4 | Ficha del paciente, vinculación de cuentas y lista de espera | Pendiente |
+| 5 | Sedes, consultorios y perfil profesional completo | Pendiente |
+| 6 | Perfil público, SEO y widget de reservas | Pendiente |
+| 7 | Opiniones verificadas | Pendiente |
+| 8 | Directorio público y búsqueda de médicos | Pendiente |
+| 9 | Pagos en línea y políticas de inasistencia | Pendiente |
+| 10 | Telemedicina (videoconsulta) | Pendiente |
+| 11 | Expediente clínico electrónico y recetas | Pendiente |
+| 12 | Suscripciones SaaS y facturación CFDI 4.0 | Pendiente |
+| 13 | Reportes y analítica | Pendiente |
+| 14 | Integraciones: calendarios, API pública y notificaciones push | Pendiente |
+
+### Sprint 1 · Base y agenda ✅
+
+Clínicas multi-tenant, roles OWNER/ADMIN/RECEPTION/DOCTOR, autenticación con refresh rotativo para el personal y para pacientes, servicios, médicos, horario semanal, bloqueos, disponibilidad, página pública de reservas, portal del paciente, panel de agenda, citas por teléfono, reprogramación, cancelación y asistencia. PostgreSQL impide el doble agendado. Detalle en [Alcance del Sprint 1](#alcance-del-sprint-1).
+
+### Sprint 2 · Correo y cuentas
+
+- Envío de correo transaccional con proveedor configurable (SMTP o un servicio tipo Resend o SES) y plantillas en español.
+- Cola de trabajos persistente en PostgreSQL (por ejemplo, pg-boss) con reintentos e idempotencia. Será la base de los recordatorios.
+- Verificación de correo del paciente. Reservar en línea requiere un correo verificado.
+- Recuperación de contraseña con token de un solo uso y vigencia corta, para pacientes y personal. Revoca las sesiones.
+- Correo de confirmación al reservar, reprogramar o cancelar, con un archivo `.ics` para agregar al calendario.
+- Invitación al personal por correo en lugar de una contraseña inicial compartida.
+- **Terminado cuando**: un paciente nuevo verifica su correo, reserva y recibe la confirmación, y el envío sobrevive a reinicios de la API sin duplicarse.
+
+### Sprint 3 · Recordatorios y confirmación de asistencia
+
+- Recordatorios automáticos 24 h y 2 h antes, configurables por clínica, por correo y por WhatsApp Business (Cloud API) con plantillas aprobadas.
+- Enlace firmado para **confirmar** o **cancelar** desde el recordatorio, sin iniciar sesión, de un solo uso y con vencimiento.
+- Estado de la cita «Confirmada por el paciente» visible en la agenda.
+- Registro de cada envío (canal, estado, error) y consentimiento del paciente para recibir WhatsApp.
+- **Terminado cuando**: los recordatorios salen a tiempo, nunca se duplican, respetan las cancelaciones de último minuto y la clínica ve quién confirmó.
+
+### Sprint 4 · Pacientes y lista de espera
+
+- Vincular una ficha telefónica con la cuenta en línea del mismo paciente, con verificación por correo o teléfono, y fusionar duplicados con auditoría.
+- Perfil del paciente en la clínica: historial de citas, inasistencias, notas internas y etiquetas.
+- Edición de datos del paciente por recepción y por el propio paciente.
+- Lista de espera por médico y servicio: al liberarse un horario se avisa al primero de la lista y se le aparta temporalmente.
+- Citas subsecuentes: agendar la siguiente desde la cita atendida.
+- **Terminado cuando**: recepción encuentra a cualquier paciente con su historial completo y los huecos por cancelación se vuelven a ocupar.
+
+### Sprint 5 · Sedes y perfil profesional
+
+- Varias sedes por clínica, con dirección, mapa y horario. Un médico puede atender en varias sedes con horarios distintos.
+- Consultorios o recursos por sede, para evitar dos citas a la vez en el mismo consultorio.
+- Perfil profesional completo: foto, formación, certificaciones de consejo, idiomas, enfermedades que trata y aseguradoras aceptadas.
+- Servicios con precio por sede y por médico, y servicios sólo para primera vez o subsecuente.
+- **Terminado cuando**: una clínica con dos sedes publica horarios correctos por sede y no hay choques de consultorio.
+
+### Sprint 6 · Perfil público, SEO y widget
+
+- Páginas públicas con renderizado en servidor, indexables, con URLs legibles (`/c/<clinica>/<medico>`), metadatos, Open Graph y schema.org (`Physician`, `MedicalClinic`).
+- Mapa del sitio y página de cada médico con su agenda en línea.
+- Widget «Reservar cita» para insertar en el sitio web de la clínica, más un botón para Google Maps e Instagram.
+- **Terminado cuando**: las páginas pasan Lighthouse (SEO, accesibilidad ≥ 90) y el widget reserva desde un sitio externo.
+
+### Sprint 7 · Opiniones verificadas
+
+- Sólo pueden opinar pacientes con una cita en estado «Atendida», una opinión por cita, mediante una invitación por correo o WhatsApp tras la consulta.
+- Calificación (puntualidad, trato, instalaciones) y comentario. Moderación por la clínica con motivos y sin borrar en silencio, más una respuesta pública del médico.
+- Promedio y número de opiniones en el perfil público y en schema.org.
+- **Terminado cuando**: no es posible publicar una opinión sin haber tenido una cita atendida y todo cambio de moderación queda auditado.
+
+### Sprint 8 · Directorio y búsqueda
+
+- Directorio público entre clínicas que activen su participación, con búsqueda por especialidad, padecimiento, ciudad o colonia, aseguradora, precio, primera disponibilidad y videoconsulta.
+- Búsqueda de texto completo con `pg_trgm` y filtros geográficos (PostGIS o una búsqueda por radio).
+- Resultados con la próxima disponibilidad y una reserva directa.
+- Catálogo normalizado de especialidades y padecimientos.
+- **Terminado cuando**: un paciente encuentra un médico por especialidad y zona y reserva en menos de un minuto.
+
+### Sprint 9 · Pagos en línea
+
+- Anticipo o pago completo al reservar con un proveedor para México (Stripe, Mercado Pago o Conekta), con tarjeta y OXXO o SPEI según el proveedor.
+- Políticas por clínica: pago obligatorio u opcional, ventana de cancelación con reembolso y cargo por inasistencia.
+- Webhooks idempotentes y conciliación de pagos con citas.
+- **Terminado cuando**: un pago aprobado confirma la cita, un webhook repetido no duplica nada y los reembolsos siguen la política de la clínica.
+
+### Sprint 10 · Telemedicina
+
+- Servicios marcados como videoconsulta, con una sala por cita a través de un proveedor (Daily, Twilio o Jitsi autohospedado) y enlaces que caducan.
+- Sala de espera virtual, prueba de cámara y micrófono y aviso al médico cuando el paciente entra.
+- Consentimiento informado para teleconsulta.
+- **Terminado cuando**: médico y paciente completan una videoconsulta desde el navegador, sin instalar nada, y la cita queda como atendida.
+
+### Sprint 11 · Expediente clínico y recetas
+
+- Expediente por paciente conforme a la NOM-004-SSA3-2012: historia clínica, notas de evolución (SOAP), signos vitales, alergias, diagnósticos (CIE-10) y archivos adjuntos.
+- Recetas en PDF con los datos del médico y su cédula, más un código de verificación.
+- Control de acceso estricto (sólo el médico tratante y el personal autorizado), bitácora de cada consulta del expediente, cifrado de adjuntos y retención de 5 años.
+- Revisión de los lineamientos de la NOM-024-SSA3-2012 para la interoperabilidad futura.
+- **Terminado cuando**: un médico documenta la consulta, imprime la receta y la bitácora muestra quién vio cada expediente.
+
+### Sprint 12 · Suscripciones y facturación
+
+- Planes para clínicas (número de médicos, recordatorios, telemedicina) con cobro recurrente y periodo de prueba.
+- Facturación CFDI 4.0 a la clínica por su suscripción, y facturación opcional de consultas a los pacientes, a través de un PAC (por ejemplo, Facturama).
+- Alta autoservicio de clínicas, con verificación de la cédula del médico.
+- **Terminado cuando**: una clínica nueva se registra, paga, recibe su factura y sus límites se aplican según el plan.
+
+### Sprint 13 · Reportes y analítica
+
+- Ocupación de la agenda por médico, tasa de inasistencia, cancelaciones con anticipación, origen de las citas (en línea, teléfono, directorio o widget), ingresos y pacientes nuevos o recurrentes.
+- Exportación a CSV y Excel y un resumen semanal por correo al propietario.
+- **Terminado cuando**: el propietario ve los indicadores del mes y las cifras cuadran con la agenda.
+
+### Sprint 14 · Integraciones
+
+- Sincronización bidireccional con Google Calendar y Outlook, para que los eventos personales del médico bloqueen su agenda.
+- API pública con llaves por clínica y webhooks de citas.
+- Notificaciones push de la PWA y evaluación de una app móvil nativa.
+- **Terminado cuando**: un evento personal en Google Calendar bloquea la agenda en menos de un minuto y un tercero integra las citas por API.
+
+### Temas transversales (todos los sprints)
+
+- **Privacidad (LFPDPPP)**: aviso de privacidad, consentimiento expreso para datos de salud, derechos ARCO y minimización de datos. Los datos de salud son sensibles.
+- **Seguridad**: dependencias al día, respaldos probados, rate limit compartido antes de escalar a más de una réplica, monitoreo de errores y bitácoras sin datos médicos.
+- **Calidad**: pruebas de integración contra PostgreSQL real para cada regla de negocio y migraciones aditivas con plan de reversión.
+
 ## Alcance del Sprint 1
 
 **Base y autenticación**
@@ -36,7 +166,7 @@ Agenda y reservas de citas médicas en línea para clínicas y consultorios (Saa
 
 ### Fuera de este sprint
 
-Directorio público entre clínicas, opiniones verificadas, recordatorios por correo, SMS o WhatsApp, videoconsulta, cobro en línea, expediente clínico (NOM-004/NOM-024), aseguradoras, vinculación de fichas telefónicas con cuentas en línea, verificación de correo y recuperación de contraseña, y Google Calendar. No se envían correos ni mensajes en esta entrega.
+Directorio público entre clínicas, opiniones verificadas, recordatorios por correo, SMS o WhatsApp, videoconsulta, cobro en línea, expediente clínico (NOM-004/NOM-024), aseguradoras, vinculación de fichas telefónicas con cuentas en línea, verificación de correo y recuperación de contraseña, y Google Calendar. No se envían correos ni mensajes en esta entrega. Ver el [plan por sprints](#plan-por-sprints).
 
 > Antes de operar con pacientes reales se recomienda publicar un aviso de privacidad conforme a la LFPDPPP. Los datos de salud son datos personales sensibles.
 
@@ -145,7 +275,3 @@ Ver [TEST_RESULTS.md](TEST_RESULTS.md).
 - La migración `20261015090000_init` agrega, además del esquema de Prisma, `btree_gist`, la exclusión anti-traslape de citas y de bloques de horario, y CHECKs de rangos (duraciones, precios, slug, minutos). No editar a mano las tablas ni eliminar estas restricciones.
 - El límite de peticiones vive en memoria y corresponde a una sola réplica de la API. Antes de escalar horizontalmente, usar almacenamiento compartido.
 - La PWA guarda en caché sólo la pantalla de desconexión e iconos; nunca respuestas de `/api` ni páginas con datos privados.
-
-## Siguiente sprint sugerido
-
-Recordatorios por correo y WhatsApp (24 h y 2 h antes) con confirmación de asistencia, verificación de correo y recuperación de contraseña, vinculación de fichas telefónicas con cuentas, y lista de espera.
