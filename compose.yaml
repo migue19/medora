@@ -1,0 +1,77 @@
+# Medora · servicios aislados del proyecto (nombre de proyecto: medora)
+name: medora
+
+services:
+  db:
+    image: postgres:17.9-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Define POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?Define POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    mem_limit: 512m
+    cpus: 1.0
+
+  api:
+    build: { context: ., target: api }
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      DATABASE_URL: ${DATABASE_URL:?Define DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET}
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:6011}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      TRUST_PROXY: "true"
+    ports:
+      - "127.0.0.1:6010:3000"
+    networks: [backend, frontend]
+    mem_limit: 384m
+    cpus: 1.0
+
+  web:
+    build:
+      context: .
+      target: web
+      args:
+        API_INTERNAL_URL: ${API_INTERNAL_URL:-http://api:3000}
+    restart: unless-stopped
+    depends_on:
+      api: { condition: service_healthy }
+    ports:
+      - "127.0.0.1:6011:3000"
+    networks: [frontend]
+    mem_limit: 384m
+    cpus: 1.0
+
+  tools:
+    profiles: [tools]
+    build: { context: ., target: tools }
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Define DATABASE_URL}
+      SEED_CLINIC_SLUG: ${SEED_CLINIC_SLUG:-}
+      SEED_CLINIC_NAME: ${SEED_CLINIC_NAME:-}
+      SEED_OWNER_EMAIL: ${SEED_OWNER_EMAIL:-}
+      SEED_OWNER_NAME: ${SEED_OWNER_NAME:-}
+      SEED_OWNER_PASSWORD: ${SEED_OWNER_PASSWORD:-}
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
+    networks: [backend]
+
+volumes:
+  pgdata:
+
+networks:
+  backend:
+    internal: true
+  frontend: {}

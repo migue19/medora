@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.next/
+.env
+.env.local
+apps/api/.env
+apps/web/.env.local
+work/
+*.log
+*.dump
+next-env.d.ts
+*.tsbuildinfo
+apps/api/prisma.wasm.config.ts

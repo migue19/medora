@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+**/dist-test
+**/.next
+.env
+**/.env
+**/.env.local
+work
+.git
+*.log
+*.dump
+apps/api/prisma.wasm.config.ts

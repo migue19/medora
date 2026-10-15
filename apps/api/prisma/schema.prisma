@@ -1,0 +1,288 @@
+// Medora · Sprint 1
+// Todas las entidades de negocio llevan clinicId y se consultan siempre
+// filtradas por la clínica obtenida de la sesión.
+
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum StaffRole {
+  OWNER
+  ADMIN
+  RECEPTION
+  DOCTOR
+}
+
+enum SessionKind {
+  STAFF
+  PATIENT
+}
+
+enum AppointmentStatus {
+  BOOKED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+enum AppointmentSource {
+  ONLINE
+  STAFF
+}
+
+enum ActorKind {
+  STAFF
+  PATIENT
+}
+
+enum AppointmentEventType {
+  CREATED
+  RESCHEDULED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+model Clinic {
+  id                      String   @id @default(uuid()) @db.Uuid
+  slug                    String   @unique @db.VarChar(60)
+  name                    String   @db.VarChar(120)
+  timezone                String   @default("America/Mexico_City") @db.VarChar(64)
+  phone                   String?  @db.VarChar(30)
+  address                 String?  @db.VarChar(240)
+  active                  Boolean  @default(true)
+  bookingEnabled          Boolean  @default(true)
+  minNoticeMinutes        Int      @default(60)
+  horizonDays             Int      @default(60)
+  patientCancelMinMinutes Int      @default(120)
+  createdAt               DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt               DateTime @updatedAt @db.Timestamptz(3)
+
+  memberships    Membership[]
+  doctors        Doctor[]
+  services       Service[]
+  clinicPatients ClinicPatient[]
+  appointments   Appointment[]
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique @db.VarChar(254)
+  name         String   @db.VarChar(120)
+  passwordHash String   @db.VarChar(255)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+
+  memberships Membership[]
+}
+
+model Membership {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  clinicId  String    @db.Uuid
+  role      StaffRole
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+
+  user     User             @relation(fields: [userId], references: [id])
+  clinic   Clinic           @relation(fields: [clinicId], references: [id])
+  doctor   Doctor?          @relation("DoctorMembership")
+  sessions RefreshSession[]
+
+  @@unique([userId, clinicId])
+  @@unique([id, clinicId])
+  @@index([clinicId])
+}
+
+model PatientAccount {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique @db.VarChar(254)
+  name         String   @db.VarChar(120)
+  phone        String   @db.VarChar(30)
+  passwordHash String   @db.VarChar(255)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+
+  clinicPatients ClinicPatient[]
+  sessions       RefreshSession[]
+}
+
+model RefreshSession {
+  id               String      @id @default(uuid()) @db.Uuid
+  kind             SessionKind
+  familyId         String      @db.Uuid
+  tokenHash        String      @unique @db.Char(64)
+  membershipId     String?     @db.Uuid
+  patientAccountId String?     @db.Uuid
+  expiresAt        DateTime    @db.Timestamptz(3)
+  usedAt           DateTime?   @db.Timestamptz(3)
+  revokedAt        DateTime?   @db.Timestamptz(3)
+  createdAt        DateTime    @default(now()) @db.Timestamptz(3)
+
+  membership     Membership?     @relation(fields: [membershipId], references: [id])
+  patientAccount PatientAccount? @relation(fields: [patientAccountId], references: [id])
+
+  @@index([familyId])
+  @@index([membershipId])
+  @@index([patientAccountId])
+}
+
+// Ficha del paciente dentro de una clínica. Puede venir de una cuenta en línea
+// o ser capturada por recepción (paciente telefónico sin cuenta).
+model ClinicPatient {
+  id               String   @id @default(uuid()) @db.Uuid
+  clinicId         String   @db.Uuid
+  patientAccountId String?  @db.Uuid
+  name             String   @db.VarChar(120)
+  phone            String   @db.VarChar(30)
+  email            String?  @db.VarChar(254)
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime @updatedAt @db.Timestamptz(3)
+
+  clinic         Clinic          @relation(fields: [clinicId], references: [id])
+  patientAccount PatientAccount? @relation(fields: [patientAccountId], references: [id])
+  appointments   Appointment[]
+
+  @@unique([clinicId, patientAccountId])
+  @@unique([id, clinicId])
+  @@index([clinicId, name])
+}
+
+model Doctor {
+  id           String   @id @default(uuid()) @db.Uuid
+  clinicId     String   @db.Uuid
+  membershipId String?  @unique @db.Uuid
+  displayName  String   @db.VarChar(120)
+  specialty    String   @db.VarChar(120)
+  licenseNumber String? @db.VarChar(30)
+  bio          String?  @db.VarChar(1000)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+
+  clinic       Clinic           @relation(fields: [clinicId], references: [id])
+  membership   Membership?      @relation("DoctorMembership", fields: [membershipId, clinicId], references: [id, clinicId])
+  services     DoctorService[]
+  scheduleRules ScheduleRule[]
+  timeOffs     TimeOff[]
+  appointments Appointment[]
+
+  @@unique([id, clinicId])
+  @@unique([membershipId, clinicId])
+  @@index([clinicId])
+}
+
+model Service {
+  id              String   @id @default(uuid()) @db.Uuid
+  clinicId        String   @db.Uuid
+  name            String   @db.VarChar(120)
+  durationMinutes Int
+  priceCents      Int
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
+
+  clinic       Clinic          @relation(fields: [clinicId], references: [id])
+  doctors      DoctorService[]
+  appointments Appointment[]
+
+  @@unique([clinicId, name])
+  @@unique([id, clinicId])
+}
+
+model DoctorService {
+  doctorId  String @db.Uuid
+  serviceId String @db.Uuid
+  clinicId  String @db.Uuid
+
+  doctor  Doctor  @relation(fields: [doctorId, clinicId], references: [id, clinicId])
+  service Service @relation(fields: [serviceId, clinicId], references: [id, clinicId])
+
+  @@id([doctorId, serviceId])
+}
+
+// Horario semanal en hora local de la clínica. weekday: 1 = lunes … 7 = domingo (ISO).
+model ScheduleRule {
+  id          String @id @default(uuid()) @db.Uuid
+  doctorId    String @db.Uuid
+  clinicId    String @db.Uuid
+  weekday     Int
+  startMinute Int
+  endMinute   Int
+
+  doctor Doctor @relation(fields: [doctorId, clinicId], references: [id, clinicId])
+
+  @@index([doctorId])
+}
+
+model TimeOff {
+  id          String   @id @default(uuid()) @db.Uuid
+  doctorId    String   @db.Uuid
+  clinicId    String   @db.Uuid
+  startsAt    DateTime @db.Timestamptz(3)
+  endsAt      DateTime @db.Timestamptz(3)
+  reason      String   @db.VarChar(200)
+  createdById String   @db.Uuid
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  doctor Doctor @relation(fields: [doctorId, clinicId], references: [id, clinicId])
+
+  @@index([doctorId, startsAt])
+}
+
+model Appointment {
+  id              String            @id @default(uuid()) @db.Uuid
+  clinicId        String            @db.Uuid
+  doctorId        String            @db.Uuid
+  serviceId       String            @db.Uuid
+  clinicPatientId String            @db.Uuid
+  startsAt        DateTime          @db.Timestamptz(3)
+  endsAt          DateTime          @db.Timestamptz(3)
+  status          AppointmentStatus @default(BOOKED)
+  source          AppointmentSource
+  serviceName     String            @db.VarChar(120)
+  durationMinutes Int
+  priceCents      Int
+  patientNotes    String?           @db.VarChar(500)
+  requestKey      String            @unique @db.VarChar(120)
+  requestHash     String            @db.Char(64)
+  cancelReason    String?           @db.VarChar(200)
+  createdAt       DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime          @updatedAt @db.Timestamptz(3)
+
+  clinic        Clinic             @relation(fields: [clinicId], references: [id])
+  doctor        Doctor             @relation(fields: [doctorId, clinicId], references: [id, clinicId])
+  service       Service            @relation(fields: [serviceId, clinicId], references: [id, clinicId])
+  clinicPatient ClinicPatient      @relation(fields: [clinicPatientId, clinicId], references: [id, clinicId])
+  events        AppointmentEvent[]
+
+  @@index([clinicId, startsAt])
+  @@index([doctorId, startsAt])
+  @@index([clinicPatientId, startsAt])
+}
+
+model AppointmentEvent {
+  id            String               @id @default(uuid()) @db.Uuid
+  appointmentId String               @db.Uuid
+  type          AppointmentEventType
+  actorKind     ActorKind
+  actorId       String               @db.Uuid
+  actorName     String               @db.VarChar(120)
+  reason        String?              @db.VarChar(200)
+  fromStartsAt  DateTime?            @db.Timestamptz(3)
+  toStartsAt    DateTime?            @db.Timestamptz(3)
+  createdAt     DateTime             @default(now()) @db.Timestamptz(3)
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id])
+
+  @@index([appointmentId])
+}

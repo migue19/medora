@@ -1,0 +1,354 @@
+import {
+  BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException,
+} from '@nestjs/common';
+import { ActorKind, Appointment, AppointmentSource, Prisma } from '@prisma/client';
+import { DateTime } from 'luxon';
+import { PrismaService, Tx } from '../prisma.service';
+import { canonicalHash } from '../common/crypto';
+import { computeSlots, fitsWeeklySchedule, parseLocalDate } from '../scheduling/availability';
+
+export const MAX_FUTURE_ONLINE_APPOINTMENTS = 3;
+export const MAX_AVAILABILITY_DAYS = 14;
+
+export interface Actor {
+  kind: ActorKind;
+  id: string;
+  name: string;
+}
+
+/** Serializa escrituras de agenda por médico (citas, bloqueos, horario). */
+export async function lockDoctor(tx: Tx, doctorId: string): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${doctorId}, 7))`;
+}
+
+function isDoubleBooking(e: unknown): boolean {
+  const text = e instanceof Error ? `${e.message} ${JSON.stringify((e as { meta?: unknown }).meta ?? {})}` : '';
+  return text.includes('Appointment_no_double_booking') || text.includes('23P01');
+}
+
+const SLOT_TAKEN = 'Ese horario ya no está disponible. Elige otro.';
+
+export interface BookingInput {
+  clinicId: string;
+  doctorId: string;
+  serviceId: string;
+  clinicPatientId: string;
+  startsAt: Date;
+  notes: string | null;
+  source: AppointmentSource;
+  requestId: string;
+  actor: Actor;
+}
+
+@Injectable()
+export class AppointmentsService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  /** Horarios disponibles para un médico y servicio. */
+  async availability(params: {
+    clinicId: string; doctorId: string; serviceId: string; from: string; days: number;
+    excludeAppointmentId?: string; durationMinutes?: number; now?: Date;
+  }) {
+    const clinic = await this.prisma.clinic.findUniqueOrThrow({ where: { id: params.clinicId } });
+    const { doctor, service } = await this.loadDoctorService(this.prisma, params.clinicId, params.doctorId, params.serviceId);
+    const days = Math.min(Math.max(params.days, 1), MAX_AVAILABILITY_DAYS);
+    const first = parseLocalDate(params.from, clinic.timezone);
+    if (!first) throw new BadRequestException('Fecha inválida');
+    const rangeStart = first.toJSDate();
+    const rangeEnd = first.plus({ days }).toJSDate();
+    const now = params.now ?? new Date();
+    const [rules, appointments, timeOffs] = await Promise.all([
+      this.prisma.scheduleRule.findMany({ where: { doctorId: doctor.id } }),
+      this.prisma.appointment.findMany({
+        where: {
+          doctorId: doctor.id, status: { not: 'CANCELLED' },
+          startsAt: { lt: rangeEnd }, endsAt: { gt: rangeStart },
+          ...(params.excludeAppointmentId ? { id: { not: params.excludeAppointmentId } } : {}),
+        },
+        select: { startsAt: true, endsAt: true },
+      }),
+      this.prisma.timeOff.findMany({
+        where: { doctorId: doctor.id, startsAt: { lt: rangeEnd }, endsAt: { gt: rangeStart } },
+        select: { startsAt: true, endsAt: true },
+      }),
+    ]);
+    const busy = [
+      ...appointments.map((a) => ({ start: a.startsAt, end: a.endsAt })),
+      ...timeOffs.map((t) => ({ start: t.startsAt, end: t.endsAt })),
+    ];
+    const days_ = computeSlots({
+      timezone: clinic.timezone,
+      rules,
+      durationMinutes: params.durationMinutes ?? service.durationMinutes,
+      busy,
+      fromDate: first.toISODate()!,
+      days,
+      earliest: new Date(now.getTime() + clinic.minNoticeMinutes * 60_000),
+      latest: DateTime.fromJSDate(now).plus({ days: clinic.horizonDays }).toJSDate(),
+    });
+    return {
+      timezone: clinic.timezone,
+      doctor: { id: doctor.id, displayName: doctor.displayName },
+      service: { id: service.id, name: service.name, durationMinutes: service.durationMinutes, priceCents: service.priceCents },
+      days: days_,
+    };
+  }
+
+  /** Crea una cita. Reintentos con el mismo requestId y cuerpo devuelven la misma cita. */
+  async book(input: BookingInput): Promise<{ appointment: Appointment; replayed: boolean }> {
+    const requestKey = `${input.actor.kind}:${input.actor.id}:${input.requestId}`;
+    const requestHash = canonicalHash({
+      clinicId: input.clinicId, doctorId: input.doctorId, serviceId: input.serviceId,
+      clinicPatientId: input.clinicPatientId, startsAt: input.startsAt.toISOString(), notes: input.notes,
+    });
+    const replay = async () => {
+      const existing = await this.prisma.appointment.findUnique({ where: { requestKey } });
+      if (!existing) return null;
+      if (existing.requestHash !== requestHash) {
+        throw new ConflictException('Esa referencia de envío ya se usó con otros datos');
+      }
+      return { appointment: existing, replayed: true };
+    };
+    const previous = await replay();
+    if (previous) return previous;
+
+    if (input.startsAt.getUTCSeconds() !== 0 || input.startsAt.getUTCMilliseconds() !== 0) {
+      throw new BadRequestException('La hora debe estar en minutos exactos');
+    }
+
+    try {
+      const appointment = await this.prisma.$transaction(async (tx) => {
+        const clinic = await tx.clinic.findUniqueOrThrow({ where: { id: input.clinicId } });
+        const { doctor, service } = await this.loadDoctorService(tx, input.clinicId, input.doctorId, input.serviceId);
+        await lockDoctor(tx, doctor.id);
+        const now = new Date();
+        const startsAt = input.startsAt;
+        const endsAt = new Date(startsAt.getTime() + service.durationMinutes * 60_000);
+
+        if (input.source === 'ONLINE') {
+          if (!clinic.bookingEnabled) throw new ForbiddenException('La clínica no acepta reservas en línea por ahora');
+          await this.assertOnlineSlot(tx, clinic, doctor.id, service.durationMinutes, startsAt, now, null);
+          const future = await tx.appointment.count({
+            where: { clinicPatientId: input.clinicPatientId, status: 'BOOKED', startsAt: { gt: now } },
+          });
+          if (future >= MAX_FUTURE_ONLINE_APPOINTMENTS) {
+            throw new ConflictException(
+              `Puedes tener hasta ${MAX_FUTURE_ONLINE_APPOINTMENTS} citas próximas en esta clínica.`,
+            );
+          }
+        } else {
+          await this.assertStaffSlot(tx, clinic.timezone, doctor.id, service.durationMinutes, startsAt, now);
+        }
+
+        const patientOverlap = await tx.appointment.count({
+          where: {
+            clinicPatientId: input.clinicPatientId, status: 'BOOKED',
+            startsAt: { lt: endsAt }, endsAt: { gt: startsAt },
+          },
+        });
+        if (patientOverlap > 0) throw new ConflictException('El paciente ya tiene una cita en ese horario');
+
+        const created = await tx.appointment.create({
+          data: {
+            clinicId: input.clinicId, doctorId: doctor.id, serviceId: service.id,
+            clinicPatientId: input.clinicPatientId, startsAt, endsAt, source: input.source,
+            serviceName: service.name, durationMinutes: service.durationMinutes, priceCents: service.priceCents,
+            patientNotes: input.notes, requestKey, requestHash,
+          },
+        });
+        await tx.appointmentEvent.create({
+          data: {
+            appointmentId: created.id, type: 'CREATED', actorKind: input.actor.kind,
+            actorId: input.actor.id, actorName: input.actor.name, toStartsAt: startsAt,
+          },
+        });
+        return created;
+      });
+      return { appointment, replayed: false };
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        const again = await replay();
+        if (again) return again;
+      }
+      if (isDoubleBooking(e)) throw new ConflictException(SLOT_TAKEN);
+      throw e;
+    }
+  }
+
+  /** Cancela una cita vigente. Repetir la cancelación devuelve la cita sin cambios. */
+  async cancel(params: {
+    appointment: Appointment; reason: string; actor: Actor; minMinutesBefore: number | null;
+  }): Promise<Appointment> {
+    const { appointment, actor } = params;
+    return this.prisma.$transaction(async (tx) => {
+      await lockDoctor(tx, appointment.doctorId);
+      const current = await tx.appointment.findUniqueOrThrow({ where: { id: appointment.id } });
+      if (current.status === 'CANCELLED') return current;
+      if (current.status !== 'BOOKED') throw new ConflictException('La cita ya fue atendida o marcada como no asistió');
+      const now = new Date();
+      if (current.startsAt <= now) throw new ConflictException('La cita ya comenzó');
+      if (params.minMinutesBefore !== null && current.startsAt.getTime() - now.getTime() < params.minMinutesBefore * 60_000) {
+        throw new ConflictException('Ya no es posible cancelar en línea. Comunícate con la clínica.');
+      }
+      const updated = await tx.appointment.update({
+        where: { id: current.id }, data: { status: 'CANCELLED', cancelReason: params.reason },
+      });
+      await tx.appointmentEvent.create({
+        data: {
+          appointmentId: current.id, type: 'CANCELLED', actorKind: actor.kind, actorId: actor.id,
+          actorName: actor.name, reason: params.reason, fromStartsAt: current.startsAt,
+        },
+      });
+      return updated;
+    });
+  }
+
+  /**
+   * Reprograma una cita. expectedStartsAt detecta cambios concurrentes; si la cita
+   * ya está en el horario solicitado se devuelve sin cambios (reintento).
+   */
+  async reschedule(params: {
+    appointment: Appointment; startsAt: Date; expectedStartsAt: Date; actor: Actor; online: boolean;
+  }): Promise<Appointment> {
+    const { actor } = params;
+    if (params.startsAt.getUTCSeconds() !== 0 || params.startsAt.getUTCMilliseconds() !== 0) {
+      throw new BadRequestException('La hora debe estar en minutos exactos');
+    }
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        await lockDoctor(tx, params.appointment.doctorId);
+        const current = await tx.appointment.findUniqueOrThrow({ where: { id: params.appointment.id } });
+        if (current.status !== 'BOOKED') throw new ConflictException('Sólo se pueden reprogramar citas vigentes');
+        if (current.startsAt.getTime() === params.startsAt.getTime()) return current;
+        if (current.startsAt.getTime() !== params.expectedStartsAt.getTime()) {
+          throw new ConflictException('La cita cambió mientras tanto. Actualiza e inténtalo de nuevo.');
+        }
+        const clinic = await tx.clinic.findUniqueOrThrow({ where: { id: current.clinicId } });
+        const now = new Date();
+        if (current.startsAt <= now) throw new ConflictException('La cita ya comenzó');
+        if (params.online) {
+          if (!clinic.bookingEnabled) throw new ForbiddenException('La clínica no acepta cambios en línea por ahora');
+          if (current.startsAt.getTime() - now.getTime() < clinic.patientCancelMinMinutes * 60_000) {
+            throw new ConflictException('Ya no es posible reprogramar en línea. Comunícate con la clínica.');
+          }
+          await this.assertOnlineSlot(tx, clinic, current.doctorId, current.durationMinutes, params.startsAt, now, current.id);
+        } else {
+          await this.assertStaffSlot(tx, clinic.timezone, current.doctorId, current.durationMinutes, params.startsAt, now);
+        }
+        const endsAt = new Date(params.startsAt.getTime() + current.durationMinutes * 60_000);
+        const patientOverlap = await tx.appointment.count({
+          where: {
+            clinicPatientId: current.clinicPatientId, status: 'BOOKED', id: { not: current.id },
+            startsAt: { lt: endsAt }, endsAt: { gt: params.startsAt },
+          },
+        });
+        if (patientOverlap > 0) throw new ConflictException('El paciente ya tiene otra cita en ese horario');
+        const updated = await tx.appointment.update({
+          where: { id: current.id }, data: { startsAt: params.startsAt, endsAt },
+        });
+        await tx.appointmentEvent.create({
+          data: {
+            appointmentId: current.id, type: 'RESCHEDULED', actorKind: actor.kind, actorId: actor.id,
+            actorName: actor.name, fromStartsAt: current.startsAt, toStartsAt: params.startsAt,
+          },
+        });
+        return updated;
+      });
+    } catch (e) {
+      if (isDoubleBooking(e)) throw new ConflictException(SLOT_TAKEN);
+      throw e;
+    }
+  }
+
+  /** Marca una cita como atendida o no asistió (sólo después de su hora de inicio). */
+  async markOutcome(params: {
+    appointment: Appointment; status: 'COMPLETED' | 'NO_SHOW'; expectedStatus: string; actor: Actor;
+  }): Promise<Appointment> {
+    return this.prisma.$transaction(async (tx) => {
+      await lockDoctor(tx, params.appointment.doctorId);
+      const current = await tx.appointment.findUniqueOrThrow({ where: { id: params.appointment.id } });
+      if (current.status === params.status) return current;
+      if (current.status !== params.expectedStatus || current.status !== 'BOOKED') {
+        throw new ConflictException('La cita cambió mientras tanto. Actualiza e inténtalo de nuevo.');
+      }
+      if (current.startsAt > new Date()) {
+        throw new ConflictException('Sólo puedes registrar asistencia cuando la cita ya comenzó');
+      }
+      const updated = await tx.appointment.update({ where: { id: current.id }, data: { status: params.status } });
+      await tx.appointmentEvent.create({
+        data: {
+          appointmentId: current.id, type: params.status, actorKind: params.actor.kind,
+          actorId: params.actor.id, actorName: params.actor.name,
+        },
+      });
+      return updated;
+    });
+  }
+
+  private async loadDoctorService(tx: Tx | PrismaService, clinicId: string, doctorId: string, serviceId: string) {
+    const doctor = await tx.doctor.findFirst({ where: { id: doctorId, clinicId, active: true } });
+    if (!doctor) throw new NotFoundException('Médico no disponible');
+    const service = await tx.service.findFirst({
+      where: { id: serviceId, clinicId, active: true, doctors: { some: { doctorId } } },
+    });
+    if (!service) throw new NotFoundException('Servicio no disponible con este médico');
+    return { doctor, service };
+  }
+
+  /** El horario solicitado debe coincidir exactamente con un horario disponible publicado. */
+  private async assertOnlineSlot(
+    tx: Tx,
+    clinic: { timezone: string; minNoticeMinutes: number; horizonDays: number },
+    doctorId: string, durationMinutes: number, startsAt: Date, now: Date, excludeId: string | null,
+  ) {
+    const day = DateTime.fromJSDate(startsAt, { zone: clinic.timezone }).startOf('day');
+    const dayStart = day.toJSDate();
+    const dayEnd = day.plus({ days: 1 }).toJSDate();
+    const [rules, appointments, timeOffs] = await Promise.all([
+      tx.scheduleRule.findMany({ where: { doctorId } }),
+      tx.appointment.findMany({
+        where: {
+          doctorId, status: { not: 'CANCELLED' }, startsAt: { lt: dayEnd }, endsAt: { gt: dayStart },
+          ...(excludeId ? { id: { not: excludeId } } : {}),
+        },
+        select: { startsAt: true, endsAt: true },
+      }),
+      tx.timeOff.findMany({
+        where: { doctorId, startsAt: { lt: dayEnd }, endsAt: { gt: dayStart } },
+        select: { startsAt: true, endsAt: true },
+      }),
+    ]);
+    const [slotsDay] = computeSlots({
+      timezone: clinic.timezone, rules, durationMinutes,
+      busy: [...appointments, ...timeOffs].map((b) => ({ start: b.startsAt, end: b.endsAt })),
+      fromDate: day.toISODate()!, days: 1,
+      earliest: new Date(now.getTime() + clinic.minNoticeMinutes * 60_000),
+      latest: DateTime.fromJSDate(now).plus({ days: clinic.horizonDays }).toJSDate(),
+    });
+    const wanted = startsAt.getTime();
+    if (!slotsDay?.slots.some((s) => new Date(s.startsAt).getTime() === wanted)) {
+      throw new ConflictException(SLOT_TAKEN);
+    }
+  }
+
+  /** Personal: dentro del horario del médico, sin bloqueos y en el futuro. */
+  private async assertStaffSlot(
+    tx: Tx, timezone: string, doctorId: string, durationMinutes: number, startsAt: Date, now: Date,
+  ) {
+    if (startsAt <= now) throw new BadRequestException('La cita debe ser en el futuro');
+    if (startsAt.getTime() - now.getTime() > 400 * 24 * 3600_000) {
+      throw new BadRequestException('La cita está demasiado lejos en el futuro');
+    }
+    const local = DateTime.fromJSDate(startsAt, { zone: timezone });
+    if (local.minute % 5 !== 0) throw new BadRequestException('La hora debe ir en múltiplos de 5 minutos');
+    const rules = await tx.scheduleRule.findMany({ where: { doctorId } });
+    if (!fitsWeeklySchedule(startsAt, durationMinutes, timezone, rules)) {
+      throw new ConflictException('Ese horario está fuera del horario de atención del médico');
+    }
+    const endsAt = new Date(startsAt.getTime() + durationMinutes * 60_000);
+    const blocked = await tx.timeOff.count({
+      where: { doctorId, startsAt: { lt: endsAt }, endsAt: { gt: startsAt } },
+    });
+    if (blocked > 0) throw new ConflictException('El médico tiene un bloqueo en ese horario');
+  }
+}

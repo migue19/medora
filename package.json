@@ -1,0 +1,24 @@
+{
+  "name": "medora",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Medora · agenda y reservas en línea para clínicas",
+  "workspaces": [
+    "apps/api",
+    "apps/web"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "npm run dev -w @medora/api & npm run dev -w @medora/web",
+    "build": "npm run build -w @medora/api && npm run build -w @medora/web",
+    "typecheck": "npm run typecheck -w @medora/api && npm run typecheck -w @medora/web",
+    "test": "npm test -w @medora/api",
+    "test:integration": "npm run test:integration -w @medora/api",
+    "db:generate": "npm run db:generate -w @medora/api",
+    "db:migrate": "npm run db:migrate -w @medora/api",
+    "db:seed": "npm run db:seed -w @medora/api",
+    "verify:local": "bash scripts/verify-local.sh"
+  }
+}
