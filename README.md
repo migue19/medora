@@ -207,6 +207,19 @@ docker compose logs --tail=100 api web db
 docker compose stop          # down conserva el volumen; no usar down -v con datos reales
 ```
 
+## Respaldos
+
+`scripts/backup-db.sh` genera un `pg_dump` en formato custom en `/var/backups/medora` (modo 600), comprueba que `pg_restore` puede leerlo y borra los de más de 14 días (`BACKUP_KEEP_DAYS`). `scripts/restore-check.sh` restaura el más reciente en un PostgreSQL temporal sin red y cuenta registros. En el VPS, `/etc/cron.d/medora-backup` ejecuta el respaldo a diario a las 03:15 (Ciudad de México) y la prueba de restauración cada domingo; la bitácora está en `/var/log/medora-backup.log`.
+
+```sh
+scripts/backup-db.sh
+scripts/restore-check.sh
+# Restaurar en producción (detener api/web antes):
+docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner' < /var/backups/medora/medora-AAAAMMDD-HHMMSS.dump
+```
+
+Los respaldos viven en el mismo VPS: protegen contra errores y borrados, no contra la pérdida del servidor. Pendiente: copia diaria fuera del VPS.
+
 ## Desarrollo sin Docker
 
 Requisitos: Node 24 y PostgreSQL 17 local (por ejemplo, `brew install postgresql@17`).
