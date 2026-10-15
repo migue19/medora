@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { FormEvent, useState } from 'react';
 import { ApiError, errorMessage, patientSession } from '@/lib/api';
 
@@ -43,7 +44,9 @@ export function PatientAuthForm({ onDone }: { onDone?: () => void }) {
         <input name="password" type="password" required minLength={mode === 'register' ? 10 : 1}
           autoComplete={mode === 'register' ? 'new-password' : 'current-password'} />
       </label>
-      {mode === 'register' && <p className="muted small">Mínimo 10 caracteres. Tus datos sólo se comparten con las clínicas donde reservas.</p>}
+      {mode === 'register'
+        ? <p className="muted small">Mínimo 10 caracteres. Te enviaremos un enlace para confirmar tu correo. Tus datos sólo se comparten con las clínicas donde reservas.</p>
+        : <p className="small"><Link href="/recuperar?tipo=paciente">¿Olvidaste tu contraseña?</Link></p>}
       {error && <div className="alert error" role="alert">{error}</div>}
       <button className="primary" disabled={busy}>{busy ? 'Un momento…' : mode === 'login' ? 'Entrar' : 'Crear cuenta'}</button>
     </form>

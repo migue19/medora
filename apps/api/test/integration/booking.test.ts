@@ -1,8 +1,8 @@
 import { after, before, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  Client, Harness, createClinicWithOwner, localIso, loginStaff, nextMonday, randomUUID, registerPatient, resetDb,
-  startHarness,
+  Client, Harness, addStaff, createClinicWithOwner, localIso, loginStaff, nextMonday, randomUUID, registerPatient,
+  resetDb, startHarness,
 } from './harness';
 
 let h: Harness;
@@ -175,9 +175,9 @@ test('bloqueos de agenda', async () => {
 });
 
 test('recepción agenda a un paciente telefónico y el médico ve sólo su agenda', async () => {
-  await owner.post('/api/clinic/members', { name: 'Rec', email: 'rec@test.mx', password: 'recepcionista-1', role: 'RECEPTION' });
-  const docMember = await owner.post('/api/clinic/members', { name: 'Dr Juan', email: 'juan@test.mx', password: 'medico-seguro-01', role: 'DOCTOR' });
-  assert.equal((await owner.patch(`/api/clinic/doctors/${doctorId}`, { membershipId: docMember.body.id })).status, 200);
+  await addStaff(h, owner, { name: 'Rec', email: 'rec@test.mx', password: 'recepcionista-1', role: 'RECEPTION' });
+  const docMember = await addStaff(h, owner, { name: 'Dr Juan', email: 'juan@test.mx', password: 'medico-seguro-01', role: 'DOCTOR' });
+  assert.equal((await owner.patch(`/api/clinic/doctors/${doctorId}`, { membershipId: docMember.membershipId })).status, 200);
   const other = await owner.post('/api/clinic/doctors', { displayName: 'Dra. Otra', specialty: 'Pediatría', serviceIds: [serviceId] });
   await owner.put(`/api/clinic/doctors/${other.body.id}/schedule`, { rules: [{ weekday: 1, startMinute: 540, endMinute: 600 }] });
 

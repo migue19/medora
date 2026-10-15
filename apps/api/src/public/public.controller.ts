@@ -1,5 +1,5 @@
 import {
-  Body, Controller, Get, NotFoundException, Param, ParseUUIDPipe, Post, Query, Req, UseGuards,
+  Body, Controller, ForbiddenException, Get, NotFoundException, Param, ParseUUIDPipe, Post, Query, Req, UseGuards,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { Transform, Type } from 'class-transformer';
@@ -93,6 +93,9 @@ export class PublicController {
   @UseGuards(PatientGuard)
   async book(@Param('slug') slug: string, @Patient() patient: PatientContext, @Body() dto: BookDto) {
     const clinic = await this.clinic(slug);
+    if (!patient.emailVerified) {
+      throw new ForbiddenException('Confirma tu correo para reservar. Te enviamos un enlace al registrarte.');
+    }
     // Ficha del paciente en la clínica: se crea al reservar por primera vez.
     const clinicPatient = await this.prisma.clinicPatient.upsert({
       where: { clinicId_patientAccountId: { clinicId: clinic.id, patientAccountId: patient.id } },

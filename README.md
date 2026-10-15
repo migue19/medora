@@ -1,4 +1,4 @@
-# Medora · Sprint 1
+# Medora · Sprint 2
 
 Agenda y reservas de citas médicas en línea para clínicas y consultorios (SaaS multi-clínica). Monorepo npm con Next.js 16 / React 19 (PWA), NestJS 11, Prisma 6 y PostgreSQL 17. Node.js 24 LTS recomendado. Mismo stack y criterios de seguridad que Tavixo.
 
@@ -9,7 +9,7 @@ Objetivo: llegar a la funcionalidad de una plataforma tipo Doctoralia sobre una 
 | Sprint | Tema | Estado |
 |---|---|---|
 | 1 | Base, autenticación, agenda y reservas en línea | ✅ Entregado |
-| 2 | Correo, verificación de cuenta y recuperación de contraseña | Pendiente |
+| 2 | Correo, verificación de cuenta y recuperación de contraseña | ✅ Entregado |
 | 3 | Recordatorios y confirmación de asistencia (WhatsApp y correo) | Pendiente |
 | 4 | Ficha del paciente, vinculación de cuentas y lista de espera | Pendiente |
 | 5 | Sedes, consultorios y perfil profesional completo | Pendiente |
@@ -27,7 +27,9 @@ Objetivo: llegar a la funcionalidad de una plataforma tipo Doctoralia sobre una 
 
 Clínicas multi-tenant, roles OWNER/ADMIN/RECEPTION/DOCTOR, autenticación con refresh rotativo para el personal y para pacientes, servicios, médicos, horario semanal, bloqueos, disponibilidad, página pública de reservas, portal del paciente, panel de agenda, citas por teléfono, reprogramación, cancelación y asistencia. PostgreSQL impide el doble agendado. Detalle en [Alcance del Sprint 1](#alcance-del-sprint-1).
 
-### Sprint 2 · Correo y cuentas
+### Sprint 2 · Correo y cuentas ✅
+
+Entregado como se planeó, con un cambio: en lugar de pg-boss, la cola es una tabla propia (`Job`) que se escribe **en la misma transacción** que el cambio de negocio. Así un correo existe si y sólo si la cita, el registro o la invitación se confirmaron (pg-boss usa su propia conexión y no puede participar en la transacción de Prisma). El trabajador reclama trabajos con `FOR UPDATE SKIP LOCKED` y un arrendamiento de 5 minutos, reintenta con espera exponencial (30 s → 1 h, 8 intentos) y, al terminar, borra el cuerpo del correo y conserva sólo destinatario y asunto. Detalle en [SPRINT2_RESULTS.md](SPRINT2_RESULTS.md) y en [Correo](#correo-smtp).
 
 - Envío de correo transaccional con proveedor configurable (SMTP o un servicio tipo Resend o SES) y plantillas en español.
 - Cola de trabajos persistente en PostgreSQL (por ejemplo, pg-boss) con reintentos e idempotencia. Será la base de los recordatorios.
@@ -180,6 +182,32 @@ scripts/           verificación local con PostgreSQL temporal en Docker
 compose.yaml       servicios aislados del proyecto medora
 ```
 
+## Correo (SMTP)
+
+La API envía los correos por SMTP con nodemailer. Variables:
+
+| Variable | Ejemplo | Notas |
+|---|---|---|
+| `SMTP_HOST` | `smtp.hostinger.com` | Obligatoria en producción. Sin ella (desarrollo) los correos se escriben en la bitácora de la API. |
+| `SMTP_PORT` | `465` | 465 usa TLS directo; otro puerto usa STARTTLS obligatorio. |
+| `SMTP_USER` | `no-reply@nut.com.mx` | Buzón que envía. |
+| `SMTP_PASSWORD` | — | Contraseña del buzón. Sólo en `.env` del servidor. |
+| `MAIL_FROM` | `Medora <no-reply@nut.com.mx>` | Debe usar el mismo dominio del buzón (SPF/DKIM). |
+| `JOBS_POLL_MS` | `2000` | Intervalo del trabajador de la cola. |
+
+Los enlaces de los correos llevan el token en el fragmento (`/verificar#…`, `/restablecer?tipo=paciente#…`, `/invitacion#…`): el navegador no lo envía al servidor ni en el Referer, y la página lo quita de la barra de direcciones al leerlo. Vigencias: verificación 24 h, recuperación 30 min, invitación 7 días.
+
+Para revisar la cola en el servidor, abre `psql` y consulta los últimos trabajos:
+
+```sh
+docker compose exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+```
+
+```sql
+SELECT type, payload->>'to' AS para, attempts, "lastError", "completedAt", "failedAt"
+FROM "Job" ORDER BY "createdAt" DESC LIMIT 20;
+```
+
 ## Arranque con Docker Compose (local)
 
 Requisitos: Docker Desktop con Compose v2 y los puertos 6010/6011 libres. Estos puertos no chocan con Tavixo (6000/6001).
@@ -252,7 +280,13 @@ La API escucha en 127.0.0.1:6010 y Next en 127.0.0.1:6011. `WEB_ORIGIN` debe coi
 | GET | /api/public/clinics/:slug/doctors/:id/availability?serviceId&from&days | Público (máx. 14 días) |
 | POST | /api/public/clinics/:slug/appointments | Paciente; `requestId`, `doctorId`, `serviceId`, `startsAt`, `notes` |
 | GET / PATCH | /api/clinic | Todos / OWNER, ADMIN |
-| GET / POST / PATCH | /api/clinic/members | OWNER, ADMIN según jerarquía |
+| POST | /api/auth/forgot · reset | Personal; Origin. `forgot` siempre responde 204 |
+| POST | /api/auth/invitations/inspect · accept | Público con el token de la invitación; Origin |
+| POST | /api/patient/auth/verify-email · forgot · reset | Paciente; Origin |
+| POST | /api/patient/me/resend-verification | Paciente (3 por hora) |
+| GET / PATCH | /api/clinic/members | OWNER, ADMIN según jerarquía |
+| GET / POST | /api/clinic/invitations | OWNER, ADMIN según jerarquía |
+| POST | /api/clinic/invitations/:id/resend · revoke | OWNER, ADMIN según jerarquía |
 | GET / POST | /api/clinic/patients | OWNER, ADMIN, RECEPTION |
 | GET / POST / PATCH | /api/clinic/services | Todos / OWNER, ADMIN |
 | GET / POST / PATCH | /api/clinic/doctors | Todos / OWNER, ADMIN |

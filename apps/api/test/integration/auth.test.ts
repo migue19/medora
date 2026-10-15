@@ -1,6 +1,8 @@
 import { after, before, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Client, Harness, createClinicWithOwner, loginStaff, registerPatient, resetDb, startHarness } from './harness';
+import {
+  Client, Harness, addStaff, createClinicWithOwner, loginStaff, registerPatient, resetDb, startHarness,
+} from './harness';
 
 let h: Harness;
 before(async () => { h = await startHarness(); });
@@ -85,19 +87,17 @@ test('registro, login y sesión de pacientes separada del personal', async () =>
 test('jerarquía de roles en el equipo', async () => {
   const { email, password } = await createClinicWithOwner(h.prisma, 'clinica-a');
   const owner = await loginStaff(h.base, email, password, 'clinica-a');
-  const admin = await owner.post('/api/clinic/members', { name: 'Admin', email: 'admin@test.mx', password: 'administrador-1', role: 'ADMIN' });
-  assert.equal(admin.status, 201);
-  assert.equal((await owner.post('/api/clinic/members', { name: 'Dup', email: 'ADMIN@test.mx', password: 'administrador-1', role: 'RECEPTION' })).status, 409);
-  assert.equal((await owner.post('/api/clinic/members', { name: 'Otro dueño', email: 'o2@test.mx', password: 'administrador-1', role: 'OWNER' })).status, 403);
+  const admin = await addStaff(h, owner, { name: 'Admin', email: 'admin@test.mx', password: 'administrador-1', role: 'ADMIN' });
+  assert.equal((await owner.post('/api/clinic/invitations', { name: 'Dup', email: 'ADMIN@test.mx', role: 'RECEPTION' })).status, 409);
+  assert.equal((await owner.post('/api/clinic/invitations', { name: 'Otro dueño', email: 'o2@test.mx', role: 'OWNER' })).status, 403);
   const adminClient = await loginStaff(h.base, 'admin@test.mx', 'administrador-1', 'clinica-a');
-  assert.equal((await adminClient.post('/api/clinic/members', { name: 'Admin2', email: 'a2@test.mx', password: 'administrador-1', role: 'ADMIN' })).status, 403);
-  const rec = await adminClient.post('/api/clinic/members', { name: 'Recepción', email: 'rec@test.mx', password: 'recepcionista-1', role: 'RECEPTION' });
-  assert.equal(rec.status, 201);
+  assert.equal((await adminClient.post('/api/clinic/invitations', { name: 'Admin2', email: 'a2@test.mx', role: 'ADMIN' })).status, 403);
+  const rec = { body: { id: (await addStaff(h, adminClient, { name: 'Recepción', email: 'rec@test.mx', password: 'recepcionista-1', role: 'RECEPTION' })).membershipId } };
   const recClient = await loginStaff(h.base, 'rec@test.mx', 'recepcionista-1', 'clinica-a');
   assert.equal((await recClient.get('/api/clinic/members')).status, 403);
   assert.equal((await recClient.post('/api/clinic/services', { name: 'X', durationMinutes: 30, priceCents: 0 })).status, 403);
   // Desactivar revoca sus sesiones.
   assert.equal((await adminClient.patch(`/api/clinic/members/${rec.body.id}`, { active: false })).status, 200);
   assert.equal((await recClient.get('/api/clinic')).status, 401);
-  assert.equal((await adminClient.patch(`/api/clinic/members/${admin.body.id}`, { active: false })).status, 403);
+  assert.equal((await adminClient.patch(`/api/clinic/members/${admin.membershipId}`, { active: false })).status, 403);
 });

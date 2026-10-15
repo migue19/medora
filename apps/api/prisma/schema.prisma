@@ -1,4 +1,4 @@
-// Medora · Sprint 1
+// Medora · Sprint 2
 // Todas las entidades de negocio llevan clinicId y se consultan siempre
 // filtradas por la clínica obtenida de la sesión.
 
@@ -41,6 +41,12 @@ enum ActorKind {
   PATIENT
 }
 
+enum AuthTokenKind {
+  PATIENT_VERIFY_EMAIL
+  PATIENT_RESET_PASSWORD
+  STAFF_RESET_PASSWORD
+}
+
 enum AppointmentEventType {
   CREATED
   RESCHEDULED
@@ -65,6 +71,7 @@ model Clinic {
   updatedAt               DateTime @updatedAt @db.Timestamptz(3)
 
   memberships    Membership[]
+  invitations    StaffInvitation[]
   doctors        Doctor[]
   services       Service[]
   clinicPatients ClinicPatient[]
@@ -81,6 +88,7 @@ model User {
   updatedAt    DateTime @updatedAt @db.Timestamptz(3)
 
   memberships Membership[]
+  authTokens  AuthToken[]
 }
 
 model Membership {
@@ -106,14 +114,16 @@ model PatientAccount {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique @db.VarChar(254)
   name         String   @db.VarChar(120)
-  phone        String   @db.VarChar(30)
-  passwordHash String   @db.VarChar(255)
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+  phone           String    @db.VarChar(30)
+  passwordHash    String    @db.VarChar(255)
+  emailVerifiedAt DateTime? @db.Timestamptz(3)
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
 
   clinicPatients ClinicPatient[]
   sessions       RefreshSession[]
+  authTokens     AuthToken[]
 }
 
 model RefreshSession {
@@ -285,4 +295,61 @@ model AppointmentEvent {
   appointment Appointment @relation(fields: [appointmentId], references: [id])
 
   @@index([appointmentId])
+}
+
+// Token de un solo uso enviado por correo (verificación y recuperación de contraseña).
+// Sólo se guarda el SHA-256; el token en claro viaja únicamente en el correo.
+model AuthToken {
+  id               String        @id @default(uuid()) @db.Uuid
+  kind             AuthTokenKind
+  tokenHash        String        @unique @db.Char(64)
+  patientAccountId String?       @db.Uuid
+  userId           String?       @db.Uuid
+  email            String        @db.VarChar(254)
+  expiresAt        DateTime      @db.Timestamptz(3)
+  usedAt           DateTime?     @db.Timestamptz(3)
+  createdAt        DateTime      @default(now()) @db.Timestamptz(3)
+
+  patientAccount PatientAccount? @relation(fields: [patientAccountId], references: [id])
+  user           User?           @relation(fields: [userId], references: [id])
+
+  @@index([patientAccountId])
+  @@index([userId])
+}
+
+// Invitación al personal: reemplaza la contraseña inicial compartida.
+model StaffInvitation {
+  id           String    @id @default(uuid()) @db.Uuid
+  clinicId     String    @db.Uuid
+  email        String    @db.VarChar(254)
+  name         String    @db.VarChar(120)
+  role         StaffRole
+  tokenHash    String    @unique @db.Char(64)
+  invitedById  String    @db.Uuid
+  expiresAt    DateTime  @db.Timestamptz(3)
+  acceptedAt   DateTime? @db.Timestamptz(3)
+  revokedAt    DateTime? @db.Timestamptz(3)
+  membershipId String?   @db.Uuid
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+
+  @@index([clinicId])
+}
+
+// Cola de trabajos persistente. Se inserta en la misma transacción que el cambio
+// de negocio, así que un trabajo existe si y sólo si el cambio se confirmó.
+model Job {
+  id          String    @id @default(uuid()) @db.Uuid
+  type        String    @db.VarChar(60)
+  payload     Json
+  dedupeKey   String?   @unique @db.VarChar(200)
+  runAt       DateTime  @default(now()) @db.Timestamptz(3)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(8)
+  lockedUntil DateTime? @db.Timestamptz(3)
+  completedAt DateTime? @db.Timestamptz(3)
+  failedAt    DateTime? @db.Timestamptz(3)
+  lastError   String?   @db.VarChar(1000)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
 }

@@ -1,5 +1,6 @@
 'use client';
-import { FormEvent, useState } from 'react';
+import Link from 'next/link';
+import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Header } from '@/components/Header';
 import { ApiError, errorMessage, staffSession } from '@/lib/api';
@@ -8,6 +9,9 @@ export default function StaffLogin() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [slug, setSlug] = useState('');
+  // Llega desde la invitación aceptada: /login?clinica=<slug>
+  useEffect(() => { setSlug(new URLSearchParams(window.location.search).get('clinica') ?? ''); }, []);
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -31,12 +35,14 @@ export default function StaffLogin() {
       <main className="container narrow section">
         <form className="card stack" onSubmit={submit}>
           <h1>Acceso para clínicas</h1>
-          <label>Clínica (identificador)<input name="clinicSlug" required pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="mi-clinica" autoCapitalize="none" /></label>
+          <label>Clínica (identificador)<input name="clinicSlug" required pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="mi-clinica" autoCapitalize="none"
+            value={slug} onChange={(e) => setSlug(e.target.value)} /></label>
           <label>Correo<input name="email" type="email" required autoComplete="username" /></label>
           <label>Contraseña<input name="password" type="password" required autoComplete="current-password" /></label>
           {error && <div className="alert error" role="alert">{error}</div>}
           <button className="primary" disabled={busy}>{busy ? 'Entrando…' : 'Entrar'}</button>
-          <p className="muted small">No hay registro público: el propietario de la clínica da de alta al equipo.</p>
+          <p className="small"><Link href="/recuperar?tipo=personal">¿Olvidaste tu contraseña?</Link></p>
+          <p className="muted small">No hay registro público: el propietario o un administrador te invita por correo.</p>
         </form>
       </main>
     </>

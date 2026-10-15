@@ -1,15 +1,16 @@
 import {
-  BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, NotFoundException, Param,
+  BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, HttpCode, NotFoundException, Param,
   ParseUUIDPipe, Patch, Post, Query, UseGuards,
 } from '@nestjs/common';
-import { Prisma, StaffRole } from '@prisma/client';
+import { StaffInvitation, StaffRole } from '@prisma/client';
 import { Transform } from 'class-transformer';
 import {
   IsBoolean, IsEmail, IsEnum, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength, ValidateIf,
 } from 'class-validator';
-import { PrismaService } from '../prisma.service';
-import { hashPassword } from '../common/crypto';
+import { PrismaService, Tx } from '../prisma.service';
+import { randomToken, sha256 } from '../common/crypto';
 import { normalizeEmail } from '../common/http';
+import { MailService } from '../mail/mail.service';
 import { Roles, Staff, StaffContext, StaffGuard } from '../auth/guards';
 import { PHONE_PATTERN } from '../patient/patient-auth.controller';
 
@@ -29,11 +30,19 @@ class UpdateClinicDto {
   @IsOptional() @IsInt() @Min(0) @Max(10080) patientCancelMinMinutes?: number;
 }
 
-class CreateMemberDto {
+class InviteDto {
   @Transform(trim) @IsString() @MinLength(2) @MaxLength(120) name: string;
   @IsEmail() @MaxLength(254) email: string;
-  @IsString() @MinLength(12) @MaxLength(200) password: string;
   @IsEnum(StaffRole) role: StaffRole;
+}
+
+export const INVITATION_TTL_MS = 7 * 24 * 60 * 60_000;
+
+function serializeInvitation(i: StaffInvitation) {
+  return {
+    id: i.id, name: i.name, email: i.email, role: i.role, createdAt: i.createdAt, expiresAt: i.expiresAt,
+    expired: i.expiresAt <= new Date(),
+  };
 }
 
 class UpdateMemberDto {
@@ -62,7 +71,7 @@ function manageableRoles(actor: StaffRole): StaffRole[] {
 @Controller('api/clinic')
 @UseGuards(StaffGuard)
 export class ClinicController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly mail: MailService) {}
 
   @Get()
   async get(@Staff() staff: StaffContext) {
@@ -92,33 +101,93 @@ export class ClinicController {
     }));
   }
 
-  @Post('members')
+  // ---------------------------------------------------------- Invitaciones
+  @Get('invitations')
   @Roles('OWNER', 'ADMIN')
-  async createMember(@Staff() staff: StaffContext, @Body() dto: CreateMemberDto) {
+  async invitations(@Staff() staff: StaffContext) {
+    const rows = await this.prisma.staffInvitation.findMany({
+      where: { clinicId: staff.clinicId, acceptedAt: null, revokedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+    return rows.map(serializeInvitation);
+  }
+
+  /** Invita por correo. Una invitación pendiente anterior al mismo correo se reemplaza. */
+  @Post('invitations')
+  @Roles('OWNER', 'ADMIN')
+  async invite(@Staff() staff: StaffContext, @Body() dto: InviteDto) {
     if (!manageableRoles(staff.role).includes(dto.role)) {
       throw new ForbiddenException('No puedes asignar ese rol');
     }
-    const passwordHash = await hashPassword(dto.password);
-    try {
-      const m = await this.prisma.$transaction(async (tx) => {
-        const user = await tx.user.create({
-          data: { email: normalizeEmail(dto.email), name: dto.name, passwordHash },
-        });
-        return tx.membership.create({
-          data: { userId: user.id, clinicId: staff.clinicId, role: dto.role },
-          include: { user: true },
-        });
+    const email = normalizeEmail(dto.email);
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Clinic" WHERE id = ${staff.clinicId}::uuid FOR UPDATE`;
+      const clinic = await tx.clinic.findUniqueOrThrow({ where: { id: staff.clinicId } });
+      const member = await tx.membership.findFirst({ where: { clinicId: staff.clinicId, user: { email } } });
+      if (member) throw new ConflictException('Esa persona ya es parte del equipo');
+      await tx.staffInvitation.updateMany({
+        where: { clinicId: staff.clinicId, email, acceptedAt: null, revokedAt: null },
+        data: { revokedAt: new Date() },
       });
-      return {
-        id: m.id, role: m.role, active: m.active, createdAt: m.createdAt,
-        user: { id: m.user.id, name: m.user.name, email: m.user.email }, doctor: null,
-      };
-    } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-        throw new ConflictException('Ese correo ya está registrado');
-      }
-      throw e;
+      const token = randomToken();
+      const invitation = await tx.staffInvitation.create({
+        data: {
+          clinicId: staff.clinicId, email, name: dto.name, role: dto.role, tokenHash: sha256(token),
+          invitedById: staff.userId, expiresAt: new Date(Date.now() + INVITATION_TTL_MS),
+        },
+      });
+      await this.mail.staffInvitation(tx, {
+        email, name: dto.name, clinicName: clinic.name, timezone: clinic.timezone, role: dto.role,
+        inviterName: staff.name, token, expiresAt: invitation.expiresAt,
+      });
+      return serializeInvitation(invitation);
+    });
+  }
+
+  /** Reenvía con un enlace nuevo; el anterior deja de servir. */
+  @Post('invitations/:id/resend')
+  @Roles('OWNER', 'ADMIN')
+  @HttpCode(200)
+  async resendInvitation(@Staff() staff: StaffContext, @Param('id', ParseUUIDPipe) id: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const current = await this.pendingInvitation(tx, staff, id);
+      const clinic = await tx.clinic.findUniqueOrThrow({ where: { id: staff.clinicId } });
+      const token = randomToken();
+      const invitation = await tx.staffInvitation.update({
+        where: { id: current.id },
+        data: { tokenHash: sha256(token), expiresAt: new Date(Date.now() + INVITATION_TTL_MS) },
+      });
+      await this.mail.staffInvitation(tx, {
+        email: invitation.email, name: invitation.name, clinicName: clinic.name, timezone: clinic.timezone,
+        role: invitation.role, inviterName: staff.name, token, expiresAt: invitation.expiresAt,
+      });
+      return serializeInvitation(invitation);
+    });
+  }
+
+  @Post('invitations/:id/revoke')
+  @Roles('OWNER', 'ADMIN')
+  @HttpCode(204)
+  async revokeInvitation(@Staff() staff: StaffContext, @Param('id', ParseUUIDPipe) id: string) {
+    await this.prisma.$transaction(async (tx) => {
+      const current = await this.pendingInvitation(tx, staff, id);
+      await tx.staffInvitation.update({ where: { id: current.id }, data: { revokedAt: new Date() } });
+    });
+  }
+
+  private async pendingInvitation(tx: Tx, staff: StaffContext, id: string) {
+    const rows = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "StaffInvitation" WHERE id = ${id}::uuid AND "clinicId" = ${staff.clinicId}::uuid FOR UPDATE`;
+    const invitation = rows.length
+      ? await tx.staffInvitation.findUnique({ where: { id: rows[0].id } })
+      : null;
+    if (!invitation || invitation.acceptedAt || invitation.revokedAt) {
+      throw new NotFoundException('Invitación no encontrada');
     }
+    if (!manageableRoles(staff.role).includes(invitation.role)) {
+      throw new ForbiddenException('No puedes modificar esta invitación');
+    }
+    return invitation;
   }
 
   @Patch('members/:id')

@@ -1,9 +1,10 @@
 import {
-  Body, ConflictException, Controller, Get, HttpCode, Inject, Patch, Post, Req, Res, UnauthorizedException, UseGuards,
+  BadRequestException, Body, ConflictException, Controller, Get, HttpCode, Inject, Patch, Post, Req, Res,
+  UnauthorizedException, UseGuards,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { Prisma } from '@prisma/client';
-import { IsEmail, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsEmail, IsString, Length, Matches, MaxLength, MinLength } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { APP_CONFIG, AppConfig } from '../config';
 import { PrismaService } from '../prisma.service';
@@ -13,6 +14,9 @@ import { Patient, PatientContext, PatientGuard } from '../auth/guards';
 import { ACCESS_TTL_SECONDS, TokensService } from '../auth/tokens.service';
 import { loginLimiter } from '../auth/staff-auth.controller';
 import { RateLimiter } from '../common/rate-limit';
+import { AuthTokensService, RESET_TTL_MS, VERIFY_TTL_MS } from '../auth/auth-tokens.service';
+import { forgotEmailLimiter, forgotIpLimiter, resendLimiter, tokenLimiter } from '../auth/limits';
+import { MailService } from '../mail/mail.service';
 
 export const PATIENT_COOKIE = 'medora_patient_rt';
 const PATIENT_COOKIE_PATH = '/api/patient/auth';
@@ -42,6 +46,21 @@ class ChangePasswordDto {
   @IsString() @MinLength(10) @MaxLength(200) newPassword: string;
 }
 
+export class TokenDto {
+  @IsString() @Length(20, 200) token: string;
+}
+
+export class ForgotDto {
+  @IsEmail() @MaxLength(254) email: string;
+}
+
+class ResetDto {
+  @IsString() @Length(20, 200) token: string;
+  @IsString() @MinLength(10) @MaxLength(200) password: string;
+}
+
+const INVALID_LINK = 'El enlace no es válido o ya venció. Solicita uno nuevo.';
+
 const registerLimiter = new RateLimiter(5, 60 * 60_000);
 
 @Controller('api/patient')
@@ -50,6 +69,8 @@ export class PatientAuthController {
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     private readonly prisma: PrismaService,
     private readonly tokens: TokensService,
+    private readonly authTokens: AuthTokensService,
+    private readonly mail: MailService,
   ) {}
 
   @Post('auth/register')
@@ -64,6 +85,10 @@ export class PatientAuthController {
           data: { email: normalizeEmail(dto.email), name: dto.name, phone: dto.phone, passwordHash },
         });
         const refresh = await this.tokens.createRefresh({ kind: 'PATIENT', patientAccountId: account.id }, tx);
+        const verify = await this.authTokens.issue(
+          tx, 'PATIENT_VERIFY_EMAIL', { patientAccountId: account.id }, account.email, VERIFY_TTL_MS,
+        );
+        await this.mail.verifyEmail(tx, { email: account.email, name: account.name, token: verify });
         return { account, ...refresh };
       });
       res.cookie(PATIENT_COOKIE, token, refreshCookieOptions(this.config, PATIENT_COOKIE_PATH));
@@ -126,10 +151,94 @@ export class PatientAuthController {
     res.clearCookie(PATIENT_COOKIE, { path: PATIENT_COOKIE_PATH });
   }
 
+  /** Confirma el correo con el enlace enviado al registrarse. Repetir un enlace ya usado no falla. */
+  @Post('auth/verify-email')
+  @HttpCode(200)
+  async verifyEmail(@Body() dto: TokenDto, @Req() req: Request) {
+    assertOrigin(req, this.config);
+    tokenLimiter.consume(`token:${clientIp(req)}`);
+    const claimed = await this.prisma.$transaction(async (tx) => {
+      const t = await this.authTokens.consume(tx, 'PATIENT_VERIFY_EMAIL', dto.token);
+      if (!t) return null;
+      const updated = await tx.patientAccount.updateMany({
+        where: { id: t.patientAccountId!, email: t.email },
+        data: { emailVerifiedAt: new Date() },
+      });
+      if (updated.count !== 1) throw new BadRequestException(INVALID_LINK);
+      return t;
+    });
+    if (claimed) return { verified: true };
+    const used = await this.authTokens.find('PATIENT_VERIFY_EMAIL', dto.token);
+    if (used?.usedAt && used.patientAccountId) {
+      const account = await this.prisma.patientAccount.findUnique({ where: { id: used.patientAccountId } });
+      if (account?.emailVerifiedAt && account.email === used.email) return { verified: true };
+    }
+    throw new BadRequestException(INVALID_LINK);
+  }
+
+  @Post('me/resend-verification')
+  @UseGuards(PatientGuard)
+  @HttpCode(204)
+  async resendVerification(@Patient() patient: PatientContext) {
+    if (patient.emailVerified) throw new ConflictException('Tu correo ya está confirmado');
+    resendLimiter.consume(`resend:${patient.id}`);
+    await this.prisma.$transaction(async (tx) => {
+      await this.authTokens.invalidateOthers(tx, 'PATIENT_VERIFY_EMAIL', { patientAccountId: patient.id });
+      const token = await this.authTokens.issue(
+        tx, 'PATIENT_VERIFY_EMAIL', { patientAccountId: patient.id }, patient.email, VERIFY_TTL_MS,
+      );
+      await this.mail.verifyEmail(tx, { email: patient.email, name: patient.name, token });
+    });
+  }
+
+  /** Siempre responde 204 para no revelar si el correo tiene cuenta. */
+  @Post('auth/forgot')
+  @HttpCode(204)
+  async forgot(@Body() dto: ForgotDto, @Req() req: Request) {
+    assertOrigin(req, this.config);
+    forgotIpLimiter.consume(`forgot:${clientIp(req)}`);
+    const email = normalizeEmail(dto.email);
+    forgotEmailLimiter.consume(`forgot:patient:${email}`);
+    const account = await this.prisma.patientAccount.findUnique({ where: { email } });
+    if (!account || !account.active) return;
+    await this.prisma.$transaction(async (tx) => {
+      const token = await this.authTokens.issue(
+        tx, 'PATIENT_RESET_PASSWORD', { patientAccountId: account.id }, account.email, RESET_TTL_MS,
+      );
+      await this.mail.passwordReset(tx, { email: account.email, name: account.name, token, audience: 'paciente' });
+    });
+  }
+
+  /** Restablece la contraseña, revoca todas las sesiones y confirma el correo (el enlace prueba que es suyo). */
+  @Post('auth/reset')
+  @HttpCode(204)
+  async reset(@Body() dto: ResetDto, @Req() req: Request) {
+    assertOrigin(req, this.config);
+    tokenLimiter.consume(`token:${clientIp(req)}`);
+    const passwordHash = await hashPassword(dto.password);
+    await this.prisma.$transaction(async (tx) => {
+      const t = await this.authTokens.consume(tx, 'PATIENT_RESET_PASSWORD', dto.token);
+      if (!t) throw new BadRequestException(INVALID_LINK);
+      await tx.$queryRaw`SELECT id FROM "PatientAccount" WHERE id = ${t.patientAccountId}::uuid FOR UPDATE`;
+      const account = await tx.patientAccount.findUnique({ where: { id: t.patientAccountId! } });
+      if (!account || !account.active || account.email !== t.email) throw new BadRequestException(INVALID_LINK);
+      await tx.patientAccount.update({
+        where: { id: account.id },
+        data: { passwordHash, emailVerifiedAt: account.emailVerifiedAt ?? new Date() },
+      });
+      await tx.refreshSession.updateMany({
+        where: { patientAccountId: account.id, revokedAt: null }, data: { revokedAt: new Date() },
+      });
+      await this.authTokens.invalidateOthers(tx, 'PATIENT_RESET_PASSWORD', { patientAccountId: account.id });
+    });
+  }
+
   @Get('me')
   @UseGuards(PatientGuard)
   me(@Patient() patient: PatientContext) {
-    return { id: patient.id, name: patient.name, email: patient.email, phone: patient.phone };
+    return {
+      id: patient.id, name: patient.name, email: patient.email, phone: patient.phone, emailVerified: patient.emailVerified,
+    };
   }
 
   @Patch('me')
@@ -138,7 +247,7 @@ export class PatientAuthController {
     const a = await this.prisma.patientAccount.update({
       where: { id: patient.id }, data: { name: dto.name, phone: dto.phone },
     });
-    return { id: a.id, name: a.name, email: a.email, phone: a.phone };
+    return { id: a.id, name: a.name, email: a.email, phone: a.phone, emailVerified: a.emailVerifiedAt !== null };
   }
 
   @Patch('me/password')
@@ -167,7 +276,7 @@ export class PatientAuthController {
     return {
       accessToken,
       expiresIn: ACCESS_TTL_SECONDS,
-      patient: { id: a.id, name: a.name, email: a.email, phone: a.phone },
+      patient: { id: a.id, name: a.name, email: a.email, phone: a.phone, emailVerified: a.emailVerifiedAt !== null },
     };
   }
 }

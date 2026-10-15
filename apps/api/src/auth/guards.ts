@@ -23,6 +23,7 @@ export interface PatientContext {
   name: string;
   email: string;
   phone: string;
+  emailVerified: boolean;
   sessionId: string;
 }
 
@@ -89,7 +90,8 @@ export class PatientGuard implements CanActivate {
     const account = await this.prisma.patientAccount.findUnique({ where: { id: claims.sub } });
     if (!account || !account.active) throw new UnauthorizedException('Sesión inválida');
     req.patient = {
-      id: account.id, name: account.name, email: account.email, phone: account.phone, sessionId: claims.sid,
+      id: account.id, name: account.name, email: account.email, phone: account.phone,
+      emailVerified: account.emailVerifiedAt !== null, sessionId: claims.sid,
     };
     return true;
   }

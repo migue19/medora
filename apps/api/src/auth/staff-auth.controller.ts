@@ -1,5 +1,6 @@
 import {
-  Body, ConflictException, Controller, Get, HttpCode, Inject, Patch, Post, Req, Res, UnauthorizedException, UseGuards,
+  BadRequestException, Body, ConflictException, Controller, Get, HttpCode, Inject, Patch, Post, Req, Res,
+  UnauthorizedException, UseGuards,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { IsEmail, IsString, Length, Matches, MaxLength, MinLength } from 'class-validator';
@@ -10,6 +11,9 @@ import { assertOrigin, clientIp, normalizeEmail, refreshCookieOptions } from '..
 import { RateLimiter } from '../common/rate-limit';
 import { Staff, StaffContext, StaffGuard } from './guards';
 import { ACCESS_TTL_SECONDS, TokensService } from './tokens.service';
+import { AuthTokensService, RESET_TTL_MS } from './auth-tokens.service';
+import { forgotEmailLimiter, forgotIpLimiter, tokenLimiter } from './limits';
+import { MailService } from '../mail/mail.service';
 
 export const STAFF_COOKIE = 'medora_staff_rt';
 const STAFF_COOKIE_PATH = '/api/auth';
@@ -25,6 +29,15 @@ class ChangePasswordDto {
   @IsString() @MinLength(12) @MaxLength(200) newPassword: string;
 }
 
+class ForgotDto {
+  @IsEmail() @MaxLength(254) email: string;
+}
+
+class ResetDto {
+  @IsString() @Length(20, 200) token: string;
+  @IsString() @MinLength(12) @MaxLength(200) password: string;
+}
+
 export const loginLimiter = new RateLimiter(10, 60_000);
 
 @Controller('api')
@@ -33,6 +46,8 @@ export class StaffAuthController {
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     private readonly prisma: PrismaService,
     private readonly tokens: TokensService,
+    private readonly authTokens: AuthTokensService,
+    private readonly mail: MailService,
   ) {}
 
   @Post('auth/login')
@@ -93,6 +108,44 @@ export class StaffAuthController {
     const token = req.cookies?.[STAFF_COOKIE];
     if (typeof token === 'string' && token) await this.tokens.revokeFamilyByToken(token);
     res.clearCookie(STAFF_COOKIE, { path: STAFF_COOKIE_PATH });
+  }
+
+  /** Siempre responde 204 para no revelar si el correo pertenece al personal. */
+  @Post('auth/forgot')
+  @HttpCode(204)
+  async forgot(@Body() dto: ForgotDto, @Req() req: Request) {
+    assertOrigin(req, this.config);
+    forgotIpLimiter.consume(`forgot:${clientIp(req)}`);
+    const email = normalizeEmail(dto.email);
+    forgotEmailLimiter.consume(`forgot:staff:${email}`);
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user || !user.active) return;
+    await this.prisma.$transaction(async (tx) => {
+      const token = await this.authTokens.issue(tx, 'STAFF_RESET_PASSWORD', { userId: user.id }, user.email, RESET_TTL_MS);
+      await this.mail.passwordReset(tx, { email: user.email, name: user.name, token, audience: 'personal' });
+    });
+  }
+
+  /** Restablece la contraseña de la identidad del personal y revoca sus sesiones en todas las clínicas. */
+  @Post('auth/reset')
+  @HttpCode(204)
+  async reset(@Body() dto: ResetDto, @Req() req: Request) {
+    assertOrigin(req, this.config);
+    tokenLimiter.consume(`token:${clientIp(req)}`);
+    const passwordHash = await hashPassword(dto.password);
+    await this.prisma.$transaction(async (tx) => {
+      const t = await this.authTokens.consume(tx, 'STAFF_RESET_PASSWORD', dto.token);
+      const invalid = 'El enlace no es válido o ya venció. Solicita uno nuevo.';
+      if (!t) throw new BadRequestException(invalid);
+      await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${t.userId}::uuid FOR UPDATE`;
+      const user = await tx.user.findUnique({ where: { id: t.userId! } });
+      if (!user || !user.active || user.email !== t.email) throw new BadRequestException(invalid);
+      await tx.user.update({ where: { id: user.id }, data: { passwordHash } });
+      await tx.refreshSession.updateMany({
+        where: { membership: { userId: user.id }, revokedAt: null }, data: { revokedAt: new Date() },
+      });
+      await this.authTokens.invalidateOthers(tx, 'STAFF_RESET_PASSWORD', { userId: user.id });
+    });
   }
 
   @Get('me')

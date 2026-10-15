@@ -6,6 +6,7 @@ import { DateTime } from 'luxon';
 import { PrismaService, Tx } from '../prisma.service';
 import { canonicalHash } from '../common/crypto';
 import { computeSlots, fitsWeeklySchedule, parseLocalDate } from '../scheduling/availability';
+import { MailService } from '../mail/mail.service';
 
 export const MAX_FUTURE_ONLINE_APPOINTMENTS = 3;
 export const MAX_AVAILABILITY_DAYS = 14;
@@ -42,7 +43,7 @@ export interface BookingInput {
 
 @Injectable()
 export class AppointmentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly mail: MailService) {}
 
   /** Horarios disponibles para un médico y servicio. */
   async availability(params: {
@@ -156,12 +157,13 @@ export class AppointmentsService {
             patientNotes: input.notes, requestKey, requestHash,
           },
         });
-        await tx.appointmentEvent.create({
+        const event = await tx.appointmentEvent.create({
           data: {
             appointmentId: created.id, type: 'CREATED', actorKind: input.actor.kind,
             actorId: input.actor.id, actorName: input.actor.name, toStartsAt: startsAt,
           },
         });
+        await this.mail.appointmentEvent(tx, event.id);
         return created;
       });
       return { appointment, replayed: false };
@@ -193,12 +195,13 @@ export class AppointmentsService {
       const updated = await tx.appointment.update({
         where: { id: current.id }, data: { status: 'CANCELLED', cancelReason: params.reason },
       });
-      await tx.appointmentEvent.create({
+      const event = await tx.appointmentEvent.create({
         data: {
           appointmentId: current.id, type: 'CANCELLED', actorKind: actor.kind, actorId: actor.id,
           actorName: actor.name, reason: params.reason, fromStartsAt: current.startsAt,
         },
       });
+      await this.mail.appointmentEvent(tx, event.id);
       return updated;
     });
   }
@@ -246,12 +249,13 @@ export class AppointmentsService {
         const updated = await tx.appointment.update({
           where: { id: current.id }, data: { startsAt: params.startsAt, endsAt },
         });
-        await tx.appointmentEvent.create({
+        const event = await tx.appointmentEvent.create({
           data: {
             appointmentId: current.id, type: 'RESCHEDULED', actorKind: actor.kind, actorId: actor.id,
             actorName: actor.name, fromStartsAt: current.startsAt, toStartsAt: params.startsAt,
           },
         });
+        await this.mail.appointmentEvent(tx, event.id);
         return updated;
       });
     } catch (e) {

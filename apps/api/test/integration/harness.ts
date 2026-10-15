@@ -7,6 +7,8 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { DateTime } from 'luxon';
 import { createApp } from '../../src/bootstrap';
 import { hashPassword } from '../../src/common/crypto';
+import { JobsService } from '../../src/jobs/jobs.service';
+import { MemoryTransport, OutgoingEmail } from '../../src/mail/mail.transport';
 
 export const ORIGIN = 'http://localhost:6011';
 export const TZ = 'America/Mexico_City';
@@ -23,11 +25,18 @@ export interface Harness {
   app: INestApplication;
   base: string;
   prisma: PrismaClient;
+  mail: MemoryTransport;
+  jobs: JobsService;
+  /** Ejecuta la cola y devuelve los correos enviados en esta corrida. */
+  deliver(): Promise<OutgoingEmail[]>;
   close(): Promise<void>;
 }
 
+let sharedPrisma: PrismaClient | null = null;
+
 export async function startHarness(): Promise<Harness> {
   const databaseUrl = testDatabaseUrl();
+  const mail = new MemoryTransport();
   const app = await createApp({
     databaseUrl,
     jwtSecret: new TextEncoder().encode('integration-secret-integration-secret-0123'),
@@ -38,13 +47,22 @@ export async function startHarness(): Promise<Harness> {
     production: false,
     trustProxy: false,
     rateLimitEnabled: false,
-  }, false);
+    mail: { from: 'Medora <no-reply@test.mx>', smtp: null },
+    jobsPollMs: 0,
+  }, false, mail);
   await app.listen(0, '127.0.0.1');
   const { port } = app.getHttpServer().address() as AddressInfo;
   const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: databaseUrl }) });
+  sharedPrisma = prisma;
+  const jobs = app.get(JobsService);
   return {
-    app, base: `http://127.0.0.1:${port}`, prisma,
-    async close() { await prisma.$disconnect(); await app.close(); },
+    app, base: `http://127.0.0.1:${port}`, prisma, mail, jobs,
+    async deliver() {
+      const before = mail.sent.length;
+      await jobs.runOnce();
+      return mail.sent.slice(before);
+    },
+    async close() { sharedPrisma = null; await prisma.$disconnect(); await app.close(); },
   };
 }
 
@@ -83,7 +101,7 @@ export class Client {
 }
 
 export async function resetDb(prisma: PrismaClient): Promise<void> {
-  await prisma.$executeRawUnsafe(`TRUNCATE "AppointmentEvent", "Appointment", "TimeOff", "ScheduleRule",
+  await prisma.$executeRawUnsafe(`TRUNCATE "Job", "AuthToken", "StaffInvitation", "AppointmentEvent", "Appointment", "TimeOff", "ScheduleRule",
     "DoctorService", "Service", "Doctor", "ClinicPatient", "RefreshSession", "PatientAccount", "Membership",
     "User", "Clinic" CASCADE`);
 }
@@ -105,7 +123,29 @@ export async function loginStaff(base: string, email: string, password: string, 
   return c;
 }
 
-export async function registerPatient(base: string, name: string): Promise<Client> {
+/** Token que viaja en el fragmento (#) del primer enlace del correo. */
+export function linkToken(email: OutgoingEmail): string {
+  const m = email.text.match(/https?:\/\/\S+#([A-Za-z0-9_-]{20,})/);
+  if (!m) throw new Error(`Sin enlace con token en «${email.subject}»`);
+  return m[1];
+}
+
+/** Invita a un integrante, entrega el correo y acepta la invitación con la contraseña indicada. */
+export async function addStaff(
+  h: Harness, inviter: Client, data: { name: string; email: string; role: string; password: string },
+): Promise<{ membershipId: string }> {
+  const inv = await inviter.post('/api/clinic/invitations', { name: data.name, email: data.email, role: data.role });
+  if (inv.status !== 201) throw new Error(`invitación ${inv.status} ${JSON.stringify(inv.body)}`);
+  const sent = (await h.deliver()).filter((e) => e.to === data.email.toLowerCase());
+  const token = linkToken(sent[sent.length - 1]);
+  const accepted = await new Client(h.base).post('/api/auth/invitations/accept', { token, password: data.password });
+  if (accepted.status !== 200) throw new Error(`aceptar ${accepted.status} ${JSON.stringify(accepted.body)}`);
+  const invitation = await h.prisma.staffInvitation.findUniqueOrThrow({ where: { id: inv.body.id } });
+  return { membershipId: invitation.membershipId! };
+}
+
+/** Registra un paciente. Por defecto marca su correo como confirmado (requisito para reservar). */
+export async function registerPatient(base: string, name: string, opts: { verified?: boolean } = {}): Promise<Client> {
   const c = new Client(base);
   const r = await c.post('/api/patient/auth/register', {
     name, email: `${name.toLowerCase().replace(/\W+/g, '.')}-${randomUUID().slice(0, 8)}@test.mx`,
@@ -113,6 +153,11 @@ export async function registerPatient(base: string, name: string): Promise<Clien
   });
   if (r.status !== 201) throw new Error(`register ${r.status} ${JSON.stringify(r.body)}`);
   c.token = r.body.accessToken;
+  if (opts.verified ?? true) {
+    if (!sharedPrisma) throw new Error('Inicia el harness antes de registrar pacientes');
+    await sharedPrisma.patientAccount.update({ where: { id: r.body.patient.id }, data: { emailVerifiedAt: new Date() } });
+    // El JWT no cambia: la verificación se lee de la base en cada petición.
+  }
   return c;
 }
 

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Header } from '@/components/Header';
 import { SlotPicker } from '@/components/SlotPicker';
 import { PatientAuthForm } from '@/components/PatientAuthForm';
+import { VerifyEmailNotice } from '@/components/VerifyEmailNotice';
 import { ApiError, errorMessage, patientSession, publicGet } from '@/lib/api';
 import { useSession } from '@/lib/hooks';
 import { fmtDate, fmtTime, money, todayIn, uuid } from '@/lib/format';
@@ -92,6 +93,7 @@ export function BookingPage({ slug }: { slug: string }) {
             <h2>{doctor?.displayName}</h2>
             <p>{service?.name} · {money(service!.priceCents)}</p>
             <p><strong>{fmtDate(booked.startsAt, tz)}</strong> a las <strong>{fmtTime(booked.startsAt, tz)}</strong> (hora de la clínica)</p>
+            <p className="muted small">Te enviamos la confirmación por correo con un archivo para agregarla a tu calendario.</p>
             <div className="row">
               <Link className="btn primary" href="/paciente">Ver mis citas</Link>
               <button onClick={() => { setBooked(null); setSlot(null); setRequestId(uuid()); setReloadKey((k) => k + 1); }}>Agendar otra</button>
@@ -150,6 +152,7 @@ export function BookingPage({ slug }: { slug: string }) {
                 ) : (
                   <>
                     <p className="small muted">Reservando como {patient.patient.name} ({patient.patient.email})</p>
+                    {!patient.patient.emailVerified && <VerifyEmailNotice email={patient.patient.email} />}
                     <label>Motivo de consulta (opcional)
                       <textarea value={notes} maxLength={500} onChange={(e) => setNotes(e.target.value)} placeholder="Ej. revisión anual" />
                     </label>
@@ -157,7 +160,7 @@ export function BookingPage({ slug }: { slug: string }) {
                       Podrás cancelar o reprogramar en línea hasta {Math.round(clinic.patientCancelMinMinutes / 60 * 10) / 10} h antes de la cita.
                     </p>
                     {error && <div className="alert error" role="alert">{error}</div>}
-                    <button className="primary" onClick={confirm} disabled={busy}>{busy ? 'Agendando…' : 'Confirmar cita'}</button>
+                    <button className="primary" onClick={confirm} disabled={busy || !patient.patient.emailVerified}>{busy ? 'Agendando…' : 'Confirmar cita'}</button>
                   </>
                 )}
               </section>

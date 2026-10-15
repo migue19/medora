@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Header } from '@/components/Header';
 import { PatientAuthForm } from '@/components/PatientAuthForm';
 import { SlotPicker } from '@/components/SlotPicker';
+import { VerifyEmailNotice } from '@/components/VerifyEmailNotice';
 import { ApiError, errorMessage, patientSession } from '@/lib/api';
 import { useSession } from '@/lib/hooks';
 import { STATUS_LABEL, fmtDate, fmtTime, money, todayIn } from '@/lib/format';
@@ -60,6 +61,7 @@ export function PatientPortal() {
         ) : (
           <>
             <h1>Mis citas</h1>
+            {!session.patient.emailVerified && <VerifyEmailNotice email={session.patient.email} />}
             {notice && <div className="alert ok" role="status">{notice}</div>}
             {error && <div className="alert error" role="alert">{error}</div>}
             {!list ? <p className="muted">Cargando…</p> : (

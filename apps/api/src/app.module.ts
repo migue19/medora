@@ -12,16 +12,23 @@ import { AppointmentsService } from './appointments/appointments.service';
 import { StaffAppointmentsController } from './appointments/staff-appointments.controller';
 import { PublicController } from './public/public.controller';
 import { HealthController } from './health.controller';
+import { AuthTokensService } from './auth/auth-tokens.service';
+import { InvitationsController } from './auth/invitations.controller';
+import { JobsService } from './jobs/jobs.service';
+import { MailService } from './mail/mail.service';
+import { MAIL_TRANSPORT, MailTransport, createTransport } from './mail/mail.transport';
 
-export function buildAppModule(config: AppConfig = loadConfig()) {
+export function buildAppModule(config: AppConfig = loadConfig(), mailTransport: MailTransport = createTransport(config.mail)) {
   @Module({
     controllers: [
       HealthController, StaffAuthController, PatientAuthController, PatientAppointmentsController,
-      ClinicController, SchedulingController, StaffAppointmentsController, PublicController,
+      ClinicController, SchedulingController, StaffAppointmentsController, PublicController, InvitationsController,
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
+      { provide: MAIL_TRANSPORT, useValue: mailTransport },
       PrismaService, TokensService, StaffGuard, PatientGuard, AppointmentsService,
+      AuthTokensService, JobsService, MailService,
     ],
   })
   class AppModule {}

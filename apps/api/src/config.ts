@@ -8,6 +8,15 @@ export interface AppConfig {
   production: boolean;
   trustProxy: boolean;
   rateLimitEnabled?: boolean;
+  mail: MailConfig;
+  /** Intervalo del trabajador de la cola; 0 lo desactiva (pruebas). */
+  jobsPollMs: number;
+}
+
+export interface MailConfig {
+  from: string;
+  /** Sin SMTP los correos se escriben en la bitácora (sólo fuera de producción). */
+  smtp: { host: string; port: number; secure: boolean; user: string; password: string } | null;
 }
 
 function required(name: string): string {
@@ -28,6 +37,8 @@ export function loadConfig(): AppConfig {
     throw new Error('En producción WEB_ORIGIN debe ser HTTPS y COOKIE_SECURE=true');
   }
   return {
+    mail: loadMailConfig(production),
+    jobsPollMs: Number(process.env.JOBS_POLL_MS ?? 2000),
     databaseUrl: required('DATABASE_URL'),
     jwtSecret: new TextEncoder().encode(jwtSecret),
     webOrigin,
@@ -36,6 +47,24 @@ export function loadConfig(): AppConfig {
     host: process.env.HOST ?? '127.0.0.1',
     production,
     trustProxy: (process.env.TRUST_PROXY ?? 'true') === 'true',
+  };
+}
+
+function loadMailConfig(production: boolean): MailConfig {
+  const host = process.env.SMTP_HOST?.trim();
+  if (!host) {
+    if (production) throw new Error('En producción se requiere SMTP_HOST para enviar correos');
+    return { from: process.env.MAIL_FROM?.trim() || 'Medora <no-reply@localhost>', smtp: null };
+  }
+  const port = Number(process.env.SMTP_PORT ?? 465);
+  return {
+    from: required('MAIL_FROM'),
+    smtp: {
+      host, port,
+      secure: (process.env.SMTP_SECURE ?? (port === 465 ? 'true' : 'false')) === 'true',
+      user: required('SMTP_USER'),
+      password: required('SMTP_PASSWORD'),
+    },
   };
 }
 
