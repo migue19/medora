@@ -11,3 +11,4 @@ work/
 next-env.d.ts
 *.tsbuildinfo
 apps/api/prisma.wasm.config.ts
+hostinger.txt
