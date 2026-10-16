@@ -9,8 +9,21 @@ export interface AppConfig {
   trustProxy: boolean;
   rateLimitEnabled?: boolean;
   mail: MailConfig;
+  whatsapp: WhatsAppConfig | null;
   /** Intervalo del trabajador de la cola; 0 lo desactiva (pruebas). */
   jobsPollMs: number;
+}
+
+/** WhatsApp Business Cloud API (Meta). Sin token, el canal queda desactivado. */
+export interface WhatsAppConfig {
+  token: string;
+  phoneNumberId: string;
+  /** Plantilla aprobada para el recordatorio y su idioma. */
+  template: string;
+  language: string;
+  apiVersion: string;
+  /** Lada que se antepone a teléfonos de 10 dígitos. */
+  defaultCountryCode: string;
 }
 
 export interface MailConfig {
@@ -38,6 +51,7 @@ export function loadConfig(): AppConfig {
   }
   return {
     mail: loadMailConfig(production),
+    whatsapp: loadWhatsAppConfig(),
     jobsPollMs: Number(process.env.JOBS_POLL_MS ?? 2000),
     databaseUrl: required('DATABASE_URL'),
     jwtSecret: new TextEncoder().encode(jwtSecret),
@@ -47,6 +61,19 @@ export function loadConfig(): AppConfig {
     host: process.env.HOST ?? '127.0.0.1',
     production,
     trustProxy: (process.env.TRUST_PROXY ?? 'true') === 'true',
+  };
+}
+
+function loadWhatsAppConfig(): WhatsAppConfig | null {
+  const token = process.env.WHATSAPP_TOKEN?.trim();
+  if (!token) return null;
+  return {
+    token,
+    phoneNumberId: required('WHATSAPP_PHONE_NUMBER_ID'),
+    template: process.env.WHATSAPP_TEMPLATE?.trim() || 'recordatorio_cita',
+    language: process.env.WHATSAPP_TEMPLATE_LANG?.trim() || 'es_MX',
+    apiVersion: process.env.WHATSAPP_API_VERSION?.trim() || 'v21.0',
+    defaultCountryCode: process.env.WHATSAPP_DEFAULT_COUNTRY?.trim() || '52',
   };
 }
 

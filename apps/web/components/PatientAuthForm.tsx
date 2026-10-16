@@ -16,7 +16,10 @@ export function PatientAuthForm({ onDone }: { onDone?: () => void }) {
     try {
       const body = mode === 'login'
         ? { email: f.get('email'), password: f.get('password') }
-        : { name: f.get('name'), email: f.get('email'), phone: f.get('phone'), password: f.get('password') };
+        : {
+          name: f.get('name'), email: f.get('email'), phone: f.get('phone'), password: f.get('password'),
+          whatsappConsent: f.get('whatsappConsent') === 'on',
+        };
       const res = await patientSession.request('POST', `/api/patient/auth/${mode}`, body, false);
       patientSession.set(res);
       onDone?.();
@@ -44,6 +47,9 @@ export function PatientAuthForm({ onDone }: { onDone?: () => void }) {
         <input name="password" type="password" required minLength={mode === 'register' ? 10 : 1}
           autoComplete={mode === 'register' ? 'new-password' : 'current-password'} />
       </label>
+      {mode === 'register' && (
+        <label className="check"><input type="checkbox" name="whatsappConsent" />Quiero recibir recordatorios de mis citas por WhatsApp</label>
+      )}
       {mode === 'register'
         ? <p className="muted small">Mínimo 10 caracteres. Te enviaremos un enlace para confirmar tu correo. Tus datos sólo se comparten con las clínicas donde reservas.</p>
         : <p className="small"><Link href="/recuperar?tipo=paciente">¿Olvidaste tu contraseña?</Link></p>}

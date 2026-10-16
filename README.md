@@ -1,4 +1,4 @@
-# Medora · Sprint 2
+# Medora · Sprint 3
 
 Agenda y reservas de citas médicas en línea para clínicas y consultorios (SaaS multi-clínica). Monorepo npm con Next.js 16 / React 19 (PWA), NestJS 11, Prisma 6 y PostgreSQL 17. Node.js 24 LTS recomendado. Mismo stack y criterios de seguridad que Tavixo.
 
@@ -10,7 +10,7 @@ Objetivo: llegar a la funcionalidad de una plataforma tipo Doctoralia sobre una 
 |---|---|---|
 | 1 | Base, autenticación, agenda y reservas en línea | ✅ Entregado |
 | 2 | Correo, verificación de cuenta y recuperación de contraseña | ✅ Entregado |
-| 3 | Recordatorios y confirmación de asistencia (WhatsApp y correo) | Pendiente |
+| 3 | Recordatorios y confirmación de asistencia (WhatsApp y correo) | ✅ Entregado |
 | 4 | Ficha del paciente, vinculación de cuentas y lista de espera | Pendiente |
 | 5 | Sedes, consultorios y perfil profesional completo | Pendiente |
 | 6 | Perfil público, SEO y widget de reservas | Pendiente |
@@ -39,7 +39,9 @@ Entregado como se planeó, con un cambio: en lugar de pg-boss, la cola es una ta
 - Invitación al personal por correo en lugar de una contraseña inicial compartida.
 - **Terminado cuando**: un paciente nuevo verifica su correo, reserva y recibe la confirmación, y el envío sobrevive a reinicios de la API sin duplicarse.
 
-### Sprint 3 · Recordatorios y confirmación de asistencia
+### Sprint 3 · Recordatorios y confirmación de asistencia ✅
+
+Entregado. Los recordatorios son trabajos de la cola programados al reservar o reprogramar (`runAt` = inicio − anticipación) que, al salir, vuelven a comprobar la cita: si se canceló, se reprogramó o la clínica cambió sus ajustes, no envían nada. Una bitácora (`NotificationLog`) con índice único parcial en los envíos exitosos garantiza un solo envío por cita, horario, anticipación y canal aun si el proceso muere a la mitad. El token del enlace se genera al enviar (nunca se guarda en claro), vale una vez y sólo para ese horario. WhatsApp está implementado con la Cloud API de Meta y queda inactivo hasta configurar las credenciales y la plantilla ([WhatsApp](#whatsapp-business)). Detalle en [SPRINT3_RESULTS.md](SPRINT3_RESULTS.md).
 
 - Recordatorios automáticos 24 h y 2 h antes, configurables por clínica, por correo y por WhatsApp Business (Cloud API) con plantillas aprobadas.
 - Enlace firmado para **confirmar** o **cancelar** desde el recordatorio, sin iniciar sesión, de un solo uso y con vencimiento.
@@ -208,6 +210,26 @@ SELECT type, payload->>'to' AS para, attempts, "lastError", "completedAt", "fail
 FROM "Job" ORDER BY "createdAt" DESC LIMIT 20;
 ```
 
+## WhatsApp Business
+
+Opcional. Sin `WHATSAPP_TOKEN` el canal queda desactivado y los recordatorios salen sólo por correo.
+
+1. En Meta Business: app con el producto WhatsApp, número verificado y un **token de acceso permanente** de un usuario del sistema.
+2. Crear y aprobar la plantilla `recordatorio_cita` (categoría *Utilidad*, idioma *Español (MEX)*):
+   - Cuerpo: `Hola {{1}}, te recordamos tu cita en {{2}} el {{3}} con {{4}}. Confírmanos tu asistencia o cancela desde el botón.`
+   - Botón de tipo URL dinámica: `https://medora.nut.com.mx/cita?t={{1}}` con el texto «Confirmar o cancelar».
+3. Variables en el `.env` del servidor y reiniciar la API:
+
+| Variable | Valor |
+|---|---|
+| `WHATSAPP_TOKEN` | Token permanente (secreto) |
+| `WHATSAPP_PHONE_NUMBER_ID` | ID del número en Meta |
+| `WHATSAPP_TEMPLATE` | `recordatorio_cita` |
+| `WHATSAPP_TEMPLATE_LANG` | `es_MX` |
+| `WHATSAPP_DEFAULT_COUNTRY` | `52` (se antepone a teléfonos de 10 dígitos) |
+
+4. En el panel, «Clínica → Recordatorios», activar «También por WhatsApp». Sólo reciben WhatsApp los pacientes con consentimiento: los de cuenta en línea lo activan en su registro o en «Mis citas»; para fichas telefónicas lo registra recepción.
+
 ## Arranque con Docker Compose (local)
 
 Requisitos: Docker Desktop con Compose v2 y los puertos 6010/6011 libres. Estos puertos no chocan con Tavixo (6000/6001).
@@ -284,6 +306,8 @@ La API escucha en 127.0.0.1:6010 y Next en 127.0.0.1:6011. `WEB_ORIGIN` debe coi
 | POST | /api/auth/invitations/inspect · accept | Público con el token de la invitación; Origin |
 | POST | /api/patient/auth/verify-email · forgot · reset | Paciente; Origin |
 | POST | /api/patient/me/resend-verification | Paciente (3 por hora) |
+| POST | /api/public/appointment-actions/inspect · confirm · cancel | Público con el token del recordatorio; Origin |
+| PATCH | /api/clinic/patients/:id | OWNER, ADMIN, RECEPTION: consentimiento de WhatsApp de fichas telefónicas |
 | GET / PATCH | /api/clinic/members | OWNER, ADMIN según jerarquía |
 | GET / POST | /api/clinic/invitations | OWNER, ADMIN según jerarquía |
 | POST | /api/clinic/invitations/:id/resend · revoke | OWNER, ADMIN según jerarquía |

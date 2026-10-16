@@ -155,3 +155,35 @@ export function appointmentEmail(p: AppointmentEmailData): RenderedEmail {
     footer,
   });
 }
+
+export function reminderEmail(p: {
+  patientName: string;
+  clinic: { name: string; address: string | null; phone: string | null; timezone: string };
+  doctorName: string;
+  serviceName: string;
+  startsAt: Date;
+  link: string;
+  /** Fecha límite para cancelar en línea; null si ya pasó. */
+  cancelUntil: Date | null;
+}): RenderedEmail {
+  const when = formatWhen(p.startsAt, p.clinic.timezone);
+  return layout({
+    subject: `Recordatorio de tu cita: ${when}`,
+    greeting: `Hola, ${p.patientName}:`,
+    paragraphs: [`Te recordamos tu cita en ${p.clinic.name}. Confírmanos si vas a asistir.`],
+    details: [
+      { label: 'Fecha', value: when },
+      { label: 'Médico', value: p.doctorName },
+      { label: 'Servicio', value: p.serviceName },
+      ...(p.clinic.address ? [{ label: 'Dirección', value: p.clinic.address }] : []),
+      ...(p.clinic.phone ? [{ label: 'Teléfono', value: p.clinic.phone }] : []),
+    ],
+    action: { label: 'Confirmar o cancelar', url: p.link },
+    footer: [
+      p.cancelUntil
+        ? `Puedes cancelar desde el enlace hasta el ${formatWhen(p.cancelUntil, p.clinic.timezone)}. Después, comunícate con la clínica.`
+        : 'Si no puedes asistir, comunícate con la clínica lo antes posible.',
+      'El enlace sirve una sola vez y es personal: no lo compartas.',
+    ],
+  });
+}

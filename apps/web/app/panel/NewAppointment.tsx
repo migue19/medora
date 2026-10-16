@@ -120,7 +120,9 @@ export function PatientChooser({ onChoose }: { onChoose: (p: ClinicPatient) => v
     const f = new FormData(e.currentTarget);
     setError(null);
     try {
-      const p = await staffSession.post<ClinicPatient>('/api/clinic/patients', { name: f.get('name'), phone: f.get('phone'), email: f.get('email') });
+      const p = await staffSession.post<ClinicPatient>('/api/clinic/patients', {
+        name: f.get('name'), phone: f.get('phone'), email: f.get('email'), whatsappConsent: f.get('whatsappConsent') === 'on',
+      });
       onChoose(p);
     } catch (err) { setError(errorMessage(err)); }
   }
@@ -143,6 +145,7 @@ export function PatientChooser({ onChoose }: { onChoose: (p: ClinicPatient) => v
             <label>Teléfono<input name="phone" required inputMode="tel" pattern="\+?[0-9 \(\)\-]{8,20}" /></label>
             <label>Correo (opcional)<input name="email" type="email" /></label>
           </div>
+          <label className="check"><input type="checkbox" name="whatsappConsent" />El paciente acepta recibir recordatorios por WhatsApp</label>
           {error && <div className="alert error">{error}</div>}
           <div className="row"><button className="primary">Guardar y continuar</button><button type="button" onClick={() => setCreating(false)}>Cancelar</button></div>
         </form>

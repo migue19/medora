@@ -5,15 +5,14 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppConfig, loadConfig } from './config';
-import { buildAppModule } from './app.module';
+import { Transports, buildAppModule } from './app.module';
 import { RateLimiter } from './common/rate-limit';
-import { MailTransport } from './mail/mail.transport';
 
 export async function createApp(
-  config: AppConfig = loadConfig(), logger = true, mailTransport?: MailTransport,
+  config: AppConfig = loadConfig(), logger = true, transports: Transports = {},
 ): Promise<INestApplication> {
   RateLimiter.enabled = config.rateLimitEnabled ?? true;
-  const app = await NestFactory.create<NestExpressApplication>(buildAppModule(config, mailTransport), {
+  const app = await NestFactory.create<NestExpressApplication>(buildAppModule(config, transports), {
     logger: logger ? ['error', 'warn', 'log'] : false,
   });
   // Un único salto de proxy (Nginx o el proxy de Next) para obtener la IP del cliente.

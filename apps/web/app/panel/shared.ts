@@ -5,9 +5,13 @@ export interface Doctor {
   serviceIds: string[]; rules: Rule[];
   membership: { id: string; user: { name: string; email: string } } | null;
 }
-export interface ClinicPatient { id: string; name: string; phone: string; email: string | null; patientAccountId: string | null }
+export interface ClinicPatient {
+  id: string; name: string; phone: string; email: string | null; patientAccountId: string | null; whatsappConsent?: boolean;
+}
+export interface ReminderLog { channel: 'EMAIL' | 'WHATSAPP'; offsetMinutes: number | null; status: 'SENT' | 'FAILED' | 'SKIPPED'; error: string | null; createdAt: string }
 export interface Appointment {
   id: string; startsAt: string; endsAt: string; status: 'BOOKED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW'; source: string;
   serviceId: string; serviceName: string; durationMinutes: number; priceCents: number; patientNotes: string | null;
   cancelReason: string | null; doctor: { id: string; displayName: string }; patient: ClinicPatient;
+  confirmedAt: string | null; reminders: ReminderLog[];
 }

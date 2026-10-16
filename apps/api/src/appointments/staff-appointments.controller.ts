@@ -79,6 +79,7 @@ export class StaffAppointmentsController {
       include: {
         doctor: { select: { id: true, displayName: true } },
         clinicPatient: { select: { id: true, name: true, phone: true, email: true } },
+        notifications: NOTIFICATION_SELECT,
       },
       orderBy: [{ startsAt: 'asc' }],
       take: 1000,
@@ -97,6 +98,7 @@ export class StaffAppointmentsController {
       include: {
         doctor: { select: { id: true, displayName: true } },
         clinicPatient: { select: { id: true, name: true, phone: true, email: true } },
+        notifications: NOTIFICATION_SELECT,
       },
     });
     return { ...serialize(full), events };
@@ -163,10 +165,16 @@ export class StaffAppointmentsController {
   }
 }
 
+const NOTIFICATION_SELECT = {
+  select: { channel: true, offsetMinutes: true, status: true, error: true, createdAt: true, startsAt: true },
+  orderBy: { createdAt: 'asc' },
+} as const;
+
 type Row = {
   id: string; startsAt: Date; endsAt: Date; status: string; source: string; serviceName: string;
   durationMinutes: number; priceCents: number; patientNotes: string | null; cancelReason: string | null;
-  createdAt: Date; serviceId: string;
+  createdAt: Date; serviceId: string; confirmedAt: Date | null;
+  notifications: { channel: string; offsetMinutes: number | null; status: string; error: string | null; createdAt: Date; startsAt: Date }[];
   doctor: { id: string; displayName: string };
   clinicPatient: { id: string; name: string; phone: string; email: string | null };
 };
@@ -175,8 +183,12 @@ function serialize(a: Row) {
   return {
     id: a.id, startsAt: a.startsAt, endsAt: a.endsAt, status: a.status, source: a.source,
     serviceId: a.serviceId, serviceName: a.serviceName, durationMinutes: a.durationMinutes, priceCents: a.priceCents,
-    patientNotes: a.patientNotes, cancelReason: a.cancelReason, createdAt: a.createdAt,
+    patientNotes: a.patientNotes, cancelReason: a.cancelReason, createdAt: a.createdAt, confirmedAt: a.confirmedAt,
     doctor: a.doctor, patient: a.clinicPatient,
+    // Sólo los envíos del horario vigente (los de un horario anterior ya no aplican).
+    reminders: a.notifications
+      .filter((n) => n.startsAt.getTime() === a.startsAt.getTime())
+      .map(({ startsAt: _s, ...n }) => n),
   };
 }
 

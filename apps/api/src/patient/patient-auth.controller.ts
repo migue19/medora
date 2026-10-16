@@ -4,7 +4,7 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { Prisma } from '@prisma/client';
-import { IsEmail, IsString, Length, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsOptional, IsString, Length, Matches, MaxLength, MinLength } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { APP_CONFIG, AppConfig } from '../config';
 import { PrismaService } from '../prisma.service';
@@ -29,6 +29,7 @@ class RegisterDto {
   @IsEmail() @MaxLength(254) email: string;
   @Transform(trim) @IsString() @Matches(PHONE_PATTERN, { message: 'Teléfono inválido' }) phone: string;
   @IsString() @MinLength(10) @MaxLength(200) password: string;
+  @IsOptional() @IsBoolean() whatsappConsent?: boolean;
 }
 
 class PatientLoginDto {
@@ -39,6 +40,18 @@ class PatientLoginDto {
 class UpdateProfileDto {
   @Transform(trim) @IsString() @MinLength(2) @MaxLength(120) name: string;
   @Transform(trim) @IsString() @Matches(PHONE_PATTERN, { message: 'Teléfono inválido' }) phone: string;
+  @IsOptional() @IsBoolean() whatsappConsent?: boolean;
+}
+
+type AccountView = {
+  id: string; name: string; email: string; phone: string; emailVerifiedAt: Date | null; whatsappConsentAt: Date | null;
+};
+
+function view(a: AccountView) {
+  return {
+    id: a.id, name: a.name, email: a.email, phone: a.phone,
+    emailVerified: a.emailVerifiedAt !== null, whatsappConsent: a.whatsappConsentAt !== null,
+  };
 }
 
 class ChangePasswordDto {
@@ -82,7 +95,10 @@ export class PatientAuthController {
     try {
       const { account, token, session } = await this.prisma.$transaction(async (tx) => {
         const account = await tx.patientAccount.create({
-          data: { email: normalizeEmail(dto.email), name: dto.name, phone: dto.phone, passwordHash },
+          data: {
+            email: normalizeEmail(dto.email), name: dto.name, phone: dto.phone, passwordHash,
+            whatsappConsentAt: dto.whatsappConsent ? new Date() : null,
+          },
         });
         const refresh = await this.tokens.createRefresh({ kind: 'PATIENT', patientAccountId: account.id }, tx);
         const verify = await this.authTokens.issue(
@@ -235,19 +251,24 @@ export class PatientAuthController {
 
   @Get('me')
   @UseGuards(PatientGuard)
-  me(@Patient() patient: PatientContext) {
-    return {
-      id: patient.id, name: patient.name, email: patient.email, phone: patient.phone, emailVerified: patient.emailVerified,
-    };
+  async me(@Patient() patient: PatientContext) {
+    return view(await this.prisma.patientAccount.findUniqueOrThrow({ where: { id: patient.id } }));
   }
 
   @Patch('me')
   @UseGuards(PatientGuard)
   async updateMe(@Patient() patient: PatientContext, @Body() dto: UpdateProfileDto) {
+    const current = await this.prisma.patientAccount.findUniqueOrThrow({ where: { id: patient.id } });
     const a = await this.prisma.patientAccount.update({
-      where: { id: patient.id }, data: { name: dto.name, phone: dto.phone },
+      where: { id: patient.id },
+      data: {
+        name: dto.name, phone: dto.phone,
+        ...(dto.whatsappConsent === undefined ? {} : {
+          whatsappConsentAt: dto.whatsappConsent ? (current.whatsappConsentAt ?? new Date()) : null,
+        }),
+      },
     });
-    return { id: a.id, name: a.name, email: a.email, phone: a.phone, emailVerified: a.emailVerifiedAt !== null };
+    return view(a);
   }
 
   @Patch('me/password')
@@ -276,7 +297,7 @@ export class PatientAuthController {
     return {
       accessToken,
       expiresIn: ACCESS_TTL_SECONDS,
-      patient: { id: a.id, name: a.name, email: a.email, phone: a.phone, emailVerified: a.emailVerifiedAt !== null },
+      patient: view(a),
     };
   }
 }

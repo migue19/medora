@@ -7,6 +7,7 @@ import { PrismaService, Tx } from '../prisma.service';
 import { canonicalHash } from '../common/crypto';
 import { computeSlots, fitsWeeklySchedule, parseLocalDate } from '../scheduling/availability';
 import { MailService } from '../mail/mail.service';
+import { RemindersService } from '../notifications/reminders.service';
 
 export const MAX_FUTURE_ONLINE_APPOINTMENTS = 3;
 export const MAX_AVAILABILITY_DAYS = 14;
@@ -43,7 +44,11 @@ export interface BookingInput {
 
 @Injectable()
 export class AppointmentsService {
-  constructor(private readonly prisma: PrismaService, private readonly mail: MailService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mail: MailService,
+    private readonly reminders: RemindersService,
+  ) {}
 
   /** Horarios disponibles para un médico y servicio. */
   async availability(params: {
@@ -164,6 +169,7 @@ export class AppointmentsService {
           },
         });
         await this.mail.appointmentEvent(tx, event.id);
+        await this.reminders.schedule(tx, created, clinic, now);
         return created;
       });
       return { appointment, replayed: false };
@@ -246,8 +252,9 @@ export class AppointmentsService {
           },
         });
         if (patientOverlap > 0) throw new ConflictException('El paciente ya tiene otra cita en ese horario');
+        // Una confirmación previa era para el horario anterior.
         const updated = await tx.appointment.update({
-          where: { id: current.id }, data: { startsAt: params.startsAt, endsAt },
+          where: { id: current.id }, data: { startsAt: params.startsAt, endsAt, confirmedAt: null },
         });
         const event = await tx.appointmentEvent.create({
           data: {
@@ -256,12 +263,32 @@ export class AppointmentsService {
           },
         });
         await this.mail.appointmentEvent(tx, event.id);
+        await this.reminders.schedule(tx, updated, clinic, now);
         return updated;
       });
     } catch (e) {
       if (isDoubleBooking(e)) throw new ConflictException(SLOT_TAKEN);
       throw e;
     }
+  }
+
+  /** El paciente confirma su asistencia. Repetir la confirmación no cambia nada. */
+  async confirm(params: { appointment: Appointment; actor: Actor }): Promise<Appointment> {
+    return this.prisma.$transaction(async (tx) => {
+      await lockDoctor(tx, params.appointment.doctorId);
+      const current = await tx.appointment.findUniqueOrThrow({ where: { id: params.appointment.id } });
+      if (current.status !== 'BOOKED') throw new ConflictException('La cita ya no está vigente');
+      if (current.startsAt <= new Date()) throw new ConflictException('La cita ya comenzó');
+      if (current.confirmedAt) return current;
+      const updated = await tx.appointment.update({ where: { id: current.id }, data: { confirmedAt: new Date() } });
+      await tx.appointmentEvent.create({
+        data: {
+          appointmentId: current.id, type: 'CONFIRMED', actorKind: params.actor.kind,
+          actorId: params.actor.id, actorName: params.actor.name,
+        },
+      });
+      return updated;
+    });
   }
 
   /** Marca una cita como atendida o no asistió (sólo después de su hora de inicio). */

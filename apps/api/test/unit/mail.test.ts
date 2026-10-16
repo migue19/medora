@@ -39,3 +39,12 @@ test('reintentos con espera exponencial y tope de una hora', () => {
   assert.equal(backoffMs(3), 120_000);
   assert.equal(backoffMs(20), 60 * 60_000);
 });
+
+test('teléfonos a formato de WhatsApp', async () => {
+  const { toWhatsAppNumber } = await import('../../src/notifications/whatsapp.transport');
+  assert.equal(toWhatsAppNumber('55 1234 5678', '52'), '525512345678');
+  assert.equal(toWhatsAppNumber('(33) 1111-2222', '52'), '523311112222');
+  assert.equal(toWhatsAppNumber('+1 415 555 0100', '52'), '14155550100');
+  assert.equal(toWhatsAppNumber('52 55 1234 5678', '52'), '525512345678');
+  assert.equal(toWhatsAppNumber('1234', '52'), null);
+});

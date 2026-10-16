@@ -9,6 +9,7 @@ import { createApp } from '../../src/bootstrap';
 import { hashPassword } from '../../src/common/crypto';
 import { JobsService } from '../../src/jobs/jobs.service';
 import { MemoryTransport, OutgoingEmail } from '../../src/mail/mail.transport';
+import { MemoryWhatsApp } from '../../src/notifications/whatsapp.transport';
 
 export const ORIGIN = 'http://localhost:6011';
 export const TZ = 'America/Mexico_City';
@@ -26,6 +27,7 @@ export interface Harness {
   base: string;
   prisma: PrismaClient;
   mail: MemoryTransport;
+  whatsapp: MemoryWhatsApp;
   jobs: JobsService;
   /** Ejecuta la cola y devuelve los correos enviados en esta corrida. */
   deliver(): Promise<OutgoingEmail[]>;
@@ -37,6 +39,7 @@ let sharedPrisma: PrismaClient | null = null;
 export async function startHarness(): Promise<Harness> {
   const databaseUrl = testDatabaseUrl();
   const mail = new MemoryTransport();
+  const whatsapp = new MemoryWhatsApp();
   const app = await createApp({
     databaseUrl,
     jwtSecret: new TextEncoder().encode('integration-secret-integration-secret-0123'),
@@ -48,15 +51,19 @@ export async function startHarness(): Promise<Harness> {
     trustProxy: false,
     rateLimitEnabled: false,
     mail: { from: 'Medora <no-reply@test.mx>', smtp: null },
+    whatsapp: {
+      token: 'prueba', phoneNumberId: '123', template: 'recordatorio_cita', language: 'es_MX', apiVersion: 'v21.0',
+      defaultCountryCode: '52',
+    },
     jobsPollMs: 0,
-  }, false, mail);
+  }, false, { mail, whatsapp });
   await app.listen(0, '127.0.0.1');
   const { port } = app.getHttpServer().address() as AddressInfo;
   const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: databaseUrl }) });
   sharedPrisma = prisma;
   const jobs = app.get(JobsService);
   return {
-    app, base: `http://127.0.0.1:${port}`, prisma, mail, jobs,
+    app, base: `http://127.0.0.1:${port}`, prisma, mail, whatsapp, jobs,
     async deliver() {
       const before = mail.sent.length;
       await jobs.runOnce();
@@ -101,7 +108,7 @@ export class Client {
 }
 
 export async function resetDb(prisma: PrismaClient): Promise<void> {
-  await prisma.$executeRawUnsafe(`TRUNCATE "Job", "AuthToken", "StaffInvitation", "AppointmentEvent", "Appointment", "TimeOff", "ScheduleRule",
+  await prisma.$executeRawUnsafe(`TRUNCATE "NotificationLog", "AppointmentActionToken", "Job", "AuthToken", "StaffInvitation", "AppointmentEvent", "Appointment", "TimeOff", "ScheduleRule",
     "DoctorService", "Service", "Doctor", "ClinicPatient", "RefreshSession", "PatientAccount", "Membership",
     "User", "Clinic" CASCADE`);
 }

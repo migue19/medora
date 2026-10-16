@@ -95,12 +95,14 @@ export function Agenda({ session }: { session: StaffSessionData }) {
                   <div className="row">
                     <strong>{a.patient.name}</strong>
                     <span className={`badge ${a.status}`}>{STATUS_LABEL[a.status]}</span>
+                    {a.status === 'BOOKED' && a.confirmedAt && <span className="badge COMPLETED">Confirmada por el paciente</span>}
                     {a.source === 'ONLINE' && <span className="badge">En línea</span>}
                   </div>
                   <span className="small">{a.serviceName} · {a.doctor.displayName} · {money(a.priceCents)}</span>
                   <span className="small muted"><a href={`tel:${a.patient.phone.replace(/[^+\d]/g, '')}`}>{a.patient.phone}</a>{a.patient.email ? ` · ${a.patient.email}` : ''}</span>
                   {a.patientNotes && <span className="small">Motivo: {a.patientNotes}</span>}
                   {a.cancelReason && <span className="small muted">Cancelación: {a.cancelReason}</span>}
+                  {a.reminders.length > 0 && <Reminders logs={a.reminders} />}
                   {a.status === 'BOOKED' && (
                     <div className="row">
                       {started ? (
@@ -129,6 +131,29 @@ export function Agenda({ session }: { session: StaffSessionData }) {
         </section>
       ))}
     </div>
+  );
+}
+
+const CHANNEL: Record<string, string> = { EMAIL: 'correo', WHATSAPP: 'WhatsApp' };
+const STATE: Record<string, string> = { SENT: 'enviado', FAILED: 'falló', SKIPPED: 'no enviado' };
+
+function offsetLabel(minutes: number | null) {
+  if (minutes === null) return '';
+  return minutes % 1440 === 0 ? `${minutes / 1440} d` : minutes % 60 === 0 ? `${minutes / 60} h` : `${minutes} min`;
+}
+
+/** Último resultado de cada recordatorio (canal y anticipación) del horario vigente. */
+function Reminders({ logs }: { logs: Appointment['reminders'] }) {
+  const latest = new Map<string, Appointment['reminders'][number]>();
+  for (const l of logs) latest.set(`${l.channel}:${l.offsetMinutes}`, l);
+  return (
+    <span className="small muted">
+      Recordatorios: {[...latest.values()].map((l, i) => (
+        <span key={i} title={l.error ?? undefined} style={l.status === 'FAILED' ? { color: 'var(--danger)' } : undefined}>
+          {i > 0 ? ' · ' : ''}{CHANNEL[l.channel]} {offsetLabel(l.offsetMinutes)} {STATE[l.status]}{l.status !== 'SENT' && l.error ? ` (${l.error})` : ''}
+        </span>
+      ))}
+    </span>
   );
 }
 

@@ -11,12 +11,14 @@ const LEASE_MS = 5 * 60_000;
 const BATCH = 10;
 
 export interface JobInput {
-  type: 'email.send';
-  payload: OutgoingEmail;
+  type: string;
+  payload: object;
   /** Evita encolar dos veces el mismo efecto (p. ej. un evento de cita). */
   dedupeKey?: string;
   runAt?: Date;
 }
+
+export type JobHandler = (payload: Prisma.JsonValue) => Promise<void>;
 
 interface ClaimedJob {
   id: string;
@@ -37,12 +39,20 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
   private timer: NodeJS.Timeout | null = null;
   private running: Promise<number> | null = null;
   private stopped = false;
+  private readonly handlers = new Map<string, JobHandler>([
+    ['email.send', (payload) => this.mail.send(payload as unknown as OutgoingEmail)],
+  ]);
 
   constructor(
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     private readonly prisma: PrismaService,
     @Inject(MAIL_TRANSPORT) private readonly mail: MailTransport,
   ) {}
+
+  /** Otros módulos registran aquí sus tipos de trabajo. */
+  register(type: string, handler: JobHandler): void {
+    this.handlers.set(type, handler);
+  }
 
   /** Encola dentro de la transacción del cambio de negocio. Con dedupeKey repetida no hace nada. */
   async enqueue(tx: Tx | PrismaService, job: JobInput): Promise<void> {
@@ -77,7 +87,7 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
       for (;;) {
         const jobs = await this.claim(now);
         if (jobs.length === 0) return total;
-        for (const job of jobs) await this.execute(job);
+        for (const job of jobs) await this.execute(job, now);
         total += jobs.length;
       }
     })();
@@ -99,13 +109,14 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
       RETURNING id, type, payload, attempts, "maxAttempts"`;
   }
 
-  private async execute(job: ClaimedJob): Promise<void> {
+  private async execute(job: ClaimedJob, now: Date): Promise<void> {
     try {
       await this.handle(job);
       // El cuerpo puede llevar tokens y datos de la cita: se conserva sólo el destinatario y el asunto.
       await this.prisma.$executeRaw`
         UPDATE "Job" SET "completedAt" = now(), "lockedUntil" = NULL, "lastError" = NULL,
-          payload = jsonb_build_object('to', payload->'to', 'subject', payload->'subject')
+          payload = CASE WHEN type = 'email.send'
+            THEN jsonb_build_object('to', payload->'to', 'subject', payload->'subject') ELSE payload END
         WHERE id = ${job.id}::uuid AND attempts = ${job.attempts}`;
     } catch (e) {
       const message = errorText(e).slice(0, 1000);
@@ -113,20 +124,16 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
       this.logger.warn(`Trabajo ${job.type} ${job.id} falló (intento ${job.attempts}): ${message}`);
       await this.prisma.$executeRaw`
         UPDATE "Job" SET "lockedUntil" = NULL, "lastError" = ${message},
-          "runAt" = ${new Date(Date.now() + backoffMs(job.attempts))},
+          "runAt" = ${new Date(Math.max(now.getTime(), Date.now()) + backoffMs(job.attempts))},
           "failedAt" = ${final ? new Date() : null}
         WHERE id = ${job.id}::uuid AND attempts = ${job.attempts}`;
     }
   }
 
   private async handle(job: ClaimedJob): Promise<void> {
-    switch (job.type) {
-      case 'email.send':
-        await this.mail.send(job.payload as unknown as OutgoingEmail);
-        return;
-      default:
-        throw new Error(`Tipo de trabajo desconocido: ${job.type}`);
-    }
+    const handler = this.handlers.get(job.type);
+    if (!handler) throw new Error(`Tipo de trabajo desconocido: ${job.type}`);
+    await handler(job.payload);
   }
 }
 

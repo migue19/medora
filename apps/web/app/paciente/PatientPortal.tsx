@@ -86,6 +86,7 @@ export function PatientPortal() {
                     </div>
                   ))}
                 </section>
+                <WhatsAppPreference session={session.patient} />
                 {list.past.length > 0 && (
                   <section className="stack">
                     <h2>Historial</h2>
@@ -148,5 +149,30 @@ function Reschedule({ a, onDone }: { a: Appt; onDone: (msg?: string) => void }) 
         <button onClick={() => onDone()}>Cerrar</button>
       </div>
     </div>
+  );
+}
+
+/** El paciente decide si recibe recordatorios por WhatsApp (consentimiento expreso). */
+function WhatsAppPreference({ session }: { session: { name: string; phone: string; whatsappConsent: boolean } }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function toggle(value: boolean) {
+    setBusy(true); setError(null);
+    try {
+      await patientSession.patch('/api/patient/me', { name: session.name, phone: session.phone, whatsappConsent: value });
+      await patientSession.refresh();
+    } catch (e) { setError(errorMessage(e)); } finally { setBusy(false); }
+  }
+  return (
+    <section className="card stack">
+      <h2>Recordatorios</h2>
+      <p className="small muted">Te enviamos un recordatorio por correo antes de cada cita, con un enlace para confirmar o cancelar.</p>
+      <label className="check">
+        <input type="checkbox" checked={session.whatsappConsent} disabled={busy} onChange={(e) => toggle(e.target.checked)} />
+        También por WhatsApp al {session.phone}
+      </label>
+      <p className="small muted">Sólo si la clínica tiene activado WhatsApp. Puedes desactivarlo cuando quieras.</p>
+      {error && <div className="alert error" role="alert">{error}</div>}
+    </section>
   );
 }

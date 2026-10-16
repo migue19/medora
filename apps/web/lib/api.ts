@@ -98,7 +98,7 @@ export interface StaffSessionData {
 }
 
 export interface PatientSessionData {
-  patient: { id: string; name: string; email: string; phone: string; emailVerified: boolean };
+  patient: { id: string; name: string; email: string; phone: string; emailVerified: boolean; whatsappConsent: boolean };
 }
 
 export const staffSession = new Session<StaffSessionData>('staff');

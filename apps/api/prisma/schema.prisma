@@ -1,4 +1,4 @@
-// Medora · Sprint 2
+// Medora · Sprint 3
 // Todas las entidades de negocio llevan clinicId y se consultan siempre
 // filtradas por la clínica obtenida de la sesión.
 
@@ -53,6 +53,18 @@ enum AppointmentEventType {
   CANCELLED
   COMPLETED
   NO_SHOW
+  CONFIRMED
+}
+
+enum NotificationChannel {
+  EMAIL
+  WHATSAPP
+}
+
+enum NotificationStatus {
+  SENT
+  FAILED
+  SKIPPED
 }
 
 model Clinic {
@@ -67,6 +79,10 @@ model Clinic {
   minNoticeMinutes        Int      @default(60)
   horizonDays             Int      @default(60)
   patientCancelMinMinutes Int      @default(120)
+  remindersEnabled        Boolean  @default(true)
+  // Minutos antes de la cita (por defecto 24 h y 2 h).
+  reminderOffsets         Int[]    @default([1440, 120])
+  whatsappEnabled         Boolean  @default(false)
   createdAt               DateTime @default(now()) @db.Timestamptz(3)
   updatedAt               DateTime @updatedAt @db.Timestamptz(3)
 
@@ -117,6 +133,8 @@ model PatientAccount {
   phone           String    @db.VarChar(30)
   passwordHash    String    @db.VarChar(255)
   emailVerifiedAt DateTime? @db.Timestamptz(3)
+  // Consentimiento expreso para recordatorios por WhatsApp.
+  whatsappConsentAt DateTime? @db.Timestamptz(3)
   active          Boolean   @default(true)
   createdAt       DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
@@ -155,6 +173,8 @@ model ClinicPatient {
   name             String   @db.VarChar(120)
   phone            String   @db.VarChar(30)
   email            String?  @db.VarChar(254)
+  // Consentimiento registrado por la clínica (pacientes telefónicos).
+  whatsappConsentAt DateTime? @db.Timestamptz(3)
   createdAt        DateTime @default(now()) @db.Timestamptz(3)
   updatedAt        DateTime @updatedAt @db.Timestamptz(3)
 
@@ -266,6 +286,8 @@ model Appointment {
   requestKey      String            @unique @db.VarChar(120)
   requestHash     String            @db.Char(64)
   cancelReason    String?           @db.VarChar(200)
+  // El paciente confirmó su asistencia (se reinicia al reprogramar).
+  confirmedAt     DateTime?         @db.Timestamptz(3)
   createdAt       DateTime          @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime          @updatedAt @db.Timestamptz(3)
 
@@ -274,6 +296,8 @@ model Appointment {
   service       Service            @relation(fields: [serviceId, clinicId], references: [id, clinicId])
   clinicPatient ClinicPatient      @relation(fields: [clinicPatientId, clinicId], references: [id, clinicId])
   events        AppointmentEvent[]
+  actionTokens  AppointmentActionToken[]
+  notifications NotificationLog[]
 
   @@index([clinicId, startsAt])
   @@index([doctorId, startsAt])
@@ -352,4 +376,41 @@ model Job {
   failedAt    DateTime? @db.Timestamptz(3)
   lastError   String?   @db.VarChar(1000)
   createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+}
+
+// Enlace del recordatorio para confirmar o cancelar sin iniciar sesión.
+// Vale para un solo uso, sólo para el horario con que se emitió y vence al iniciar la cita.
+model AppointmentActionToken {
+  id            String    @id @default(uuid()) @db.Uuid
+  appointmentId String    @db.Uuid
+  tokenHash     String    @unique @db.Char(64)
+  startsAt      DateTime  @db.Timestamptz(3)
+  expiresAt     DateTime  @db.Timestamptz(3)
+  usedAt        DateTime? @db.Timestamptz(3)
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id])
+
+  @@index([appointmentId])
+}
+
+// Bitácora de cada envío de recordatorio (canal, resultado y error).
+model NotificationLog {
+  id            String              @id @default(uuid()) @db.Uuid
+  clinicId      String              @db.Uuid
+  appointmentId String              @db.Uuid
+  channel       NotificationChannel
+  kind          String              @db.VarChar(30)
+  offsetMinutes Int?
+  startsAt      DateTime            @db.Timestamptz(3)
+  status        NotificationStatus
+  recipient     String?             @db.VarChar(254)
+  providerId    String?             @db.VarChar(200)
+  error         String?             @db.VarChar(500)
+  createdAt     DateTime            @default(now()) @db.Timestamptz(3)
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id])
+
+  @@index([appointmentId])
+  @@index([clinicId, createdAt])
 }
