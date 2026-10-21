@@ -61,6 +61,7 @@ export class MailService {
         appointment: {
           include: {
             clinic: true,
+            location: true,
             doctor: { select: { displayName: true } },
             clinicPatient: { select: { name: true, email: true, patientAccountId: true } },
           },
@@ -77,7 +78,10 @@ export class MailService {
     const rendered = appointmentEmail({
       kind,
       patientName: a.clinicPatient.name,
-      clinic: { name: a.clinic.name, address: a.clinic.address, phone: a.clinic.phone, timezone: a.clinic.timezone },
+      clinic: {
+        name: a.clinic.name, address: placeOf(a.location, a.clinic), phone: a.location.phone ?? a.clinic.phone,
+        timezone: a.clinic.timezone,
+      },
       doctorName: a.doctor.displayName,
       serviceName: a.serviceName,
       startsAt,
@@ -97,7 +101,7 @@ export class MailService {
       start: startsAt,
       end: endsAt,
       summary: `${a.serviceName} · ${a.doctor.displayName}`,
-      location: [a.clinic.name, a.clinic.address].filter(Boolean).join(', '),
+      location: [a.clinic.name, placeOf(a.location, a.clinic)].filter(Boolean).join(', '),
       description: a.clinic.phone ? `Teléfono de la clínica: ${a.clinic.phone}` : null,
       organizerEmail: this.fromAddress(),
       organizerName: a.clinic.name,
@@ -125,4 +129,9 @@ export class MailService {
     const { dedupeKey, ...rest } = extra;
     await this.jobs.enqueue(tx, { type: 'email.send', payload: { to, ...rendered, ...rest }, dedupeKey });
   }
+}
+
+/** Sede y dirección de la cita: «Sede Norte, Av. X 123» (la de la clínica si la sede no tiene). */
+export function placeOf(location: { name: string; address: string | null }, clinic: { address: string | null }): string {
+  return [location.name, location.address ?? clinic.address].filter(Boolean).join(', ');
 }

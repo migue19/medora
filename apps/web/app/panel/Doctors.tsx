@@ -2,7 +2,7 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { StaffSessionData, errorMessage, staffSession } from '@/lib/api';
 import { WEEKDAYS, fmtDate, fmtTime, hhmmToMinutes, minutesToHHMM, todayIn, zonedToUtcIso } from '@/lib/format';
-import type { Doctor, Rule, Service } from './shared';
+import type { Doctor, Location, Rule, Service } from './shared';
 
 interface Member { id: string; role: string; active: boolean; user: { name: string; email: string }; doctor: { id: string } | null }
 
@@ -12,17 +12,19 @@ export function Doctors({ session }: { session: StaffSessionData }) {
   const [doctors, setDoctors] = useState<Doctor[] | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [editing, setEditing] = useState<Doctor | 'new' | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     try {
-      const [d, s] = await Promise.all([
+      const [d, s, l] = await Promise.all([
         staffSession.get<Doctor[]>('/api/clinic/doctors'),
         staffSession.get<Service[]>('/api/clinic/services'),
+        staffSession.get<Location[]>('/api/clinic/locations'),
       ]);
-      setDoctors(d); setServices(s);
+      setDoctors(d); setServices(s); setLocations(l);
       if (isAdmin) setMembers(await staffSession.get<Member[]>('/api/clinic/members'));
     } catch (e) { setError(errorMessage(e)); }
   }, [isAdmin]);
@@ -37,22 +39,25 @@ export function Doctors({ session }: { session: StaffSessionData }) {
       {error && <div className="alert error">{error}</div>}
       {isAdmin && !editing && <div><button className="primary" onClick={() => setEditing('new')}>+ Agregar médico</button></div>}
       {editing && (
-        <DoctorForm doctor={editing === 'new' ? null : editing} services={services} members={members}
+        <DoctorForm doctor={editing === 'new' ? null : editing} services={services} members={members} canPhoto
           onDone={async () => { setEditing(null); await reload(); }} />
       )}
       {doctors && visible.length === 0 && <p className="muted">{role === 'DOCTOR' ? 'Tu usuario no está vinculado a un perfil de médico.' : 'Aún no hay médicos.'}</p>}
       <div className="grid">
         {visible.map((d) => (
           <div key={d.id} className="card stack" style={{ opacity: d.active ? 1 : 0.6 }}>
-            <div>
+            <div className="row" style={{ alignItems: 'flex-start', flexWrap: 'nowrap' }}>
+              {d.photoUrl && <img src={d.photoUrl} alt="" width={56} height={56} style={{ borderRadius: 12, objectFit: 'cover', flexShrink: 0 }} />}
+              <div>
               <h3 style={{ margin: 0 }}>{d.displayName} {!d.active && <span className="badge">Inactivo</span>}</h3>
               <div className="muted small">{d.specialty}{d.licenseNumber ? ` · Céd. ${d.licenseNumber}` : ''}</div>
               {d.membership && <div className="muted small">Usuario: {d.membership.user.email}</div>}
+              </div>
             </div>
             <div className="small">
               {services.filter((s) => d.serviceIds.includes(s.id)).map((s) => s.name).join(', ') || <span className="muted">Sin servicios</span>}
             </div>
-            <div className="small muted">{summarizeRules(d.rules)}</div>
+            <div className="small muted">{summarizeRules(d.rules, locations)}</div>
             <div className="row">
               <button onClick={() => setSelected(selected === d.id ? null : d.id)}>{selected === d.id ? 'Cerrar' : 'Horario y bloqueos'}</button>
               {isAdmin && <button className="ghost" onClick={() => setEditing(d)}>Editar</button>}
@@ -63,7 +68,8 @@ export function Doctors({ session }: { session: StaffSessionData }) {
       {current && (
         <div className="card stack">
           <h2>{current.displayName}</h2>
-          <ScheduleEditor doctor={current} canEdit={isAdmin || current.id === session.membership.doctorId} onSaved={reload} />
+          {!isAdmin && current.id === session.membership.doctorId && <PhotoUploader doctor={current} onDone={reload} />}
+          <ScheduleEditor doctor={current} locations={locations} canEdit={isAdmin || current.id === session.membership.doctorId} onSaved={reload} />
           <TimeOffEditor doctor={current} tz={session.clinic.timezone} canEdit={role !== 'DOCTOR' || current.id === session.membership.doctorId} />
         </div>
       )}
@@ -71,13 +77,63 @@ export function Doctors({ session }: { session: StaffSessionData }) {
   );
 }
 
-function summarizeRules(rules: Rule[]): string {
+function summarizeRules(rules: Rule[], locations: Location[]): string {
   if (!rules.length) return 'Sin horario configurado';
+  const many = locations.length > 1;
+  const place = (r: Rule) => (many ? ` (${locations.find((l) => l.id === r.locationId)?.name ?? ''})` : '');
   const days = [...new Set(rules.map((r) => r.weekday))].sort();
-  return days.map((w) => `${WEEKDAYS[w - 1].slice(0, 3)} ${rules.filter((r) => r.weekday === w).map((r) => `${minutesToHHMM(r.startMinute)}–${minutesToHHMM(r.endMinute)}`).join(', ')}`).join(' · ');
+  return days.map((w) => `${WEEKDAYS[w - 1].slice(0, 3)} ${rules.filter((r) => r.weekday === w).map((r) => `${minutesToHHMM(r.startMinute)}–${minutesToHHMM(r.endMinute)}${place(r)}`).join(', ')}`).join(' · ');
 }
 
-function DoctorForm({ doctor, services, members, onDone }: { doctor: Doctor | null; services: Service[]; members: Member[]; onDone: () => void }) {
+const lines = (v: FormDataEntryValue | null) => String(v ?? '').split('\n').map((x) => x.trim()).filter(Boolean);
+
+/** Reduce la foto en el navegador (máx. 600 px, JPEG) para que pese poco y se vea igual en todos lados. */
+async function shrink(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 600 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('No se pudo procesar la imagen'))), 'image/jpeg', 0.85));
+}
+
+function PhotoUploader({ doctor, onDone }: { doctor: Doctor; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [url, setUrl] = useState(doctor.photoUrl ?? null);
+  async function upload(file: File) {
+    setBusy(true); setError(null);
+    try {
+      const form = new FormData();
+      form.append('photo', await shrink(file), 'foto.jpg');
+      const res = await fetch(`/api/clinic/doctors/${doctor.id}/photo`, {
+        method: 'POST', body: form, credentials: 'same-origin', headers: { authorization: `Bearer ${staffSession.token}` },
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(body?.message ?? 'No se pudo subir la foto');
+      setUrl(body.photoUrl);
+      onDone();
+    } catch (e) { setError(errorMessage(e)); } finally { setBusy(false); }
+  }
+  async function remove() {
+    setError(null);
+    try { await staffSession.del(`/api/clinic/doctors/${doctor.id}/photo`); setUrl(null); onDone(); } catch (e) { setError(errorMessage(e)); }
+  }
+  return (
+    <div className="row">
+      {url ? <img src={url} alt="" width={72} height={72} style={{ borderRadius: 12, objectFit: 'cover' }} /> : <span className="small muted">Sin foto</span>}
+      <label className="btn" style={{ fontWeight: 500 }}>{busy ? 'Subiendo…' : url ? 'Cambiar foto' : 'Subir foto'}
+        <input type="file" accept="image/jpeg,image/png,image/webp" hidden disabled={busy}
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.target.value = ''; }} />
+      </label>
+      {url && <button type="button" className="ghost" onClick={remove}>Quitar</button>}
+      {error && <span className="small" style={{ color: 'var(--danger)' }}>{error}</span>}
+    </div>
+  );
+}
+
+function DoctorForm({ doctor, services, members, onDone, canPhoto }: { doctor: Doctor | null; services: Service[]; members: Member[]; onDone: () => void; canPhoto?: boolean }) {
   const [serviceIds, setServiceIds] = useState<string[]>(doctor?.serviceIds ?? []);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -89,6 +145,8 @@ function DoctorForm({ doctor, services, members, onDone }: { doctor: Doctor | nu
     const body: Record<string, unknown> = {
       displayName: f.get('displayName'), specialty: f.get('specialty'), licenseNumber: f.get('licenseNumber'),
       bio: f.get('bio'), serviceIds, membershipId: (f.get('membershipId') as string) || null,
+      education: lines(f.get('education')), certifications: lines(f.get('certifications')), languages: lines(f.get('languages')),
+      conditions: lines(f.get('conditions')), insurers: lines(f.get('insurers')),
     };
     if (doctor) body.active = f.get('active') === 'on';
     setBusy(true); setError(null);
@@ -113,7 +171,16 @@ function DoctorForm({ doctor, services, members, onDone }: { doctor: Doctor | nu
           </select>
         </label>
       </div>
+      {doctor && canPhoto && <PhotoUploader doctor={doctor} onDone={() => undefined} />}
       <label>Presentación (se muestra a pacientes)<textarea name="bio" maxLength={1000} defaultValue={doctor?.bio ?? ''} /></label>
+      <p className="small muted">Perfil profesional: un elemento por renglón. Se muestra en la página de reservas.</p>
+      <div className="grid">
+        <label>Formación<textarea name="education" defaultValue={(doctor?.education ?? []).join('\n')} placeholder={'Médico Cirujano, UNAM\nEspecialidad en Cardiología, IMSS'} /></label>
+        <label>Certificaciones de consejo<textarea name="certifications" defaultValue={(doctor?.certifications ?? []).join('\n')} placeholder="Consejo Mexicano de Cardiología" /></label>
+        <label>Idiomas<textarea name="languages" defaultValue={(doctor?.languages ?? []).join('\n')} placeholder={'Español\nInglés'} /></label>
+        <label>Padecimientos que atiende<textarea name="conditions" defaultValue={(doctor?.conditions ?? []).join('\n')} placeholder={'Hipertensión\nArritmias'} /></label>
+        <label>Aseguradoras aceptadas<textarea name="insurers" defaultValue={(doctor?.insurers ?? []).join('\n')} placeholder={'GNP\nAXA'} /></label>
+      </div>
       <fieldset className="stack" style={{ border: 0, padding: 0, margin: 0 }}>
         <legend className="small" style={{ fontWeight: 600 }}>Servicios que ofrece</legend>
         {services.filter((s) => s.active || serviceIds.includes(s.id)).map((s) => (
@@ -129,17 +196,24 @@ function DoctorForm({ doctor, services, members, onDone }: { doctor: Doctor | nu
   );
 }
 
-interface EditableRule { weekday: number; start: string; end: string }
+interface EditableRule { weekday: number; start: string; end: string; locationId: string; roomId: string }
 
-function ScheduleEditor({ doctor, canEdit, onSaved }: { doctor: Doctor; canEdit: boolean; onSaved: () => void }) {
-  const toEditable = (rules: Rule[]) => rules.map((r) => ({ weekday: r.weekday, start: minutesToHHMM(r.startMinute), end: minutesToHHMM(r.endMinute) }));
+function ScheduleEditor({ doctor, locations, canEdit, onSaved }: { doctor: Doctor; locations: Location[]; canEdit: boolean; onSaved: () => void }) {
+  const active = locations.filter((l) => l.active);
+  const toEditable = (rules: Rule[]) => rules.map((r) => ({
+    weekday: r.weekday, start: minutesToHHMM(r.startMinute), end: minutesToHHMM(r.endMinute),
+    locationId: r.locationId ?? active[0]?.id ?? '', roomId: r.roomId ?? '',
+  }));
   const [rules, setRules] = useState<EditableRule[]>(toEditable(doctor.rules));
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   useEffect(() => { setRules(toEditable(doctor.rules)); setMsg(null); }, [doctor]);
 
   async function save() {
     setMsg(null);
-    const parsed = rules.map((r) => ({ weekday: r.weekday, startMinute: hhmmToMinutes(r.start), endMinute: hhmmToMinutes(r.end === '00:00' ? '24:00' : r.end) }));
+    const parsed = rules.map((r) => ({
+      weekday: r.weekday, startMinute: hhmmToMinutes(r.start), endMinute: hhmmToMinutes(r.end === '00:00' ? '24:00' : r.end),
+      ...(r.locationId ? { locationId: r.locationId } : {}), roomId: r.roomId || null,
+    }));
     if (parsed.some((r) => r.startMinute === null || r.endMinute === null)) { setMsg({ ok: false, text: 'Revisa las horas.' }); return; }
     try {
       await staffSession.put(`/api/clinic/doctors/${doctor.id}/schedule`, { rules: parsed });
@@ -151,7 +225,7 @@ function ScheduleEditor({ doctor, canEdit, onSaved }: { doctor: Doctor; canEdit:
   return (
     <section className="stack">
       <h3>Horario semanal</h3>
-      <p className="muted small">Bloques de atención en hora de la clínica. Las citas ya agendadas no se modifican al cambiar el horario.</p>
+      <p className="muted small">Bloques de atención en hora de la clínica, cada uno en una sede y, opcionalmente, un consultorio. Las citas ya agendadas no se modifican al cambiar el horario.</p>
       {WEEKDAYS.map((name, i) => {
         const weekday = i + 1;
         const dayRules = rules.map((r, idx) => ({ r, idx })).filter(({ r }) => r.weekday === weekday);
@@ -167,11 +241,24 @@ function ScheduleEditor({ doctor, canEdit, onSaved }: { doctor: Doctor; canEdit:
                   <span>a</span>
                   <input type="time" step={300} value={r.end} disabled={!canEdit} style={{ width: 'auto' }}
                     onChange={(e) => setRules(rules.map((x, j) => (j === idx ? { ...x, end: e.target.value } : x)))} />
+                  {active.length > 1 && (
+                    <select value={r.locationId} disabled={!canEdit} style={{ width: 'auto' }} aria-label="Sede"
+                      onChange={(e) => setRules(rules.map((x, j) => (j === idx ? { ...x, locationId: e.target.value, roomId: '' } : x)))}>
+                      {active.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    </select>
+                  )}
+                  {(active.find((l) => l.id === r.locationId)?.rooms.filter((x) => x.active).length ?? 0) > 0 && (
+                    <select value={r.roomId} disabled={!canEdit} style={{ width: 'auto' }} aria-label="Consultorio"
+                      onChange={(e) => setRules(rules.map((x, j) => (j === idx ? { ...x, roomId: e.target.value } : x)))}>
+                      <option value="">Sin consultorio</option>
+                      {active.find((l) => l.id === r.locationId)!.rooms.filter((x) => x.active).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                    </select>
+                  )}
                   {canEdit && <button className="ghost" aria-label="Quitar bloque" onClick={() => setRules(rules.filter((_, j) => j !== idx))}>✕</button>}
                 </div>
               ))}
             </div>
-            {canEdit && <button className="ghost small" onClick={() => setRules([...rules, { weekday, start: '09:00', end: '14:00' }])}>+ Bloque</button>}
+            {canEdit && <button className="ghost small" onClick={() => setRules([...rules, { weekday, start: '09:00', end: '14:00', locationId: active[0]?.id ?? '', roomId: '' }])}>+ Bloque</button>}
           </div>
         );
       })}

@@ -99,7 +99,7 @@ test('PostgreSQL impide el doble agendado aunque se salte la aplicación', async
         startsAt: new Date(new Date(a.startsAt).getTime() + 10 * 60_000),
         endsAt: new Date(new Date(a.startsAt).getTime() + 40 * 60_000),
         source: 'STAFF', serviceName: 'x', durationMinutes: 30, priceCents: 0,
-        requestKey: randomUUID(), requestHash: 'a'.repeat(64),
+        requestKey: randomUUID(), requestHash: 'a'.repeat(64), locationId: a.locationId,
       },
     }),
     /Appointment_no_double_booking|23P01|exclusion/i,

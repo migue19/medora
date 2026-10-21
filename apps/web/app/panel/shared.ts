@@ -1,8 +1,16 @@
-export interface Service { id: string; name: string; durationMinutes: number; priceCents: number; active: boolean }
-export interface Rule { weekday: number; startMinute: number; endMinute: number }
+export type VisitType = 'ANY' | 'FIRST' | 'FOLLOW_UP';
+export interface Service { id: string; name: string; durationMinutes: number; priceCents: number; active: boolean; visitType: VisitType }
+export interface Rule { weekday: number; startMinute: number; endMinute: number; locationId?: string; roomId?: string | null }
+export interface Hours { weekday: number; startMinute: number; endMinute: number }
+export interface Room { id: string; name: string; active: boolean }
+export interface Location {
+  id: string; name: string; address: string | null; phone: string | null; mapUrl: string | null; active: boolean;
+  sortOrder: number; hours: Hours[]; rooms: Room[];
+}
 export interface Doctor {
   id: string; displayName: string; specialty: string; licenseNumber: string | null; bio: string | null; active: boolean;
-  serviceIds: string[]; rules: Rule[];
+  serviceIds: string[]; rules: Rule[]; photoUrl?: string | null;
+  education?: string[]; certifications?: string[]; languages?: string[]; conditions?: string[]; insurers?: string[];
   membership: { id: string; user: { name: string; email: string } } | null;
 }
 export interface ClinicPatient {
@@ -15,4 +23,5 @@ export interface Appointment {
   serviceId: string; serviceName: string; durationMinutes: number; priceCents: number; patientNotes: string | null;
   cancelReason: string | null; doctor: { id: string; displayName: string }; patient: ClinicPatient;
   confirmedAt: string | null; reminders: ReminderLog[]; followUpOfId: string | null;
+  location?: { id: string; name: string }; room?: { id: string; name: string } | null;
 }

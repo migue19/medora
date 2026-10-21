@@ -1,6 +1,7 @@
 'use client';
 import { FormEvent, useEffect, useState } from 'react';
 import { errorMessage, staffSession } from '@/lib/api';
+import { Locations } from './Locations';
 
 interface Clinic {
   name: string; slug: string; phone: string | null; address: string | null; timezone: string; bookingEnabled: boolean;
@@ -51,6 +52,7 @@ export function ClinicSettings() {
           <button onClick={() => navigator.clipboard?.writeText(link)}>Copiar</button>
           <a className="btn" href={`/c/${clinic.slug}`} target="_blank" rel="noreferrer">Abrir</a></div>
       </div>
+      <Locations />
       <Reminders clinic={clinic} onSaved={setClinic} />
       <form className="card stack" onSubmit={save}>
         <h3>Datos y reglas de reserva</h3>

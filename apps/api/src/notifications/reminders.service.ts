@@ -5,6 +5,7 @@ import { PrismaService, Tx } from '../prisma.service';
 import { JobsService } from '../jobs/jobs.service';
 import { MAIL_TRANSPORT, MailTransport } from '../mail/mail.transport';
 import { formatWhen, reminderEmail } from '../mail/templates';
+import { placeOf } from '../mail/mail.service';
 import { randomToken, sha256 } from '../common/crypto';
 import { WHATSAPP_TRANSPORT, WhatsAppTransport, toWhatsAppNumber } from './whatsapp.transport';
 
@@ -70,6 +71,7 @@ export class RemindersService implements OnModuleInit {
       where: { id: p.appointmentId },
       include: {
         clinic: true,
+        location: true,
         doctor: { select: { displayName: true } },
         clinicPatient: { include: { patientAccount: { select: { whatsappConsentAt: true } } } },
       },
@@ -116,7 +118,10 @@ export class RemindersService implements OnModuleInit {
         const cancelUntil = new Date(a.startsAt.getTime() - a.clinic.patientCancelMinMinutes * 60_000);
         const rendered = reminderEmail({
           patientName: a.clinicPatient.name,
-          clinic: { name: a.clinic.name, address: a.clinic.address, phone: a.clinic.phone, timezone: a.clinic.timezone },
+          clinic: {
+            name: a.clinic.name, address: placeOf(a.location, a.clinic), phone: a.location.phone ?? a.clinic.phone,
+            timezone: a.clinic.timezone,
+          },
           doctorName: a.doctor.displayName,
           serviceName: a.serviceName,
           startsAt: a.startsAt,

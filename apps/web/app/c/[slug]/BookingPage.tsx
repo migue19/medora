@@ -7,13 +7,35 @@ import { PatientAuthForm } from '@/components/PatientAuthForm';
 import { VerifyEmailNotice } from '@/components/VerifyEmailNotice';
 import { ApiError, errorMessage, patientSession, publicGet } from '@/lib/api';
 import { useSession } from '@/lib/hooks';
-import { fmtDate, fmtTime, money, todayIn, uuid } from '@/lib/format';
+import { fmtDate, fmtTime, money, todayIn, uuid, weeklyLabel } from '@/lib/format';
 
-interface Service { id: string; name: string; durationMinutes: number; priceCents: number }
-interface Doctor { id: string; displayName: string; specialty: string; licenseNumber: string | null; bio: string | null; services: Service[] }
+interface Service {
+  id: string; name: string; durationMinutes: number; priceCents: number; visitType: 'ANY' | 'FIRST' | 'FOLLOW_UP';
+  priceByLocation: Record<string, number>;
+}
+interface Doctor {
+  id: string; displayName: string; specialty: string; licenseNumber: string | null; bio: string | null; services: Service[];
+  photoUrl: string | null; locationIds: string[];
+  education: string[]; certifications: string[]; languages: string[]; conditions: string[]; insurers: string[];
+}
+interface Place {
+  id: string; name: string; address: string | null; phone: string | null; mapUrl: string | null;
+  hours: { weekday: number; startMinute: number; endMinute: number }[];
+}
 interface Profile {
   clinic: { name: string; slug: string; phone: string | null; address: string | null; timezone: string; bookingEnabled: boolean; patientCancelMinMinutes: number };
+  locations: Place[];
   doctors: Doctor[];
+}
+
+const VISIT: Record<string, string> = { FIRST: 'Primera vez', FOLLOW_UP: 'Subsecuente' };
+
+/** Precio a mostrar: el de la sede elegida, o «desde» el menor si varía entre sedes. */
+function priceLabel(s: Service, locationId: string | null): string {
+  if (locationId && s.priceByLocation[locationId] !== undefined) return money(s.priceByLocation[locationId]);
+  const values = [...new Set(Object.values(s.priceByLocation))];
+  if (values.length > 1) return `desde ${money(Math.min(...values))}`;
+  return money(values[0] ?? s.priceCents);
 }
 
 const initials = (name: string) => name.replace(/^(Dr|Dra)\.?\s+/i, '').split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
@@ -23,6 +45,7 @@ export function BookingPage({ slug }: { slug: string }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [doctor, setDoctor] = useState<Doctor | null>(null);
   const [service, setService] = useState<Service | null>(null);
+  const [locationId, setLocationId] = useState<string | null>(null);
   const [slot, setSlot] = useState<{ startsAt: string; time: string } | null>(null);
   const [notes, setNotes] = useState('');
   const [requestId, setRequestId] = useState(uuid);
@@ -42,13 +65,17 @@ export function BookingPage({ slug }: { slug: string }) {
   const today = useMemo(() => todayIn(tz), [tz]);
 
   const load = useCallback(
-    (from: string) => publicGet(`/api/public/clinics/${encodeURIComponent(slug)}/doctors/${doctor!.id}/availability?serviceId=${service!.id}&from=${from}&days=7`),
-    [slug, doctor, service],
+    (from: string) => publicGet(`/api/public/clinics/${encodeURIComponent(slug)}/doctors/${doctor!.id}/availability?serviceId=${service!.id}&from=${from}&days=7${locationId ? `&locationId=${locationId}` : ''}`),
+    [slug, doctor, service, locationId],
   );
 
   function chooseDoctor(d: Doctor, s: Service) {
     setDoctor(d); setService(s); setSlot(null); setError(null); setBooked(null); setRequestId(uuid());
+    // Si atiende en una sola sede, queda elegida; si atiende en varias, el paciente la elige.
+    setLocationId(d.locationIds.length === 1 ? d.locationIds[0] : null);
   }
+
+  const place = (id: string | null) => profile?.locations.find((l) => l.id === id) ?? null;
 
   async function confirm() {
     if (!doctor || !service || !slot) return;
@@ -82,8 +109,20 @@ export function BookingPage({ slug }: { slug: string }) {
       <main className="container section stack">
         <div>
           <h1>{clinic.name}</h1>
-          <p className="muted">{[clinic.address, clinic.phone].filter(Boolean).join(' · ') || 'Reserva tu cita en línea'}</p>
+          <p className="muted">{profile.locations.length > 1 ? `${profile.locations.length} sedes` : [profile.locations[0]?.address ?? clinic.address, clinic.phone].filter(Boolean).join(' · ') || 'Reserva tu cita en línea'}</p>
         </div>
+        {profile.locations.length > 1 && (
+          <div className="grid">
+            {profile.locations.map((l) => (
+              <div key={l.id} className="card stack" style={{ gap: 4 }}>
+                <strong>{l.name}</strong>
+                {l.address && <span className="small">{l.address}</span>}
+                <span className="small muted">{[l.phone, l.hours.length ? weeklyLabel(l.hours) : null].filter(Boolean).join(' · ')}</span>
+                {l.mapUrl && <a className="small" href={l.mapUrl} target="_blank" rel="noreferrer">Ver en el mapa</a>}
+              </div>
+            ))}
+          </div>
+        )}
 
         {!clinic.bookingEnabled && <div className="alert warn">Por ahora esta clínica no recibe reservas en línea{clinic.phone ? `. Llama al ${clinic.phone}` : ''}.</div>}
 
@@ -91,7 +130,8 @@ export function BookingPage({ slug }: { slug: string }) {
           <div className="card stack" role="status">
             <div className="alert ok">¡Tu cita quedó agendada!</div>
             <h2>{doctor?.displayName}</h2>
-            <p>{service?.name} · {money(service!.priceCents)}</p>
+            <p>{service?.name} · {priceLabel(service!, locationId)}</p>
+            {place(locationId) && <p className="small">{place(locationId)!.name}{place(locationId)!.address ? ` · ${place(locationId)!.address}` : ''}</p>}
             <p><strong>{fmtDate(booked.startsAt, tz)}</strong> a las <strong>{fmtTime(booked.startsAt, tz)}</strong> (hora de la clínica)</p>
             <p className="muted small">Te enviamos la confirmación por correo con un archivo para agregarla a tu calendario.</p>
             <div className="row">
@@ -108,20 +148,24 @@ export function BookingPage({ slug }: { slug: string }) {
                 {profile.doctors.map((d) => (
                   <div key={d.id} className="card stack">
                     <div className="doctor">
-                      <div className="avatar" aria-hidden>{initials(d.displayName)}</div>
+                      {d.photoUrl
+                        ? <img className="avatar" src={d.photoUrl} alt={`Foto de ${d.displayName}`} width={48} height={48} style={{ objectFit: 'cover' }} />
+                        : <div className="avatar" aria-hidden>{initials(d.displayName)}</div>}
                       <div>
                         <h3 style={{ margin: 0 }}>{d.displayName}</h3>
                         <div className="muted small">{d.specialty}{d.licenseNumber ? ` · Céd. ${d.licenseNumber}` : ''}</div>
+                        {profile.locations.length > 1 && <div className="muted small">{d.locationIds.map((id) => place(id)?.name).filter(Boolean).join(' · ')}</div>}
                       </div>
                     </div>
                     {d.bio && <p className="small">{d.bio}</p>}
+                    <DoctorDetails d={d} />
                     <div className="stack" style={{ gap: 6 }}>
                       {d.services.map((s) => (
                         <button key={s.id} type="button" aria-pressed={doctor?.id === d.id && service?.id === s.id}
                           className={doctor?.id === d.id && service?.id === s.id ? 'primary' : ''}
                           onClick={() => chooseDoctor(d, s)} disabled={!clinic.bookingEnabled}
                           style={{ justifyContent: 'space-between' }}>
-                          <span>{s.name} · {s.durationMinutes} min</span><span>{money(s.priceCents)}</span>
+                          <span>{s.name} · {s.durationMinutes} min{VISIT[s.visitType] ? ` · ${VISIT[s.visitType]}` : ''}</span><span>{priceLabel(s, null)}</span>
                         </button>
                       ))}
                     </div>
@@ -133,9 +177,24 @@ export function BookingPage({ slug }: { slug: string }) {
             {doctor && service && (
               <section className="card stack">
                 <h2>2. Elige fecha y hora</h2>
+                {doctor.locationIds.length > 1 && (
+                  <div className="stack" style={{ gap: 6 }}>
+                    <span className="small" style={{ fontWeight: 600 }}>Sede</span>
+                    <div className="row">
+                      {doctor.locationIds.map((id) => (
+                        <button key={id} type="button" aria-pressed={locationId === id} className={locationId === id ? 'primary' : ''}
+                          onClick={() => { setLocationId(id); setSlot(null); setRequestId(uuid()); }}>
+                          {place(id)?.name} · {priceLabel(service, id)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <p className="muted small">Horarios en la zona horaria de la clínica ({tz}).</p>
-                <SlotPicker startDate={today} load={load} reloadKey={reloadKey} selected={slot?.startsAt ?? null}
-                  onSelect={(startsAt, time) => { setSlot({ startsAt, time }); setError(null); setRequestId(uuid()); }} />
+                {locationId || doctor.locationIds.length <= 1 ? (
+                  <SlotPicker startDate={today} load={load} reloadKey={reloadKey} selected={slot?.startsAt ?? null}
+                    onSelect={(startsAt, time) => { setSlot({ startsAt, time }); setError(null); setRequestId(uuid()); }} />
+                ) : <p className="muted">Elige la sede para ver los horarios.</p>}
                 <JoinWaitlist slug={slug} doctorId={doctor.id} serviceId={service.id} doctorName={doctor.displayName}
                   patient={patient?.patient ?? null} />
               </section>
@@ -144,7 +203,11 @@ export function BookingPage({ slug }: { slug: string }) {
             {slot && doctor && service && (
               <section className="card stack">
                 <h2>3. Confirma tu cita</h2>
-                <p><strong>{doctor.displayName}</strong> · {service.name} · {money(service.priceCents)}</p>
+                <p><strong>{doctor.displayName}</strong> · {service.name} · {priceLabel(service, locationId)}</p>
+                {place(locationId) && (
+                  <p className="small">{place(locationId)!.name}{place(locationId)!.address ? ` · ${place(locationId)!.address}` : ''}
+                    {place(locationId)!.mapUrl && <> · <a href={place(locationId)!.mapUrl!} target="_blank" rel="noreferrer">Mapa</a></>}</p>
+                )}
                 <p>{fmtDate(slot.startsAt, tz)} · {slot.time} h</p>
                 {!patient ? (
                   <div className="stack">
@@ -220,5 +283,24 @@ function JoinWaitlist({ slug, doctorId, serviceId, doctorName, patient }: {
       )}
       {msg && <div className={`alert ${msg.ok ? 'ok' : 'error'}`} role="status">{msg.text}</div>}
     </div>
+  );
+}
+
+/** Perfil profesional plegable: formación, certificaciones, idiomas, padecimientos y aseguradoras. */
+function DoctorDetails({ d }: { d: Doctor }) {
+  const sections = [
+    ['Formación', d.education], ['Certificaciones', d.certifications], ['Idiomas', d.languages],
+    ['Padecimientos que atiende', d.conditions], ['Aseguradoras', d.insurers],
+  ] as const;
+  if (sections.every(([, list]) => !list.length)) return null;
+  return (
+    <details>
+      <summary className="small">Ver perfil profesional</summary>
+      <div className="stack" style={{ gap: 6, marginTop: 6 }}>
+        {sections.filter(([, list]) => list.length).map(([title, list]) => (
+          <div key={title} className="small"><strong>{title}:</strong> {list.join(' · ')}</div>
+        ))}
+      </div>
+    </details>
   );
 }

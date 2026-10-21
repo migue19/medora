@@ -52,12 +52,14 @@ async function main() {
             data: { clinicId: clinic.id, displayName: 'Dra. Demo Medora', specialty: 'Medicina general' },
           });
           await tx.doctorService.create({ data: { doctorId: doctor.id, serviceId: service.id, clinicId: clinic.id } });
+          const location = (await tx.location.findFirst({ where: { clinicId: clinic.id } }))
+            ?? (await tx.location.create({ data: { clinicId: clinic.id, name: 'Sede principal' } }));
           const rules = [1, 2, 3, 4, 5].flatMap((weekday) => [
             { weekday, startMinute: 9 * 60, endMinute: 14 * 60 },
             { weekday, startMinute: 16 * 60, endMinute: 19 * 60 },
           ]);
           await tx.scheduleRule.createMany({
-            data: rules.map((r) => ({ ...r, doctorId: doctor.id, clinicId: clinic.id })),
+            data: rules.map((r) => ({ ...r, doctorId: doctor.id, clinicId: clinic.id, locationId: location.id })),
           });
         });
         console.log('Datos de demostración creados (médico, servicio y horario L-V).');

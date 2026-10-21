@@ -19,6 +19,7 @@ class ListDto {
   @Matches(/^\d{4}-\d{2}-\d{2}$/) from: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(31) days?: number;
   @IsOptional() @IsUUID() doctorId?: string;
+  @IsOptional() @IsUUID() locationId?: string;
 }
 
 class AvailabilityDto {
@@ -76,12 +77,15 @@ export class StaffAppointmentsController {
       where: {
         clinicId: staff.clinicId,
         ...(doctorId ? { doctorId } : {}),
+        ...(q.locationId ? { locationId: q.locationId } : {}),
         startsAt: { gte: first.toJSDate(), lt: first.plus({ days }).toJSDate() },
       },
       include: {
         doctor: { select: { id: true, displayName: true } },
         clinicPatient: { select: { id: true, name: true, phone: true, email: true } },
         notifications: NOTIFICATION_SELECT,
+        location: { select: { id: true, name: true } },
+        room: { select: { id: true, name: true } },
       },
       orderBy: [{ startsAt: 'asc' }],
       take: 1000,
@@ -101,6 +105,8 @@ export class StaffAppointmentsController {
         doctor: { select: { id: true, displayName: true } },
         clinicPatient: { select: { id: true, name: true, phone: true, email: true } },
         notifications: NOTIFICATION_SELECT,
+        location: { select: { id: true, name: true } },
+        room: { select: { id: true, name: true } },
       },
     });
     return { ...serialize(full), events };
@@ -183,6 +189,7 @@ type Row = {
   id: string; startsAt: Date; endsAt: Date; status: string; source: string; serviceName: string;
   durationMinutes: number; priceCents: number; patientNotes: string | null; cancelReason: string | null;
   createdAt: Date; serviceId: string; confirmedAt: Date | null; followUpOfId: string | null;
+  location: { id: string; name: string }; room: { id: string; name: string } | null;
   notifications: { channel: string; offsetMinutes: number | null; status: string; error: string | null; createdAt: Date; startsAt: Date }[];
   doctor: { id: string; displayName: string };
   clinicPatient: { id: string; name: string; phone: string; email: string | null };
@@ -193,7 +200,7 @@ function serialize(a: Row) {
     id: a.id, startsAt: a.startsAt, endsAt: a.endsAt, status: a.status, source: a.source,
     serviceId: a.serviceId, serviceName: a.serviceName, durationMinutes: a.durationMinutes, priceCents: a.priceCents,
     patientNotes: a.patientNotes, cancelReason: a.cancelReason, createdAt: a.createdAt, confirmedAt: a.confirmedAt,
-    followUpOfId: a.followUpOfId,
+    followUpOfId: a.followUpOfId, location: a.location, room: a.room,
     doctor: a.doctor, patient: a.clinicPatient,
     // Sólo los envíos del horario vigente (los de un horario anterior ya no aplican).
     reminders: a.notifications

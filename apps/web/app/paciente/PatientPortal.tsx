@@ -14,6 +14,7 @@ interface Appt {
   priceCents: number; patientNotes: string | null; cancelReason: string | null; canChangeOnline: boolean;
   clinic: { name: string; slug: string; timezone: string; phone: string | null; address: string | null; patientCancelMinMinutes: number };
   doctor: { id: string; displayName: string; specialty: string };
+  location?: { name: string; address: string | null; phone: string | null; mapUrl: string | null };
 }
 
 export function PatientPortal() {
@@ -112,7 +113,9 @@ function ApptSummary({ a }: { a: Appt }) {
       <strong>{fmtDate(a.startsAt, tz)} · {fmtTime(a.startsAt, tz)} h</strong>
       <span>{a.doctor.displayName} · {a.doctor.specialty}</span>
       <span className="muted small">{a.serviceName} · {a.durationMinutes} min · {money(a.priceCents)}</span>
-      {a.clinic.address && <span className="muted small">{a.clinic.address}</span>}
+      {a.location
+        ? <span className="muted small">{[a.location.name, a.location.address ?? a.clinic.address].filter(Boolean).join(' · ')}{a.location.mapUrl && <> · <a href={a.location.mapUrl} target="_blank" rel="noreferrer">Mapa</a></>}</span>
+        : a.clinic.address && <span className="muted small">{a.clinic.address}</span>}
       {a.cancelReason && <span className="muted small">Motivo de cancelación: {a.cancelReason}</span>}
     </div>
   );

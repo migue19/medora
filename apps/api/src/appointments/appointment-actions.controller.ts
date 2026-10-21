@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma.service';
 import { sha256 } from '../common/crypto';
 import { assertOrigin, clientIp } from '../common/http';
 import { tokenLimiter } from '../auth/limits';
+import { placeOf } from '../mail/mail.service';
 import { Actor, AppointmentsService } from './appointments.service';
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
@@ -45,7 +46,10 @@ export class AppointmentActionsController {
     const current = a.status === 'BOOKED' && a.startsAt.getTime() === token.startsAt.getTime();
     const usable = current && !token.usedAt && a.startsAt > now;
     return {
-      clinic: { name: a.clinic.name, phone: a.clinic.phone, address: a.clinic.address, timezone: a.clinic.timezone },
+      clinic: {
+        name: a.clinic.name, phone: a.location.phone ?? a.clinic.phone, address: placeOf(a.location, a.clinic),
+        mapUrl: a.location.mapUrl, timezone: a.clinic.timezone,
+      },
       doctor: { displayName: a.doctor.displayName, specialty: a.doctor.specialty },
       patientName: a.clinicPatient.name,
       serviceName: a.serviceName,
@@ -101,6 +105,7 @@ export class AppointmentActionsController {
         appointment: {
           include: {
             clinic: true,
+            location: true,
             doctor: { select: { displayName: true, specialty: true } },
             clinicPatient: { select: { id: true, name: true, patientAccountId: true } },
           },
@@ -129,7 +134,7 @@ export class AppointmentActionsController {
     const actor: Actor = {
       kind: 'PATIENT', id: a.clinicPatient.patientAccountId ?? a.clinicPatient.id, name: a.clinicPatient.name,
     };
-    const { clinic, doctor: _doctor, clinicPatient: _patient, ...appointment } = a;
+    const { clinic, doctor: _doctor, clinicPatient: _patient, location: _location, ...appointment } = a;
     return {
       appointment, clinic, actor,
       release: () => this.prisma.appointmentActionToken.update({ where: { id: token.id }, data: { usedAt: null } }),

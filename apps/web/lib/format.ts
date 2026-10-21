@@ -73,3 +73,18 @@ export function zonedToUtcIso(date: string, time: string, tz: string): string {
 export function uuid(): string {
   return crypto.randomUUID();
 }
+
+/** «Lun–Vie 08:00–20:00 · Sáb 09:00–14:00»: agrupa días seguidos con el mismo horario. */
+export function weeklyLabel(blocks: { weekday: number; startMinute: number; endMinute: number }[]): string {
+  const ranges = (w: number) => blocks.filter((h) => h.weekday === w).sort((a, b) => a.startMinute - b.startMinute)
+    .map((h) => `${minutesToHHMM(h.startMinute)}–${minutesToHHMM(h.endMinute)}`).join(', ');
+  const days = [...new Set(blocks.map((h) => h.weekday))].sort();
+  const groups: { from: number; to: number; text: string }[] = [];
+  for (const w of days) {
+    const last = groups[groups.length - 1];
+    if (last && last.to === w - 1 && last.text === ranges(w)) last.to = w;
+    else groups.push({ from: w, to: w, text: ranges(w) });
+  }
+  const day = (w: number) => WEEKDAYS[w - 1].slice(0, 3);
+  return groups.map((g) => `${g.from === g.to ? day(g.from) : `${day(g.from)}–${day(g.to)}`} ${g.text}`).join(' · ');
+}

@@ -5,7 +5,8 @@ import { Prisma } from '@prisma/client';
 import { DateTime } from 'luxon';
 import { PrismaService, Tx } from '../prisma.service';
 import { JobsService } from '../jobs/jobs.service';
-import { MailService } from '../mail/mail.service';
+import { MailService, placeOf } from '../mail/mail.service';
+import { ruleAt } from '../scheduling/availability';
 import { randomToken, sha256 } from '../common/crypto';
 import {
   Actor, AppointmentsService, MAX_FUTURE_ONLINE_APPOINTMENTS, WAITLIST_OFFER_JOB, lockDoctor,
@@ -171,9 +172,14 @@ export class WaitlistService implements OnModuleInit {
         });
         if (entry.clinicPatient.email) {
           const doctor = await tx.doctor.findUniqueOrThrow({ where: { id: p.doctorId } });
+          const rule = ruleAt(startsAt, service.durationMinutes, clinic.timezone,
+            await tx.scheduleRule.findMany({ where: { doctorId: p.doctorId }, include: { location: true } }));
           await this.mail.waitlistOffer(tx, {
             email: entry.clinicPatient.email, token, patientName: entry.clinicPatient.name,
-            clinic: { name: clinic.name, address: clinic.address, phone: clinic.phone, timezone: clinic.timezone },
+            clinic: {
+              name: clinic.name, address: rule ? placeOf(rule.location, clinic) : clinic.address,
+              phone: rule?.location.phone ?? clinic.phone, timezone: clinic.timezone,
+            },
             doctorName: doctor.displayName, serviceName: service.name, startsAt, expiresAt,
           });
         }

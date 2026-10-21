@@ -1,7 +1,8 @@
 import {
-  Body, Controller, ForbiddenException, Get, NotFoundException, Param, ParseUUIDPipe, Post, Query, Req, UseGuards,
+  Body, Controller, ForbiddenException, Get, NotFoundException, Param, ParseUUIDPipe, Post, Query, Req, Res, UseGuards,
 } from '@nestjs/common';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
+import { pricesFor } from '../scheduling/pricing';
 import { Transform, Type } from 'class-transformer';
 import { IsISO8601, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 import { PrismaService } from '../prisma.service';
@@ -17,6 +18,7 @@ class AvailabilityDto {
   @IsUUID() serviceId: string;
   @Matches(/^\d{4}-\d{2}-\d{2}$/) from: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(14) days?: number;
+  @IsOptional() @IsUUID() locationId?: string;
 }
 
 class BookDto {
@@ -46,30 +48,51 @@ export class PublicController {
   async profile(@Param('slug') slug: string, @Req() req: Request) {
     publicLimiter.consume(`public:${clientIp(req)}`);
     const clinic = await this.clinic(slug);
-    const doctors = await this.prisma.doctor.findMany({
-      where: { clinicId: clinic.id, active: true },
-      include: {
-        services: {
-          where: { service: { active: true } },
-          include: { service: true },
+    const [doctors, locations] = await Promise.all([
+      this.prisma.doctor.findMany({
+        where: { clinicId: clinic.id, active: true },
+        include: {
+          services: {
+            where: { service: { active: true } },
+            include: { service: true },
+          },
+          scheduleRules: { select: { locationId: true } },
+          photo: { select: { updatedAt: true } },
         },
-      },
-      orderBy: { displayName: 'asc' },
-    });
+        orderBy: { displayName: 'asc' },
+      }),
+      this.prisma.location.findMany({
+        where: { clinicId: clinic.id, active: true },
+        include: { hours: { orderBy: [{ weekday: 'asc' }, { startMinute: 'asc' }] } },
+        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+      }),
+    ]);
+    const withPrices = await Promise.all(doctors.filter((d) => d.services.length > 0).map(async (d) => {
+      const locationIds = [...new Set(d.scheduleRules.map((r) => r.locationId))];
+      const services = await Promise.all(d.services.map(async ({ service: s }) => ({
+        id: s.id, name: s.name, durationMinutes: s.durationMinutes, priceCents: s.priceCents, visitType: s.visitType,
+        priceByLocation: await pricesFor(this.prisma, s, d.id, locationIds),
+      })));
+      return { d, locationIds, services };
+    }));
     return {
       clinic: {
         name: clinic.name, slug: clinic.slug, phone: clinic.phone, address: clinic.address,
         timezone: clinic.timezone, bookingEnabled: clinic.bookingEnabled,
         patientCancelMinMinutes: clinic.patientCancelMinMinutes,
       },
-      doctors: doctors
-        .filter((d) => d.services.length > 0)
-        .map((d) => ({
-          id: d.id, displayName: d.displayName, specialty: d.specialty, licenseNumber: d.licenseNumber, bio: d.bio,
-          services: d.services
-            .map(({ service: s }) => ({ id: s.id, name: s.name, durationMinutes: s.durationMinutes, priceCents: s.priceCents }))
-            .sort((a, b) => a.name.localeCompare(b.name, 'es')),
-        })),
+      locations: locations.map((l) => ({
+        id: l.id, name: l.name, address: l.address, phone: l.phone, mapUrl: l.mapUrl,
+        hours: l.hours.map(({ weekday, startMinute, endMinute }) => ({ weekday, startMinute, endMinute })),
+      })),
+      doctors: withPrices.map(({ d, locationIds, services }) => ({
+        id: d.id, displayName: d.displayName, specialty: d.specialty, licenseNumber: d.licenseNumber, bio: d.bio,
+        education: d.education, certifications: d.certifications, languages: d.languages, conditions: d.conditions,
+        insurers: d.insurers,
+        photoUrl: d.photo ? `/api/public/doctors/${d.id}/photo?v=${d.photo.updatedAt.getTime()}` : null,
+        locationIds,
+        services: services.sort((a, b) => a.name.localeCompare(b.name, 'es')),
+      })),
     };
   }
 
@@ -84,7 +107,7 @@ export class PublicController {
       return { timezone: clinic.timezone, bookingEnabled: false, days: [] };
     }
     const result = await this.appointments.availability({
-      clinicId: clinic.id, doctorId, serviceId: q.serviceId, from: q.from, days: q.days ?? 7,
+      clinicId: clinic.id, doctorId, serviceId: q.serviceId, from: q.from, days: q.days ?? 7, locationId: q.locationId,
     });
     return { ...result, bookingEnabled: true };
   }
@@ -110,5 +133,22 @@ export class PublicController {
       actor: { kind: 'PATIENT', id: patient.id, name: patient.name },
     });
     return { appointment, replayed };
+  }
+
+}
+
+/** Fotos de médicos: públicas, con caché larga porque la URL lleva la versión. */
+@Controller('api/public/doctors')
+export class DoctorPhotoController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @Get(':id/photo')
+  async photo(@Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
+    const photo = await this.prisma.doctorPhoto.findFirst({ where: { doctorId: id, doctor: { active: true } } });
+    if (!photo) throw new NotFoundException('Sin foto');
+    res.setHeader('Content-Type', photo.mimeType);
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.setHeader('Content-Disposition', 'inline');
+    res.send(Buffer.from(photo.data));
   }
 }

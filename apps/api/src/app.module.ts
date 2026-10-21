@@ -10,7 +10,7 @@ import { ClinicController } from './clinic/clinic.controller';
 import { SchedulingController } from './scheduling/scheduling.controller';
 import { AppointmentsService } from './appointments/appointments.service';
 import { StaffAppointmentsController } from './appointments/staff-appointments.controller';
-import { PublicController } from './public/public.controller';
+import { DoctorPhotoController, PublicController } from './public/public.controller';
 import { HealthController } from './health.controller';
 import { AuthTokensService } from './auth/auth-tokens.service';
 import { InvitationsController } from './auth/invitations.controller';
@@ -23,6 +23,7 @@ import { PatientLinksController, PatientsController } from './patients/patients.
 import { PatientsService } from './patients/patients.service';
 import { PatientWaitlistController, StaffWaitlistController } from './waitlist/waitlist.controller';
 import { WaitlistService } from './waitlist/waitlist.service';
+import { LocationsController } from './locations/locations.controller';
 import { WHATSAPP_TRANSPORT, WhatsAppTransport, createWhatsApp } from './notifications/whatsapp.transport';
 
 export interface Transports {
@@ -36,7 +37,7 @@ export function buildAppModule(config: AppConfig = loadConfig(), transports: Tra
       HealthController, StaffAuthController, PatientAuthController, PatientAppointmentsController,
       ClinicController, SchedulingController, StaffAppointmentsController, PublicController, InvitationsController,
       AppointmentActionsController, PatientsController, PatientLinksController, StaffWaitlistController,
-      PatientWaitlistController,
+      PatientWaitlistController, LocationsController, DoctorPhotoController,
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },

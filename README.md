@@ -1,4 +1,4 @@
-# Medora · Sprint 4
+# Medora · Sprint 5
 
 Agenda y reservas de citas médicas en línea para clínicas y consultorios (SaaS multi-clínica). Monorepo npm con Next.js 16 / React 19 (PWA), NestJS 11, Prisma 6 y PostgreSQL 17. Node.js 24 LTS recomendado. Mismo stack y criterios de seguridad que Tavixo.
 
@@ -12,7 +12,7 @@ Objetivo: llegar a la funcionalidad de una plataforma tipo Doctoralia sobre una 
 | 2 | Correo, verificación de cuenta y recuperación de contraseña | ✅ Entregado |
 | 3 | Recordatorios y confirmación de asistencia (WhatsApp y correo) | ✅ Entregado |
 | 4 | Ficha del paciente, vinculación de cuentas y lista de espera | ✅ Entregado |
-| 5 | Sedes, consultorios y perfil profesional completo | Pendiente |
+| 5 | Sedes, consultorios y perfil profesional completo | ✅ Entregado |
 | 6 | Perfil público, SEO y widget de reservas | Pendiente |
 | 7 | Opiniones verificadas | Pendiente |
 | 8 | Directorio público y búsqueda de médicos | Pendiente |
@@ -60,7 +60,9 @@ Entregado. La verificación para vincular es por correo: el teléfono se agregar
 - Citas subsecuentes: agendar la siguiente desde la cita atendida.
 - **Terminado cuando**: recepción encuentra a cualquier paciente con su historial completo y los huecos por cancelación se vuelven a ocupar.
 
-### Sprint 5 · Sedes y perfil profesional
+### Sprint 5 · Sedes y perfil profesional ✅
+
+Entregado. La sede y el consultorio de cada cita salen del bloque del horario semanal donde cae (los bloques de un médico no se traslapan), así que el paciente sólo elige la sede cuando el médico atiende en varias. PostgreSQL impide asignar un consultorio a dos bloques traslapados y dos citas vigentes en el mismo consultorio. La migración crea una «Sede principal» por clínica con los datos existentes. El tipo de visita (primera vez o subsecuente) se exige en reservas en línea; el personal puede agendar cualquiera. Detalle en [SPRINT5_RESULTS.md](SPRINT5_RESULTS.md).
 
 - Varias sedes por clínica, con dirección, mapa y horario. Un médico puede atender en varias sedes con horarios distintos.
 - Consultorios o recursos por sede, para evitar dos citas a la vez en el mismo consultorio.
@@ -313,6 +315,12 @@ La API escucha en 127.0.0.1:6010 y Next en 127.0.0.1:6011. `WEB_ORIGIN` debe coi
 | PATCH | /api/clinic/patients/:id | OWNER, ADMIN, RECEPTION: datos, etiquetas y WhatsApp (fichas con cuenta: sólo etiquetas) |
 | POST | /api/clinic/patients/:id/notes · merge · link | Notas (personal); fusionar y vincular (OWNER, ADMIN, RECEPTION) |
 | POST | /api/public/patient-links/inspect · accept | Público con el token de vinculación; Origin |
+| GET / POST / PATCH | /api/clinic/locations | Personal / OWNER, ADMIN (sedes) |
+| PUT / POST | /api/clinic/locations/:id/hours · /rooms | OWNER, ADMIN: horario de atención y consultorios |
+| PATCH | /api/clinic/rooms/:id | OWNER, ADMIN |
+| GET / PUT | /api/clinic/services/:id/prices | Personal / OWNER, ADMIN: precios por sede y médico |
+| POST / DELETE | /api/clinic/doctors/:id/photo | OWNER, ADMIN o el propio médico (JPEG, PNG o WebP, máx. 900 KB) |
+| GET | /api/public/doctors/:id/photo | Público, caché inmutable (la URL lleva la versión) |
 | GET / POST | /api/clinic/waitlist | Personal (médico: la suya) / OWNER, ADMIN, RECEPTION |
 | POST | /api/clinic/waitlist/:id/remove · offers/:id/accept · offers/:id/release | OWNER, ADMIN, RECEPTION |
 | POST | /api/public/clinics/:slug/waitlist | Paciente con correo confirmado (máx. 3 listas) |

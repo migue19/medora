@@ -1,4 +1,4 @@
-// Medora · Sprint 4
+// Medora · Sprint 5
 // Todas las entidades de negocio llevan clinicId y se consultan siempre
 // filtradas por la clínica obtenida de la sesión.
 
@@ -78,6 +78,12 @@ enum WaitlistOfferStatus {
   RELEASED
 }
 
+enum VisitType {
+  ANY
+  FIRST
+  FOLLOW_UP
+}
+
 enum NotificationChannel {
   EMAIL
   WHATSAPP
@@ -110,6 +116,7 @@ model Clinic {
 
   memberships    Membership[]
   invitations    StaffInvitation[]
+  locations      Location[]
   doctors        Doctor[]
   services       Service[]
   clinicPatients ClinicPatient[]
@@ -224,6 +231,12 @@ model Doctor {
   specialty    String   @db.VarChar(120)
   licenseNumber String? @db.VarChar(30)
   bio          String?  @db.VarChar(1000)
+  // Perfil profesional (listas cortas de texto).
+  education      String[] @default([])
+  certifications String[] @default([])
+  languages      String[] @default([])
+  conditions     String[] @default([])
+  insurers       String[] @default([])
   active       Boolean  @default(true)
   createdAt    DateTime @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime @updatedAt @db.Timestamptz(3)
@@ -234,6 +247,7 @@ model Doctor {
   scheduleRules ScheduleRule[]
   timeOffs     TimeOff[]
   appointments Appointment[]
+  photo        DoctorPhoto?
 
   @@unique([id, clinicId])
   @@unique([membershipId, clinicId])
@@ -246,6 +260,8 @@ model Service {
   name            String   @db.VarChar(120)
   durationMinutes Int
   priceCents      Int
+  // Primera vez, subsecuente o cualquiera (se exige en reservas en línea).
+  visitType       VisitType @default(ANY)
   active          Boolean  @default(true)
   createdAt       DateTime @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime @updatedAt @db.Timestamptz(3)
@@ -253,6 +269,7 @@ model Service {
   clinic       Clinic          @relation(fields: [clinicId], references: [id])
   doctors      DoctorService[]
   appointments Appointment[]
+  prices       ServicePrice[]
 
   @@unique([clinicId, name])
   @@unique([id, clinicId])
@@ -277,10 +294,15 @@ model ScheduleRule {
   weekday     Int
   startMinute Int
   endMinute   Int
+  locationId  String @db.Uuid
+  roomId      String? @db.Uuid
 
-  doctor Doctor @relation(fields: [doctorId, clinicId], references: [id, clinicId])
+  doctor   Doctor   @relation(fields: [doctorId, clinicId], references: [id, clinicId])
+  location Location @relation(fields: [locationId], references: [id])
+  room     Room?    @relation(fields: [roomId], references: [id])
 
   @@index([doctorId])
+  @@index([roomId])
 }
 
 model TimeOff {
@@ -319,6 +341,9 @@ model Appointment {
   confirmedAt     DateTime?         @db.Timestamptz(3)
   // Cita subsecuente: la cita atendida de la que se agendó.
   followUpOfId    String?           @db.Uuid
+  // Sede y consultorio del bloque del horario en que cae la cita.
+  locationId      String            @db.Uuid
+  roomId          String?           @db.Uuid
   createdAt       DateTime          @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime          @updatedAt @db.Timestamptz(3)
 
@@ -329,6 +354,8 @@ model Appointment {
   events        AppointmentEvent[]
   actionTokens  AppointmentActionToken[]
   notifications NotificationLog[]
+  location      Location           @relation(fields: [locationId], references: [id])
+  room          Room?              @relation(fields: [roomId], references: [id])
 
   @@index([clinicId, startsAt])
   @@index([doctorId, startsAt])
@@ -538,4 +565,84 @@ model WaitlistOffer {
   entry WaitlistEntry @relation(fields: [entryId], references: [id])
 
   @@index([doctorId, status, startsAt])
+}
+
+// Sede de la clínica. Todas las citas y bloques de horario pertenecen a una sede.
+model Location {
+  id        String   @id @default(uuid()) @db.Uuid
+  clinicId  String   @db.Uuid
+  name      String   @db.VarChar(120)
+  address   String?  @db.VarChar(240)
+  phone     String?  @db.VarChar(30)
+  // Enlace a Google Maps u otro mapa.
+  mapUrl    String?  @db.VarChar(500)
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  clinic        Clinic         @relation(fields: [clinicId], references: [id])
+  hours         LocationHours[]
+  rooms         Room[]
+  scheduleRules ScheduleRule[]
+  appointments  Appointment[]
+  prices        ServicePrice[]
+
+  @@unique([clinicId, name])
+  @@index([clinicId])
+}
+
+// Horario de atención de la sede. Los bloques de los médicos en esa sede deben caber aquí.
+model LocationHours {
+  id          String @id @default(uuid()) @db.Uuid
+  locationId  String @db.Uuid
+  weekday     Int
+  startMinute Int
+  endMinute   Int
+
+  location Location @relation(fields: [locationId], references: [id])
+
+  @@index([locationId])
+}
+
+// Consultorio o recurso de una sede: no puede tener dos citas a la vez.
+model Room {
+  id         String   @id @default(uuid()) @db.Uuid
+  clinicId   String   @db.Uuid
+  locationId String   @db.Uuid
+  name       String   @db.VarChar(60)
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  location      Location       @relation(fields: [locationId], references: [id])
+  scheduleRules ScheduleRule[]
+  appointments  Appointment[]
+
+  @@unique([locationId, name])
+}
+
+// Foto del médico (JPEG, PNG o WebP de hasta 900 KB), servida con caché.
+model DoctorPhoto {
+  doctorId  String   @id @db.Uuid
+  mimeType  String   @db.VarChar(20)
+  data      Bytes
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  doctor Doctor @relation(fields: [doctorId], references: [id])
+}
+
+// Precio especial de un servicio por sede, por médico o por médico en una sede.
+// Gana el más específico: médico+sede > médico > sede > precio base del servicio.
+model ServicePrice {
+  id         String  @id @default(uuid()) @db.Uuid
+  clinicId   String  @db.Uuid
+  serviceId  String  @db.Uuid
+  doctorId   String? @db.Uuid
+  locationId String? @db.Uuid
+  priceCents Int
+
+  service  Service   @relation(fields: [serviceId], references: [id])
+  location Location? @relation(fields: [locationId], references: [id])
+
+  @@index([serviceId])
 }

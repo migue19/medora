@@ -5,7 +5,8 @@ import { ActorKind, Appointment, AppointmentSource, Prisma } from '@prisma/clien
 import { DateTime } from 'luxon';
 import { PrismaService, Tx } from '../prisma.service';
 import { canonicalHash } from '../common/crypto';
-import { computeSlots, fitsWeeklySchedule, parseLocalDate } from '../scheduling/availability';
+import { Interval, computeSlots, parseLocalDate, ruleAt } from '../scheduling/availability';
+import { pricesFor, resolvePrice } from '../scheduling/pricing';
 import { MailService } from '../mail/mail.service';
 import { RemindersService } from '../notifications/reminders.service';
 import { JobsService } from '../jobs/jobs.service';
@@ -73,6 +74,29 @@ export class AppointmentsService {
     return rows.map((r) => ({ start: r.startsAt, end: r.endsAt }));
   }
 
+  /**
+   * Citas vigentes de otros médicos en los consultorios que usa este médico: ocupan ese consultorio
+   * aunque el médico esté libre.
+   */
+  async roomBusy(
+    tx: Tx | PrismaService, rules: { roomId: string | null }[], doctorId: string, start: Date, end: Date,
+    excludeAppointmentId: string | null = null,
+  ): Promise<Map<string, Interval[]>> {
+    const rooms = [...new Set(rules.map((r) => r.roomId).filter((r): r is string => Boolean(r)))];
+    const map = new Map<string, Interval[]>();
+    if (!rooms.length) return map;
+    const rows = await tx.appointment.findMany({
+      where: {
+        roomId: { in: rooms }, doctorId: { not: doctorId }, status: { not: 'CANCELLED' },
+        startsAt: { lt: end }, endsAt: { gt: start },
+        ...(excludeAppointmentId ? { id: { not: excludeAppointmentId } } : {}),
+      },
+      select: { roomId: true, startsAt: true, endsAt: true },
+    });
+    for (const r of rows) map.set(r.roomId!, [...(map.get(r.roomId!) ?? []), { start: r.startsAt, end: r.endsAt }]);
+    return map;
+  }
+
   /** Avisa a la lista de espera que se liberó un horario (en la transacción que lo libera). */
   private async freed(tx: Tx, appointment: { id: string; doctorId: string; startsAt: Date; endsAt: Date }) {
     if (appointment.startsAt <= new Date()) return;
@@ -86,7 +110,7 @@ export class AppointmentsService {
   /** Horarios disponibles para un médico y servicio. */
   async availability(params: {
     clinicId: string; doctorId: string; serviceId: string; from: string; days: number;
-    excludeAppointmentId?: string; durationMinutes?: number; now?: Date;
+    excludeAppointmentId?: string; durationMinutes?: number; now?: Date; locationId?: string;
   }) {
     const clinic = await this.prisma.clinic.findUniqueOrThrow({ where: { id: params.clinicId } });
     const { doctor, service } = await this.loadDoctorService(this.prisma, params.clinicId, params.doctorId, params.serviceId);
@@ -121,15 +145,23 @@ export class AppointmentsService {
       rules,
       durationMinutes: params.durationMinutes ?? service.durationMinutes,
       busy,
+      roomBusy: await this.roomBusy(this.prisma, rules, doctor.id, rangeStart, rangeEnd, params.excludeAppointmentId ?? null),
+      locationId: params.locationId,
       fromDate: first.toISODate()!,
       days,
       earliest: new Date(now.getTime() + clinic.minNoticeMinutes * 60_000),
       latest: DateTime.fromJSDate(now).plus({ days: clinic.horizonDays }).toJSDate(),
     });
+    const locationIds = [...new Set(rules.map((r) => r.locationId))];
     return {
       timezone: clinic.timezone,
       doctor: { id: doctor.id, displayName: doctor.displayName },
-      service: { id: service.id, name: service.name, durationMinutes: service.durationMinutes, priceCents: service.priceCents },
+      service: {
+        id: service.id, name: service.name, durationMinutes: service.durationMinutes, priceCents: service.priceCents,
+        visitType: service.visitType,
+        /** Precio en cada sede donde atiende el médico. */
+        priceByLocation: await pricesFor(this.prisma, service, doctor.id, locationIds),
+      },
       days: days_,
     };
   }
@@ -178,9 +210,13 @@ export class AppointmentsService {
               `Puedes tener hasta ${MAX_FUTURE_ONLINE_APPOINTMENTS} citas próximas en esta clínica.`,
             );
           }
+          await this.assertVisitType(tx, service.visitType, input.clinicPatientId, doctor.id);
         } else {
-          await this.assertStaffSlot(tx, clinic.timezone, doctor.id, service.durationMinutes, startsAt, now, offer?.id ?? null);
+          await this.assertStaffSlot(tx, clinic.timezone, doctor.id, service.durationMinutes, startsAt, now, offer?.id ?? null, null);
         }
+        // La sede y el consultorio son los del bloque del horario donde cae la cita.
+        const rule = ruleAt(startsAt, service.durationMinutes, clinic.timezone, await tx.scheduleRule.findMany({ where: { doctorId: doctor.id } }));
+        if (!rule) throw new ConflictException('Ese horario está fuera del horario de atención del médico');
 
         const patientOverlap = await tx.appointment.count({
           where: {
@@ -194,8 +230,10 @@ export class AppointmentsService {
           data: {
             clinicId: input.clinicId, doctorId: doctor.id, serviceId: service.id,
             clinicPatientId: input.clinicPatientId, startsAt, endsAt, source: input.source,
-            serviceName: service.name, durationMinutes: service.durationMinutes, priceCents: service.priceCents,
+            serviceName: service.name, durationMinutes: service.durationMinutes,
+            priceCents: await resolvePrice(tx, service, doctor.id, rule.locationId),
             patientNotes: input.notes, requestKey, requestHash, followUpOfId: input.followUpOfId ?? null,
+            locationId: rule.locationId, roomId: rule.roomId,
           },
         });
         if (offer) {
@@ -283,8 +321,10 @@ export class AppointmentsService {
           }
           await this.assertOnlineSlot(tx, clinic, current.doctorId, current.durationMinutes, params.startsAt, now, current.id, null);
         } else {
-          await this.assertStaffSlot(tx, clinic.timezone, current.doctorId, current.durationMinutes, params.startsAt, now, null);
+          await this.assertStaffSlot(tx, clinic.timezone, current.doctorId, current.durationMinutes, params.startsAt, now, null, current.id);
         }
+        const rule = ruleAt(params.startsAt, current.durationMinutes, clinic.timezone, await tx.scheduleRule.findMany({ where: { doctorId: current.doctorId } }));
+        if (!rule) throw new ConflictException('Ese horario está fuera del horario de atención del médico');
         const endsAt = new Date(params.startsAt.getTime() + current.durationMinutes * 60_000);
         const patientOverlap = await tx.appointment.count({
           where: {
@@ -295,7 +335,8 @@ export class AppointmentsService {
         if (patientOverlap > 0) throw new ConflictException('El paciente ya tiene otra cita en ese horario');
         // Una confirmación previa era para el horario anterior.
         const updated = await tx.appointment.update({
-          where: { id: current.id }, data: { startsAt: params.startsAt, endsAt, confirmedAt: null },
+          where: { id: current.id },
+          data: { startsAt: params.startsAt, endsAt, confirmedAt: null, locationId: rule.locationId, roomId: rule.roomId },
         });
         const event = await tx.appointmentEvent.create({
           data: {
@@ -410,6 +451,7 @@ export class AppointmentsService {
         ...[...appointments, ...timeOffs].map((b) => ({ start: b.startsAt, end: b.endsAt })),
         ...(await this.holds(tx, doctorId, dayStart, dayEnd, excludeOfferId)),
       ],
+      roomBusy: await this.roomBusy(tx, rules, doctorId, dayStart, dayEnd, excludeId),
       fromDate: day.toISODate()!, days: 1,
       earliest: new Date(now.getTime() + clinic.minNoticeMinutes * 60_000),
       latest: DateTime.fromJSDate(now).plus({ days: clinic.horizonDays }).toJSDate(),
@@ -421,7 +463,7 @@ export class AppointmentsService {
   /** Personal: dentro del horario del médico, sin bloqueos y en el futuro. */
   private async assertStaffSlot(
     tx: Tx, timezone: string, doctorId: string, durationMinutes: number, startsAt: Date, now: Date,
-    excludeOfferId: string | null,
+    excludeOfferId: string | null, excludeAppointmentId: string | null,
   ) {
     if (startsAt <= now) throw new BadRequestException('La cita debe ser en el futuro');
     if (startsAt.getTime() - now.getTime() > 400 * 24 * 3600_000) {
@@ -429,16 +471,36 @@ export class AppointmentsService {
     }
     const local = DateTime.fromJSDate(startsAt, { zone: timezone });
     if (local.minute % 5 !== 0) throw new BadRequestException('La hora debe ir en múltiplos de 5 minutos');
-    const rules = await tx.scheduleRule.findMany({ where: { doctorId } });
-    if (!fitsWeeklySchedule(startsAt, durationMinutes, timezone, rules)) {
-      throw new ConflictException('Ese horario está fuera del horario de atención del médico');
-    }
+    const rules = await tx.scheduleRule.findMany({ where: { doctorId }, include: { room: { select: { name: true } } } });
+    const rule = ruleAt(startsAt, durationMinutes, timezone, rules);
+    if (!rule) throw new ConflictException('Ese horario está fuera del horario de atención del médico');
     const endsAt = new Date(startsAt.getTime() + durationMinutes * 60_000);
+    if (rule.roomId) {
+      const roomTaken = await tx.appointment.count({
+        where: {
+          roomId: rule.roomId, status: { not: 'CANCELLED' }, startsAt: { lt: endsAt }, endsAt: { gt: startsAt },
+          doctorId: { not: doctorId }, ...(excludeAppointmentId ? { id: { not: excludeAppointmentId } } : {}),
+        },
+      });
+      if (roomTaken > 0) throw new ConflictException(`El consultorio «${rule.room?.name}» está ocupado a esa hora`);
+    }
     const blocked = await tx.timeOff.count({
       where: { doctorId, startsAt: { lt: endsAt }, endsAt: { gt: startsAt } },
     });
     if (blocked > 0) throw new ConflictException('El médico tiene un bloqueo en ese horario');
     if ((await this.holds(tx, doctorId, startsAt, endsAt, excludeOfferId)).length > 0) throw new ConflictException(HELD);
+  }
+
+  /** Servicios sólo de primera vez o sólo subsecuentes (según citas atendidas con ese médico). */
+  private async assertVisitType(tx: Tx, visitType: string, clinicPatientId: string, doctorId: string) {
+    if (visitType === 'ANY') return;
+    const seen = await tx.appointment.count({ where: { clinicPatientId, doctorId, status: 'COMPLETED' } });
+    if (visitType === 'FIRST' && seen > 0) {
+      throw new ConflictException('Este servicio es sólo para primera vez. Elige la consulta subsecuente.');
+    }
+    if (visitType === 'FOLLOW_UP' && seen === 0) {
+      throw new ConflictException('Este servicio es para pacientes que ya fueron atendidos por este médico.');
+    }
   }
 
   /** Valida la oferta de la lista de espera que se está aceptando (bloqueada hasta el final de la transacción). */

@@ -12,6 +12,8 @@ export function Agenda({ session }: { session: StaffSessionData }) {
   const [date, setDate] = useState(() => todayIn(tz));
   const [days, setDays] = useState(1);
   const [doctorId, setDoctorId] = useState('');
+  const [locationId, setLocationId] = useState('');
+  const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [appointments, setAppointments] = useState<Appointment[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -20,17 +22,21 @@ export function Agenda({ session }: { session: StaffSessionData }) {
   const [active, setActive] = useState<{ id: string; mode: 'cancel' | 'reschedule' } | null>(null);
   const canBook = role !== 'DOCTOR';
 
-  useEffect(() => { staffSession.get<Doctor[]>('/api/clinic/doctors').then(setDoctors).catch(() => undefined); }, []);
+  useEffect(() => {
+    staffSession.get<Doctor[]>('/api/clinic/doctors').then(setDoctors).catch(() => undefined);
+    staffSession.get<{ id: string; name: string }[]>('/api/clinic/locations').then(setLocations).catch(() => undefined);
+  }, []);
 
   const reload = useCallback(async () => {
     setError(null);
     try {
       const q = new URLSearchParams({ from: date, days: String(days) });
       if (doctorId) q.set('doctorId', doctorId);
+      if (locationId) q.set('locationId', locationId);
       const res = await staffSession.get<{ appointments: Appointment[] }>(`/api/clinic/appointments?${q}`);
       setAppointments(res.appointments);
     } catch (e) { setError(errorMessage(e)); }
-  }, [date, days, doctorId]);
+  }, [date, days, doctorId, locationId]);
 
   useEffect(() => { void reload(); }, [reload]);
 
@@ -63,6 +69,12 @@ export function Agenda({ session }: { session: StaffSessionData }) {
           <select value={doctorId} onChange={(e) => setDoctorId(e.target.value)} style={{ width: 'auto' }}>
             <option value="">Todos los médicos</option>
             {doctors.map((d) => <option key={d.id} value={d.id}>{d.displayName}</option>)}
+          </select>
+        )}
+        {locations.length > 1 && (
+          <select value={locationId} onChange={(e) => setLocationId(e.target.value)} style={{ width: 'auto' }}>
+            <option value="">Todas las sedes</option>
+            {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
           </select>
         )}
         <span className="spacer" />
@@ -100,6 +112,7 @@ export function Agenda({ session }: { session: StaffSessionData }) {
                     {a.followUpOfId && <span className="badge">Subsecuente</span>}
                   </div>
                   <span className="small">{a.serviceName} · {a.doctor.displayName} · {money(a.priceCents)}</span>
+                  {a.location && <span className="small muted">{a.location.name}{a.room ? ` · ${a.room.name}` : ''}</span>}
                   <span className="small muted"><a href={`tel:${a.patient.phone.replace(/[^+\d]/g, '')}`}>{a.patient.phone}</a>{a.patient.email ? ` · ${a.patient.email}` : ''}</span>
                   {a.patientNotes && <span className="small">Motivo: {a.patientNotes}</span>}
                   {a.cancelReason && <span className="small muted">Cancelación: {a.cancelReason}</span>}

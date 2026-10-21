@@ -4,6 +4,9 @@ export interface WeeklyRule {
   weekday: number; // 1 = lunes … 7 = domingo
   startMinute: number;
   endMinute: number;
+  /** Sede y consultorio del bloque (opcionales en cálculos que no los necesitan). */
+  locationId?: string;
+  roomId?: string | null;
 }
 
 export interface Interval {
@@ -20,11 +23,15 @@ export interface SlotQuery {
   days: number;
   earliest: Date; // ahora + anticipación mínima
   latest: Date; // límite del horizonte de reserva
+  /** Sólo los bloques de esta sede. */
+  locationId?: string;
+  /** Citas de otros médicos en cada consultorio: ocupan el bloque que usa ese consultorio. */
+  roomBusy?: Map<string, Interval[]>;
 }
 
 export interface DaySlots {
   date: string;
-  slots: { startsAt: string; endsAt: string; time: string }[];
+  slots: { startsAt: string; endsAt: string; time: string; locationId?: string }[];
 }
 
 const overlaps = (aStart: number, aEnd: number, bStart: number, bEnd: number) => aStart < bEnd && bStart < aEnd;
@@ -57,6 +64,9 @@ export function computeSlots(q: SlotQuery): DaySlots[] {
   const first = parseLocalDate(q.fromDate, q.timezone);
   if (!first) return [];
   const busy = q.busy.map((b) => [b.start.getTime(), b.end.getTime()] as const);
+  const roomBusy = new Map(
+    [...(q.roomBusy ?? new Map<string, Interval[]>())].map(([room, list]) => [room, list.map((b) => [b.start.getTime(), b.end.getTime()] as const)]),
+  );
   const earliest = q.earliest.getTime();
   const latest = q.latest.getTime();
   const result: DaySlots[] = [];
@@ -64,7 +74,7 @@ export function computeSlots(q: SlotQuery): DaySlots[] {
   for (let i = 0; i < q.days; i++) {
     const day = first.plus({ days: i });
     const rules = q.rules
-      .filter((r) => r.weekday === day.weekday)
+      .filter((r) => r.weekday === day.weekday && (!q.locationId || r.locationId === q.locationId))
       .sort((a, b) => a.startMinute - b.startMinute);
     const slots: DaySlots['slots'] = [];
     for (const rule of rules) {
@@ -76,10 +86,12 @@ export function computeSlots(q: SlotQuery): DaySlots[] {
         const e = end.toMillis();
         if (s < earliest || s > latest) continue;
         if (busy.some(([bs, be]) => overlaps(s, e, bs, be))) continue;
+        if (rule.roomId && roomBusy.get(rule.roomId)?.some(([bs, be]) => overlaps(s, e, bs, be))) continue;
         slots.push({
           startsAt: start.toUTC().toISO()!,
           endsAt: end.toUTC().toISO()!,
           time: start.toFormat('HH:mm'),
+          ...(rule.locationId ? { locationId: rule.locationId } : {}),
         });
       }
     }
@@ -95,13 +107,20 @@ export function computeSlots(q: SlotQuery): DaySlots[] {
 export function fitsWeeklySchedule(
   start: Date, durationMinutes: number, timezone: string, rules: WeeklyRule[],
 ): boolean {
+  return ruleAt(start, durationMinutes, timezone, rules) !== null;
+}
+
+/** Bloque del horario semanal que contiene completa la cita (o null). Define su sede y consultorio. */
+export function ruleAt<R extends WeeklyRule>(
+  start: Date, durationMinutes: number, timezone: string, rules: R[],
+): R | null {
   const local = DateTime.fromJSDate(start, { zone: timezone });
   const minute = local.hour * 60 + local.minute;
   const end = local.plus({ minutes: durationMinutes });
-  if (!end.hasSame(local, 'day') && !(end.hour === 0 && end.minute === 0)) return false;
-  return rules.some(
+  if (!end.hasSame(local, 'day') && !(end.hour === 0 && end.minute === 0)) return null;
+  return rules.find(
     (r) => r.weekday === local.weekday && minute >= r.startMinute && minute + durationMinutes <= r.endMinute,
-  );
+  ) ?? null;
 }
 
 export function isValidTimezone(tz: string): boolean {
