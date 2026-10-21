@@ -136,6 +136,8 @@ export function BookingPage({ slug }: { slug: string }) {
                 <p className="muted small">Horarios en la zona horaria de la clínica ({tz}).</p>
                 <SlotPicker startDate={today} load={load} reloadKey={reloadKey} selected={slot?.startsAt ?? null}
                   onSelect={(startsAt, time) => { setSlot({ startsAt, time }); setError(null); setRequestId(uuid()); }} />
+                <JoinWaitlist slug={slug} doctorId={doctor.id} serviceId={service.id} doctorName={doctor.displayName}
+                  patient={patient?.patient ?? null} />
               </section>
             )}
 
@@ -170,5 +172,53 @@ export function BookingPage({ slug }: { slug: string }) {
         )}
       </main>
     </>
+  );
+}
+
+/** Si ningún horario le sirve, el paciente se anota y se le avisa cuando se libere uno. */
+function JoinWaitlist({ slug, doctorId, serviceId, doctorName, patient }: {
+  slug: string; doctorId: string; serviceId: string; doctorName: string;
+  patient: { emailVerified: boolean } | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+
+  async function join() {
+    setBusy(true); setMsg(null);
+    try {
+      await patientSession.post(`/api/public/clinics/${encodeURIComponent(slug)}/waitlist`, {
+        doctorId, serviceId, fromDate: fromDate || null, toDate: toDate || null,
+      });
+      setMsg({ ok: true, text: `Te anotamos en la lista de espera de ${doctorName}. Si se libera un horario te lo apartamos y te avisamos por correo.` });
+      setOpen(false);
+    } catch (e) { setMsg({ ok: false, text: errorMessage(e) }); } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="stack">
+      {!open ? (
+        <p className="small muted">¿Ningún horario te sirve? <button className="ghost small" onClick={() => setOpen(true)}>Anótate en la lista de espera</button></p>
+      ) : !patient ? (
+        <p className="small">Inicia sesión o crea tu cuenta (más abajo, al elegir un horario, o en <a href="/paciente">Mis citas</a>) para anotarte.</p>
+      ) : !patient.emailVerified ? (
+        <p className="small">Confirma tu correo para anotarte en la lista de espera.</p>
+      ) : (
+        <div className="stack card">
+          <span className="small">Te avisaremos si se libera un horario con {doctorName}. Opcional: ¿entre qué fechas te sirve?</span>
+          <div className="row">
+            <label>Desde<input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} /></label>
+            <label>Hasta<input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} /></label>
+          </div>
+          <div className="row">
+            <button className="primary" disabled={busy} onClick={join}>{busy ? 'Anotando…' : 'Anotarme'}</button>
+            <button onClick={() => setOpen(false)}>Cancelar</button>
+          </div>
+        </div>
+      )}
+      {msg && <div className={`alert ${msg.ok ? 'ok' : 'error'}`} role="status">{msg.text}</div>}
+    </div>
   );
 }

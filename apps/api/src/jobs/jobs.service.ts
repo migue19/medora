@@ -81,10 +81,12 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /** Procesa los trabajos vencidos. Devuelve cuántos procesó. Seguro con varios trabajadores. */
-  runOnce(now = new Date()): Promise<number> {
+  runOnce(at?: Date): Promise<number> {
     const run = (async () => {
       let total = 0;
       for (;;) {
+        // Sin hora fija, cada vuelta usa la hora actual: así salen también los trabajos que encolaron los anteriores.
+        const now = at ?? new Date();
         const jobs = await this.claim(now);
         if (jobs.length === 0) return total;
         for (const job of jobs) await this.execute(job, now);

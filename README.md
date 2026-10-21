@@ -1,4 +1,4 @@
-# Medora · Sprint 3
+# Medora · Sprint 4
 
 Agenda y reservas de citas médicas en línea para clínicas y consultorios (SaaS multi-clínica). Monorepo npm con Next.js 16 / React 19 (PWA), NestJS 11, Prisma 6 y PostgreSQL 17. Node.js 24 LTS recomendado. Mismo stack y criterios de seguridad que Tavixo.
 
@@ -11,7 +11,7 @@ Objetivo: llegar a la funcionalidad de una plataforma tipo Doctoralia sobre una 
 | 1 | Base, autenticación, agenda y reservas en línea | ✅ Entregado |
 | 2 | Correo, verificación de cuenta y recuperación de contraseña | ✅ Entregado |
 | 3 | Recordatorios y confirmación de asistencia (WhatsApp y correo) | ✅ Entregado |
-| 4 | Ficha del paciente, vinculación de cuentas y lista de espera | Pendiente |
+| 4 | Ficha del paciente, vinculación de cuentas y lista de espera | ✅ Entregado |
 | 5 | Sedes, consultorios y perfil profesional completo | Pendiente |
 | 6 | Perfil público, SEO y widget de reservas | Pendiente |
 | 7 | Opiniones verificadas | Pendiente |
@@ -49,7 +49,9 @@ Entregado. Los recordatorios son trabajos de la cola programados al reservar o r
 - Registro de cada envío (canal, estado, error) y consentimiento del paciente para recibir WhatsApp.
 - **Terminado cuando**: los recordatorios salen a tiempo, nunca se duplican, respetan las cancelaciones de último minuto y la clínica ve quién confirmó.
 
-### Sprint 4 · Pacientes y lista de espera
+### Sprint 4 · Pacientes y lista de espera ✅
+
+Entregado. La verificación para vincular es por correo: el teléfono se agregará cuando WhatsApp esté conectado. Un horario liberado se aparta 2 horas (o hasta 30 min antes de la cita, lo que ocurra primero) con una oferta `WaitlistOffer` que bloquea ese horario en la disponibilidad pública, en las reservas en línea y en las del personal; PostgreSQL impide dos apartados traslapados del mismo médico. Detalle en [SPRINT4_RESULTS.md](SPRINT4_RESULTS.md).
 
 - Vincular una ficha telefónica con la cuenta en línea del mismo paciente, con verificación por correo o teléfono, y fusionar duplicados con auditoría.
 - Perfil del paciente en la clínica: historial de citas, inasistencias, notas internas y etiquetas.
@@ -307,7 +309,15 @@ La API escucha en 127.0.0.1:6010 y Next en 127.0.0.1:6011. `WEB_ORIGIN` debe coi
 | POST | /api/patient/auth/verify-email · forgot · reset | Paciente; Origin |
 | POST | /api/patient/me/resend-verification | Paciente (3 por hora) |
 | POST | /api/public/appointment-actions/inspect · confirm · cancel | Público con el token del recordatorio; Origin |
-| PATCH | /api/clinic/patients/:id | OWNER, ADMIN, RECEPTION: consentimiento de WhatsApp de fichas telefónicas |
+| GET | /api/clinic/patients/:id | Personal (médico: sólo sus pacientes y sus citas): historial, estadísticas, notas, auditoría |
+| PATCH | /api/clinic/patients/:id | OWNER, ADMIN, RECEPTION: datos, etiquetas y WhatsApp (fichas con cuenta: sólo etiquetas) |
+| POST | /api/clinic/patients/:id/notes · merge · link | Notas (personal); fusionar y vincular (OWNER, ADMIN, RECEPTION) |
+| POST | /api/public/patient-links/inspect · accept | Público con el token de vinculación; Origin |
+| GET / POST | /api/clinic/waitlist | Personal (médico: la suya) / OWNER, ADMIN, RECEPTION |
+| POST | /api/clinic/waitlist/:id/remove · offers/:id/accept · offers/:id/release | OWNER, ADMIN, RECEPTION |
+| POST | /api/public/clinics/:slug/waitlist | Paciente con correo confirmado (máx. 3 listas) |
+| GET / POST | /api/patient/waitlist · /api/patient/waitlist/:id/leave | Paciente |
+| POST | /api/public/waitlist-offers/inspect · accept · decline | Público con el token de la oferta; Origin |
 | GET / PATCH | /api/clinic/members | OWNER, ADMIN según jerarquía |
 | GET / POST | /api/clinic/invitations | OWNER, ADMIN según jerarquía |
 | POST | /api/clinic/invitations/:id/resend · revoke | OWNER, ADMIN según jerarquía |

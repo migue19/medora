@@ -187,3 +187,49 @@ export function reminderEmail(p: {
     ],
   });
 }
+
+export function waitlistOffer(p: {
+  patientName: string;
+  clinic: { name: string; address: string | null; phone: string | null; timezone: string };
+  doctorName: string;
+  serviceName: string;
+  startsAt: Date;
+  expiresAt: Date;
+  link: string;
+}): RenderedEmail {
+  const when = formatWhen(p.startsAt, p.clinic.timezone);
+  const until = DateTime.fromJSDate(p.expiresAt, { zone: p.clinic.timezone }).setLocale('es').toFormat("HH:mm 'h del' cccc d");
+  return layout({
+    subject: `Se liberó un horario: ${when}`,
+    greeting: `Hola, ${p.patientName}:`,
+    paragraphs: [
+      `Estás en la lista de espera de ${p.clinic.name} y se liberó un horario. Lo apartamos para ti hasta las ${until}.`,
+    ],
+    details: [
+      { label: 'Fecha', value: when },
+      { label: 'Médico', value: p.doctorName },
+      { label: 'Servicio', value: p.serviceName },
+      ...(p.clinic.address ? [{ label: 'Dirección', value: p.clinic.address }] : []),
+    ],
+    action: { label: 'Ver y aceptar el horario', url: p.link },
+    footer: [
+      'Si no te sirve, puedes rechazarlo desde el mismo enlace y seguirás en la lista para el siguiente horario.',
+      'Si no respondes a tiempo, se ofrecerá a la siguiente persona.',
+    ],
+  });
+}
+
+export function patientLinkRequest(p: {
+  patientName: string; clinicName: string; link: string;
+}): RenderedEmail {
+  return layout({
+    subject: `${p.clinicName} quiere vincular tu expediente con tu cuenta de Medora`,
+    greeting: `Hola, ${p.patientName}:`,
+    paragraphs: [
+      `${p.clinicName} tiene una ficha tuya de citas agendadas por teléfono y quiere unirla con tu cuenta de Medora.`,
+      'Al confirmar verás todas tus citas de esa clínica en «Mis citas» y podrás gestionarlas en línea.',
+    ],
+    action: { label: 'Confirmar vinculación', url: p.link },
+    footer: ['El enlace vence en 7 días. Si no reconoces esta clínica, ignora este mensaje.'],
+  });
+}

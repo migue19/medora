@@ -57,37 +57,6 @@ class UpdateMemberDto {
   @IsOptional() @IsBoolean() active?: boolean;
 }
 
-class PatientSearchDto {
-  @IsOptional() @Transform(trim) @IsString() @MaxLength(120) q?: string;
-}
-
-class CreateClinicPatientDto {
-  @Transform(trim) @IsString() @MinLength(2) @MaxLength(120) name: string;
-  @Transform(trim) @IsString() @Matches(PHONE_PATTERN, { message: 'Teléfono inválido' }) phone: string;
-  @IsOptional() @Transform(emptyToNull) @ValidateIf((_, v) => v !== null) @IsEmail() @MaxLength(254)
-  email?: string | null;
-  /** El paciente aceptó (de palabra o por escrito) recibir recordatorios por WhatsApp. */
-  @IsOptional() @IsBoolean() whatsappConsent?: boolean;
-}
-
-class UpdateClinicPatientDto {
-  @IsBoolean() whatsappConsent: boolean;
-}
-
-const PATIENT_SELECT = {
-  id: true, name: true, phone: true, email: true, patientAccountId: true, createdAt: true, whatsappConsentAt: true,
-  patientAccount: { select: { whatsappConsentAt: true } },
-} as const;
-
-function serializePatient(p: {
-  id: string; name: string; phone: string; email: string | null; patientAccountId: string | null; createdAt: Date;
-  whatsappConsentAt: Date | null; patientAccount: { whatsappConsentAt: Date | null } | null;
-}) {
-  const { patientAccount, whatsappConsentAt, ...rest } = p;
-  // En pacientes con cuenta en línea el consentimiento lo da el propio paciente.
-  return { ...rest, whatsappConsent: (patientAccount ? patientAccount.whatsappConsentAt : whatsappConsentAt) !== null };
-}
-
 /** Roles que cada rol administrativo puede asignar o modificar. */
 function manageableRoles(actor: StaffRole): StaffRole[] {
   if (actor === 'OWNER') return ['ADMIN', 'RECEPTION', 'DOCTOR'];
@@ -255,60 +224,5 @@ export class ClinicController {
         user: { id: updated.user.id, name: updated.user.name, email: updated.user.email },
       };
     });
-  }
-
-  // ------------------------------------------------------------- Pacientes
-  @Get('patients')
-  @Roles('OWNER', 'ADMIN', 'RECEPTION')
-  async patients(@Staff() staff: StaffContext, @Query() query: PatientSearchDto) {
-    const q = query.q?.trim();
-    return this.prisma.clinicPatient.findMany({
-      where: {
-        clinicId: staff.clinicId,
-        ...(q ? {
-          OR: [
-            { name: { contains: q, mode: 'insensitive' } },
-            { phone: { contains: q } },
-            { email: { contains: q, mode: 'insensitive' } },
-          ],
-        } : {}),
-      },
-      select: PATIENT_SELECT,
-      orderBy: { name: 'asc' },
-      take: 50,
-    }).then((rows) => rows.map(serializePatient));
-  }
-
-  @Post('patients')
-  @Roles('OWNER', 'ADMIN', 'RECEPTION')
-  async createPatient(@Staff() staff: StaffContext, @Body() dto: CreateClinicPatientDto) {
-    const created = await this.prisma.clinicPatient.create({
-      data: {
-        clinicId: staff.clinicId, name: dto.name, phone: dto.phone,
-        email: dto.email ? normalizeEmail(dto.email) : null,
-        whatsappConsentAt: dto.whatsappConsent ? new Date() : null,
-      },
-      select: PATIENT_SELECT,
-    });
-    return serializePatient(created);
-  }
-
-  /** Registra o retira el consentimiento de WhatsApp de un paciente telefónico. */
-  @Patch('patients/:id')
-  @Roles('OWNER', 'ADMIN', 'RECEPTION')
-  async updatePatient(
-    @Staff() staff: StaffContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateClinicPatientDto,
-  ) {
-    const patient = await this.prisma.clinicPatient.findFirst({ where: { id, clinicId: staff.clinicId } });
-    if (!patient) throw new NotFoundException('Paciente no encontrado');
-    if (patient.patientAccountId) {
-      throw new ForbiddenException('Este paciente tiene cuenta en línea: él mismo decide si recibe WhatsApp');
-    }
-    const updated = await this.prisma.clinicPatient.update({
-      where: { id },
-      data: { whatsappConsentAt: dto.whatsappConsent ? (patient.whatsappConsentAt ?? new Date()) : null },
-      select: PATIENT_SELECT,
-    });
-    return serializePatient(updated);
   }
 }

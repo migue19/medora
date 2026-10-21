@@ -16,7 +16,7 @@ export function Agenda({ session }: { session: StaffSessionData }) {
   const [appointments, setAppointments] = useState<Appointment[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState<false | { patient?: Appointment['patient']; followUp?: { id: string; doctorId: string; serviceId: string } }>(false);
   const [active, setActive] = useState<{ id: string; mode: 'cancel' | 'reschedule' } | null>(null);
   const canBook = role !== 'DOCTOR';
 
@@ -67,14 +67,14 @@ export function Agenda({ session }: { session: StaffSessionData }) {
         )}
         <span className="spacer" />
         <button onClick={() => void reload()}>Actualizar</button>
-        {canBook && <button className="primary" onClick={() => setCreating(true)}>Nueva cita</button>}
+        {canBook && <button className="primary" onClick={() => setCreating({})}>Nueva cita</button>}
       </div>
       {role === 'DOCTOR' && !session.membership.doctorId && (
         <div className="alert warn">Tu usuario aún no está vinculado a un perfil de médico. Pide al administrador que lo vincule.</div>
       )}
       {creating && (
         <div className="card">
-          <NewAppointment session={session} doctors={doctors} onClose={async (msg) => {
+          <NewAppointment session={session} doctors={doctors} patient={creating.patient} followUp={creating.followUp} onClose={async (msg) => {
             setCreating(false); if (msg) { setNotice(msg); await reload(); }
           }} />
         </div>
@@ -97,6 +97,7 @@ export function Agenda({ session }: { session: StaffSessionData }) {
                     <span className={`badge ${a.status}`}>{STATUS_LABEL[a.status]}</span>
                     {a.status === 'BOOKED' && a.confirmedAt && <span className="badge COMPLETED">Confirmada por el paciente</span>}
                     {a.source === 'ONLINE' && <span className="badge">En línea</span>}
+                    {a.followUpOfId && <span className="badge">Subsecuente</span>}
                   </div>
                   <span className="small">{a.serviceName} · {a.doctor.displayName} · {money(a.priceCents)}</span>
                   <span className="small muted"><a href={`tel:${a.patient.phone.replace(/[^+\d]/g, '')}`}>{a.patient.phone}</a>{a.patient.email ? ` · ${a.patient.email}` : ''}</span>
@@ -116,6 +117,13 @@ export function Agenda({ session }: { session: StaffSessionData }) {
                           <button className="danger" onClick={() => setActive({ id: a.id, mode: 'cancel' })}>Cancelar</button>
                         </>
                       )}
+                    </div>
+                  )}
+                  {a.status === 'COMPLETED' && canBook && (
+                    <div className="row">
+                      <button onClick={() => { setCreating({ patient: a.patient, followUp: { id: a.id, doctorId: a.doctor.id, serviceId: a.serviceId } }); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
+                        Agendar subsecuente
+                      </button>
                     </div>
                   )}
                   {active?.id === a.id && active.mode === 'cancel' && (

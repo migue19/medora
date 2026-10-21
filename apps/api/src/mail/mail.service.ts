@@ -6,7 +6,8 @@ import { JobsService } from '../jobs/jobs.service';
 import { buildIcs } from './ics';
 import { OutgoingEmail } from './mail.transport';
 import {
-  AppointmentEmailKind, RenderedEmail, appointmentEmail, resetPassword, staffInvitation, verifyEmail,
+  AppointmentEmailKind, RenderedEmail, appointmentEmail, patientLinkRequest, resetPassword, staffInvitation, verifyEmail,
+  waitlistOffer,
 } from './templates';
 
 /**
@@ -39,6 +40,17 @@ export class MailService {
   }) {
     const link = this.link('/invitacion', p.token);
     await this.enqueue(tx, p.email, staffInvitation({ ...p, link }));
+  }
+
+  async waitlistOffer(tx: Tx | PrismaService, p: { email: string; token: string } & Omit<Parameters<typeof waitlistOffer>[0], 'link'>) {
+    const { email, token, ...data } = p;
+    await this.enqueue(tx, email, waitlistOffer({ ...data, link: this.link('/lista-espera', token) }));
+  }
+
+  async patientLinkRequest(tx: Tx | PrismaService, p: { email: string; patientName: string; clinicName: string; token: string }) {
+    await this.enqueue(tx, p.email, patientLinkRequest({
+      patientName: p.patientName, clinicName: p.clinicName, link: this.link('/vincular', p.token),
+    }));
   }
 
   /** Correo al paciente por un evento de su cita (creación, reprogramación o cancelación). */

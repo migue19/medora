@@ -19,6 +19,10 @@ import { MailService } from './mail/mail.service';
 import { MAIL_TRANSPORT, MailTransport, createTransport } from './mail/mail.transport';
 import { AppointmentActionsController } from './appointments/appointment-actions.controller';
 import { RemindersService } from './notifications/reminders.service';
+import { PatientLinksController, PatientsController } from './patients/patients.controller';
+import { PatientsService } from './patients/patients.service';
+import { PatientWaitlistController, StaffWaitlistController } from './waitlist/waitlist.controller';
+import { WaitlistService } from './waitlist/waitlist.service';
 import { WHATSAPP_TRANSPORT, WhatsAppTransport, createWhatsApp } from './notifications/whatsapp.transport';
 
 export interface Transports {
@@ -31,14 +35,15 @@ export function buildAppModule(config: AppConfig = loadConfig(), transports: Tra
     controllers: [
       HealthController, StaffAuthController, PatientAuthController, PatientAppointmentsController,
       ClinicController, SchedulingController, StaffAppointmentsController, PublicController, InvitationsController,
-      AppointmentActionsController,
+      AppointmentActionsController, PatientsController, PatientLinksController, StaffWaitlistController,
+      PatientWaitlistController,
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
       { provide: MAIL_TRANSPORT, useValue: transports.mail ?? createTransport(config.mail) },
       { provide: WHATSAPP_TRANSPORT, useValue: transports.whatsapp ?? createWhatsApp(config.whatsapp) },
       PrismaService, TokensService, StaffGuard, PatientGuard, AppointmentsService,
-      AuthTokensService, JobsService, MailService, RemindersService,
+      AuthTokensService, JobsService, MailService, RemindersService, PatientsService, WaitlistService,
     ],
   })
   class AppModule {}

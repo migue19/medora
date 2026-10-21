@@ -10,14 +10,16 @@ interface Props {
   doctors: Doctor[];
   patient?: ClinicPatient;
   onClose: (msg?: string) => void;
+  /** Cita atendida de la que se agenda la subsecuente (preselecciona médico y servicio). */
+  followUp?: { id: string; doctorId: string; serviceId: string } | null;
 }
 
-export function NewAppointment({ session, doctors, patient: initialPatient, onClose }: Props) {
+export function NewAppointment({ session, doctors, patient: initialPatient, onClose, followUp }: Props) {
   const tz = session.clinic.timezone;
   const [patient, setPatient] = useState<ClinicPatient | null>(initialPatient ?? null);
   const [services, setServices] = useState<Service[]>([]);
-  const [doctorId, setDoctorId] = useState('');
-  const [serviceId, setServiceId] = useState('');
+  const [doctorId, setDoctorId] = useState(followUp?.doctorId ?? '');
+  const [serviceId, setServiceId] = useState(followUp?.serviceId ?? '');
   const [slot, setSlot] = useState<string | null>(null);
   const [manualDate, setManualDate] = useState(todayIn(tz));
   const [manualTime, setManualTime] = useState('');
@@ -47,6 +49,7 @@ export function NewAppointment({ session, doctors, patient: initialPatient, onCl
     try {
       await staffSession.post('/api/clinic/appointments', {
         requestId, doctorId, serviceId, clinicPatientId: patient.id, startsAt, notes: notes.trim() || null,
+        ...(followUp ? { followUpOfId: followUp.id } : {}),
       });
       onClose(`Cita agendada para ${patient.name}: ${fmtDate(startsAt, tz)} ${fmtTime(startsAt, tz)} h.`);
     } catch (e) {
@@ -57,7 +60,7 @@ export function NewAppointment({ session, doctors, patient: initialPatient, onCl
 
   return (
     <div className="stack">
-      <div className="row"><h2 style={{ margin: 0 }}>Nueva cita</h2><span className="spacer" /><button className="ghost" onClick={() => onClose()}>Cerrar</button></div>
+      <div className="row"><h2 style={{ margin: 0 }}>{followUp ? 'Cita subsecuente' : 'Nueva cita'}</h2><span className="spacer" /><button className="ghost" onClick={() => onClose()}>Cerrar</button></div>
       {!patient ? <PatientChooser onChoose={setPatient} /> : (
         <div className="row"><span>Paciente: <strong>{patient.name}</strong> · {patient.phone}</span>
           {!initialPatient && <button className="ghost small" onClick={() => setPatient(null)}>Cambiar</button>}</div>

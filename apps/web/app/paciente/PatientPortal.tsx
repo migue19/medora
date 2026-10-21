@@ -86,6 +86,7 @@ export function PatientPortal() {
                     </div>
                   ))}
                 </section>
+                <MyWaitlist />
                 <WhatsAppPreference session={session.patient} />
                 {list.past.length > 0 && (
                   <section className="stack">
@@ -173,6 +174,36 @@ function WhatsAppPreference({ session }: { session: { name: string; phone: strin
       </label>
       <p className="small muted">Sólo si la clínica tiene activado WhatsApp. Puedes desactivarlo cuando quieras.</p>
       {error && <div className="alert error" role="alert">{error}</div>}
+    </section>
+  );
+}
+
+interface WaitEntry {
+  id: string; fromDate: string | null; toDate: string | null;
+  clinic?: { name: string; slug: string }; doctor?: { displayName: string }; service?: { name: string };
+}
+
+function MyWaitlist() {
+  const [list, setList] = useState<WaitEntry[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const load = useCallback(() => patientSession.get<WaitEntry[]>('/api/patient/waitlist').then(setList).catch((e) => setError(errorMessage(e))), []);
+  useEffect(() => { void load(); }, [load]);
+  if (list.length === 0 && !error) return null;
+  async function leave(e: WaitEntry) {
+    if (!window.confirm('¿Salir de esta lista de espera?')) return;
+    try { await patientSession.post(`/api/patient/waitlist/${e.id}/leave`); await load(); } catch (err) { setError(errorMessage(err)); }
+  }
+  return (
+    <section className="card stack">
+      <h2>Listas de espera</h2>
+      <p className="small muted">Si se libera un horario, te lo apartamos y te avisamos por correo.</p>
+      {error && <div className="alert error" role="alert">{error}</div>}
+      {list.map((e) => (
+        <div key={e.id} className="row small">
+          <span><strong>{e.clinic?.name}</strong> · {e.doctor?.displayName} · {e.service?.name}{e.fromDate || e.toDate ? ` · del ${e.fromDate ?? '…'} al ${e.toDate ?? '…'}` : ''}</span>
+          <button className="danger" onClick={() => leave(e)}>Salir</button>
+        </div>
+      ))}
     </section>
   );
 }

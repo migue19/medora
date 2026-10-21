@@ -35,6 +35,8 @@ class StaffBookDto {
   @IsISO8601({ strict: true }) startsAt: string;
   @IsOptional() @Transform(emptyToNull) @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(500)
   notes?: string | null;
+  /** Cita atendida de la que esta es subsecuente. */
+  @IsOptional() @IsUUID() followUpOfId?: string;
 }
 
 class CancelDto {
@@ -117,13 +119,20 @@ export class StaffAppointmentsController {
   @Roles('OWNER', 'ADMIN', 'RECEPTION')
   async book(@Staff() staff: StaffContext, @Body() dto: StaffBookDto) {
     const patient = await this.prisma.clinicPatient.findFirst({
-      where: { id: dto.clinicPatientId, clinicId: staff.clinicId },
+      where: { id: dto.clinicPatientId, clinicId: staff.clinicId, mergedIntoId: null },
     });
     if (!patient) throw new NotFoundException('Paciente no encontrado');
+    if (dto.followUpOfId) {
+      const previous = await this.prisma.appointment.findFirst({
+        where: { id: dto.followUpOfId, clinicId: staff.clinicId, clinicPatientId: patient.id },
+      });
+      if (!previous) throw new NotFoundException('Cita anterior no encontrada');
+      if (previous.status !== 'COMPLETED') throw new BadRequestException('La subsecuente se agenda desde una cita atendida');
+    }
     const { appointment } = await this.appointments.book({
       clinicId: staff.clinicId, doctorId: dto.doctorId, serviceId: dto.serviceId, clinicPatientId: patient.id,
       startsAt: new Date(dto.startsAt), notes: dto.notes ?? null, source: 'STAFF', requestId: dto.requestId,
-      actor: actorOf(staff),
+      actor: actorOf(staff), followUpOfId: dto.followUpOfId ?? null,
     });
     return appointment;
   }
@@ -173,7 +182,7 @@ const NOTIFICATION_SELECT = {
 type Row = {
   id: string; startsAt: Date; endsAt: Date; status: string; source: string; serviceName: string;
   durationMinutes: number; priceCents: number; patientNotes: string | null; cancelReason: string | null;
-  createdAt: Date; serviceId: string; confirmedAt: Date | null;
+  createdAt: Date; serviceId: string; confirmedAt: Date | null; followUpOfId: string | null;
   notifications: { channel: string; offsetMinutes: number | null; status: string; error: string | null; createdAt: Date; startsAt: Date }[];
   doctor: { id: string; displayName: string };
   clinicPatient: { id: string; name: string; phone: string; email: string | null };
@@ -184,6 +193,7 @@ function serialize(a: Row) {
     id: a.id, startsAt: a.startsAt, endsAt: a.endsAt, status: a.status, source: a.source,
     serviceId: a.serviceId, serviceName: a.serviceName, durationMinutes: a.durationMinutes, priceCents: a.priceCents,
     patientNotes: a.patientNotes, cancelReason: a.cancelReason, createdAt: a.createdAt, confirmedAt: a.confirmedAt,
+    followUpOfId: a.followUpOfId,
     doctor: a.doctor, patient: a.clinicPatient,
     // Sólo los envíos del horario vigente (los de un horario anterior ya no aplican).
     reminders: a.notifications

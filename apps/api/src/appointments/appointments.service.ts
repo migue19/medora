@@ -8,6 +8,10 @@ import { canonicalHash } from '../common/crypto';
 import { computeSlots, fitsWeeklySchedule, parseLocalDate } from '../scheduling/availability';
 import { MailService } from '../mail/mail.service';
 import { RemindersService } from '../notifications/reminders.service';
+import { JobsService } from '../jobs/jobs.service';
+
+/** Trabajo que ofrece un horario liberado a la lista de espera (lo atiende WaitlistService). */
+export const WAITLIST_OFFER_JOB = 'waitlist.offer';
 
 export const MAX_FUTURE_ONLINE_APPOINTMENTS = 3;
 export const MAX_AVAILABILITY_DAYS = 14;
@@ -40,7 +44,13 @@ export interface BookingInput {
   source: AppointmentSource;
   requestId: string;
   actor: Actor;
+  /** Reserva un horario apartado para esta oferta de la lista de espera. */
+  waitlistOfferId?: string;
+  /** Cita atendida de la que esta es subsecuente. */
+  followUpOfId?: string | null;
 }
+
+const HELD = 'Ese horario está apartado para una persona de la lista de espera.';
 
 @Injectable()
 export class AppointmentsService {
@@ -48,7 +58,30 @@ export class AppointmentsService {
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
     private readonly reminders: RemindersService,
+    private readonly jobs: JobsService,
   ) {}
+
+  /** Horarios apartados vigentes de la lista de espera que se traslapan con el rango. */
+  async holds(tx: Tx | PrismaService, doctorId: string, start: Date, end: Date, excludeOfferId: string | null = null) {
+    const rows = await tx.waitlistOffer.findMany({
+      where: {
+        doctorId, status: 'PENDING', expiresAt: { gt: new Date() }, startsAt: { lt: end }, endsAt: { gt: start },
+        ...(excludeOfferId ? { id: { not: excludeOfferId } } : {}),
+      },
+      select: { startsAt: true, endsAt: true },
+    });
+    return rows.map((r) => ({ start: r.startsAt, end: r.endsAt }));
+  }
+
+  /** Avisa a la lista de espera que se liberó un horario (en la transacción que lo libera). */
+  private async freed(tx: Tx, appointment: { id: string; doctorId: string; startsAt: Date; endsAt: Date }) {
+    if (appointment.startsAt <= new Date()) return;
+    await this.jobs.enqueue(tx, {
+      type: WAITLIST_OFFER_JOB,
+      payload: { doctorId: appointment.doctorId, startsAt: appointment.startsAt.toISOString(), endsAt: appointment.endsAt.toISOString() },
+      dedupeKey: `waitlist-freed:${appointment.id}:${appointment.startsAt.toISOString()}`,
+    });
+  }
 
   /** Horarios disponibles para un médico y servicio. */
   async availability(params: {
@@ -81,6 +114,7 @@ export class AppointmentsService {
     const busy = [
       ...appointments.map((a) => ({ start: a.startsAt, end: a.endsAt })),
       ...timeOffs.map((t) => ({ start: t.startsAt, end: t.endsAt })),
+      ...(await this.holds(this.prisma, doctor.id, rangeStart, rangeEnd)),
     ];
     const days_ = computeSlots({
       timezone: clinic.timezone,
@@ -106,6 +140,7 @@ export class AppointmentsService {
     const requestHash = canonicalHash({
       clinicId: input.clinicId, doctorId: input.doctorId, serviceId: input.serviceId,
       clinicPatientId: input.clinicPatientId, startsAt: input.startsAt.toISOString(), notes: input.notes,
+      waitlistOfferId: input.waitlistOfferId, followUpOfId: input.followUpOfId ?? undefined,
     });
     const replay = async () => {
       const existing = await this.prisma.appointment.findUnique({ where: { requestKey } });
@@ -130,10 +165,11 @@ export class AppointmentsService {
         const now = new Date();
         const startsAt = input.startsAt;
         const endsAt = new Date(startsAt.getTime() + service.durationMinutes * 60_000);
+        const offer = input.waitlistOfferId ? await this.lockOffer(tx, input, endsAt, now) : null;
 
         if (input.source === 'ONLINE') {
           if (!clinic.bookingEnabled) throw new ForbiddenException('La clínica no acepta reservas en línea por ahora');
-          await this.assertOnlineSlot(tx, clinic, doctor.id, service.durationMinutes, startsAt, now, null);
+          await this.assertOnlineSlot(tx, clinic, doctor.id, service.durationMinutes, startsAt, now, null, offer?.id ?? null);
           const future = await tx.appointment.count({
             where: { clinicPatientId: input.clinicPatientId, status: 'BOOKED', startsAt: { gt: now } },
           });
@@ -143,7 +179,7 @@ export class AppointmentsService {
             );
           }
         } else {
-          await this.assertStaffSlot(tx, clinic.timezone, doctor.id, service.durationMinutes, startsAt, now);
+          await this.assertStaffSlot(tx, clinic.timezone, doctor.id, service.durationMinutes, startsAt, now, offer?.id ?? null);
         }
 
         const patientOverlap = await tx.appointment.count({
@@ -159,9 +195,13 @@ export class AppointmentsService {
             clinicId: input.clinicId, doctorId: doctor.id, serviceId: service.id,
             clinicPatientId: input.clinicPatientId, startsAt, endsAt, source: input.source,
             serviceName: service.name, durationMinutes: service.durationMinutes, priceCents: service.priceCents,
-            patientNotes: input.notes, requestKey, requestHash,
+            patientNotes: input.notes, requestKey, requestHash, followUpOfId: input.followUpOfId ?? null,
           },
         });
+        if (offer) {
+          await tx.waitlistOffer.update({ where: { id: offer.id }, data: { status: 'ACCEPTED', appointmentId: created.id } });
+          await tx.waitlistEntry.update({ where: { id: offer.entryId }, data: { status: 'BOOKED', appointmentId: created.id } });
+        }
         const event = await tx.appointmentEvent.create({
           data: {
             appointmentId: created.id, type: 'CREATED', actorKind: input.actor.kind,
@@ -208,6 +248,7 @@ export class AppointmentsService {
         },
       });
       await this.mail.appointmentEvent(tx, event.id);
+      await this.freed(tx, current);
       return updated;
     });
   }
@@ -240,9 +281,9 @@ export class AppointmentsService {
           if (current.startsAt.getTime() - now.getTime() < clinic.patientCancelMinMinutes * 60_000) {
             throw new ConflictException('Ya no es posible reprogramar en línea. Comunícate con la clínica.');
           }
-          await this.assertOnlineSlot(tx, clinic, current.doctorId, current.durationMinutes, params.startsAt, now, current.id);
+          await this.assertOnlineSlot(tx, clinic, current.doctorId, current.durationMinutes, params.startsAt, now, current.id, null);
         } else {
-          await this.assertStaffSlot(tx, clinic.timezone, current.doctorId, current.durationMinutes, params.startsAt, now);
+          await this.assertStaffSlot(tx, clinic.timezone, current.doctorId, current.durationMinutes, params.startsAt, now, null);
         }
         const endsAt = new Date(params.startsAt.getTime() + current.durationMinutes * 60_000);
         const patientOverlap = await tx.appointment.count({
@@ -264,6 +305,7 @@ export class AppointmentsService {
         });
         await this.mail.appointmentEvent(tx, event.id);
         await this.reminders.schedule(tx, updated, clinic, now);
+        await this.freed(tx, current);
         return updated;
       });
     } catch (e) {
@@ -331,7 +373,20 @@ export class AppointmentsService {
     tx: Tx,
     clinic: { timezone: string; minNoticeMinutes: number; horizonDays: number },
     doctorId: string, durationMinutes: number, startsAt: Date, now: Date, excludeId: string | null,
+    excludeOfferId: string | null,
   ) {
+    if (!(await this.onlineSlotFree(tx, clinic, doctorId, durationMinutes, startsAt, now, excludeId, excludeOfferId))) {
+      throw new ConflictException(SLOT_TAKEN);
+    }
+  }
+
+  /** ¿El horario es uno de los publicados y está libre (citas, bloqueos y apartados)? */
+  async onlineSlotFree(
+    tx: Tx,
+    clinic: { timezone: string; minNoticeMinutes: number; horizonDays: number },
+    doctorId: string, durationMinutes: number, startsAt: Date, now: Date, excludeId: string | null,
+    excludeOfferId: string | null,
+  ): Promise<boolean> {
     const day = DateTime.fromJSDate(startsAt, { zone: clinic.timezone }).startOf('day');
     const dayStart = day.toJSDate();
     const dayEnd = day.plus({ days: 1 }).toJSDate();
@@ -351,20 +406,22 @@ export class AppointmentsService {
     ]);
     const [slotsDay] = computeSlots({
       timezone: clinic.timezone, rules, durationMinutes,
-      busy: [...appointments, ...timeOffs].map((b) => ({ start: b.startsAt, end: b.endsAt })),
+      busy: [
+        ...[...appointments, ...timeOffs].map((b) => ({ start: b.startsAt, end: b.endsAt })),
+        ...(await this.holds(tx, doctorId, dayStart, dayEnd, excludeOfferId)),
+      ],
       fromDate: day.toISODate()!, days: 1,
       earliest: new Date(now.getTime() + clinic.minNoticeMinutes * 60_000),
       latest: DateTime.fromJSDate(now).plus({ days: clinic.horizonDays }).toJSDate(),
     });
     const wanted = startsAt.getTime();
-    if (!slotsDay?.slots.some((s) => new Date(s.startsAt).getTime() === wanted)) {
-      throw new ConflictException(SLOT_TAKEN);
-    }
+    return Boolean(slotsDay?.slots.some((s) => new Date(s.startsAt).getTime() === wanted));
   }
 
   /** Personal: dentro del horario del médico, sin bloqueos y en el futuro. */
   private async assertStaffSlot(
     tx: Tx, timezone: string, doctorId: string, durationMinutes: number, startsAt: Date, now: Date,
+    excludeOfferId: string | null,
   ) {
     if (startsAt <= now) throw new BadRequestException('La cita debe ser en el futuro');
     if (startsAt.getTime() - now.getTime() > 400 * 24 * 3600_000) {
@@ -381,5 +438,24 @@ export class AppointmentsService {
       where: { doctorId, startsAt: { lt: endsAt }, endsAt: { gt: startsAt } },
     });
     if (blocked > 0) throw new ConflictException('El médico tiene un bloqueo en ese horario');
+    if ((await this.holds(tx, doctorId, startsAt, endsAt, excludeOfferId)).length > 0) throw new ConflictException(HELD);
+  }
+
+  /** Valida la oferta de la lista de espera que se está aceptando (bloqueada hasta el final de la transacción). */
+  private async lockOffer(tx: Tx, input: BookingInput, endsAt: Date, now: Date) {
+    const rows = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "WaitlistOffer" WHERE id = ${input.waitlistOfferId}::uuid FOR UPDATE`;
+    const offer = rows.length
+      ? await tx.waitlistOffer.findUnique({ where: { id: rows[0].id }, include: { entry: true } })
+      : null;
+    if (
+      !offer || offer.status !== 'PENDING' || offer.expiresAt <= now || offer.clinicId !== input.clinicId ||
+      offer.doctorId !== input.doctorId || offer.entry.serviceId !== input.serviceId ||
+      offer.entry.clinicPatientId !== input.clinicPatientId || offer.startsAt.getTime() !== input.startsAt.getTime() ||
+      offer.endsAt.getTime() !== endsAt.getTime()
+    ) {
+      throw new ConflictException('El horario apartado ya no está disponible');
+    }
+    return offer;
   }
 }

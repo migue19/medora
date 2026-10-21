@@ -7,6 +7,7 @@ import { useSession } from '@/lib/hooks';
 import { ROLE_LABEL } from '@/lib/format';
 import { Agenda } from './Agenda';
 import { Patients } from './Patients';
+import { Waitlist } from './Waitlist';
 import { Doctors } from './Doctors';
 import { Services } from './Services';
 import { Team } from './Team';
@@ -17,6 +18,7 @@ type Role = StaffSessionData['membership']['role'];
 const TABS: { id: string; label: string; roles: Role[] }[] = [
   { id: 'agenda', label: 'Agenda', roles: ['OWNER', 'ADMIN', 'RECEPTION', 'DOCTOR'] },
   { id: 'patients', label: 'Pacientes', roles: ['OWNER', 'ADMIN', 'RECEPTION'] },
+  { id: 'waitlist', label: 'Lista de espera', roles: ['OWNER', 'ADMIN', 'RECEPTION', 'DOCTOR'] },
   { id: 'doctors', label: 'Médicos y horarios', roles: ['OWNER', 'ADMIN', 'RECEPTION', 'DOCTOR'] },
   { id: 'services', label: 'Servicios', roles: ['OWNER', 'ADMIN'] },
   { id: 'team', label: 'Equipo', roles: ['OWNER', 'ADMIN'] },
@@ -56,6 +58,7 @@ export default function Panel() {
         </nav>
         {tab === 'agenda' && <Agenda session={session} />}
         {tab === 'patients' && <Patients session={session} />}
+        {tab === 'waitlist' && <Waitlist session={session} />}
         {tab === 'doctors' && <Doctors session={session} />}
         {tab === 'services' && <Services />}
         {tab === 'team' && <Team session={session} />}

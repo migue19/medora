@@ -17,6 +17,7 @@ import { RateLimiter } from '../common/rate-limit';
 import { AuthTokensService, RESET_TTL_MS, VERIFY_TTL_MS } from '../auth/auth-tokens.service';
 import { forgotEmailLimiter, forgotIpLimiter, resendLimiter, tokenLimiter } from '../auth/limits';
 import { MailService } from '../mail/mail.service';
+import { PatientsService } from '../patients/patients.service';
 
 export const PATIENT_COOKIE = 'medora_patient_rt';
 const PATIENT_COOKIE_PATH = '/api/patient/auth';
@@ -84,6 +85,7 @@ export class PatientAuthController {
     private readonly tokens: TokensService,
     private readonly authTokens: AuthTokensService,
     private readonly mail: MailService,
+    private readonly patients: PatientsService,
   ) {}
 
   @Post('auth/register')
@@ -259,7 +261,8 @@ export class PatientAuthController {
   @UseGuards(PatientGuard)
   async updateMe(@Patient() patient: PatientContext, @Body() dto: UpdateProfileDto) {
     const current = await this.prisma.patientAccount.findUniqueOrThrow({ where: { id: patient.id } });
-    const a = await this.prisma.patientAccount.update({
+    const a = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.patientAccount.update({
       where: { id: patient.id },
       data: {
         name: dto.name, phone: dto.phone,
@@ -267,6 +270,10 @@ export class PatientAuthController {
           whatsappConsentAt: dto.whatsappConsent ? (current.whatsappConsentAt ?? new Date()) : null,
         }),
       },
+      });
+      // Las clínicas ven sus datos actualizados.
+      await this.patients.syncFromAccount(tx, updated);
+      return updated;
     });
     return view(a);
   }

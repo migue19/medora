@@ -1,4 +1,4 @@
-// Medora · Sprint 3
+// Medora · Sprint 4
 // Todas las entidades de negocio llevan clinicId y se consultan siempre
 // filtradas por la clínica obtenida de la sesión.
 
@@ -54,6 +54,28 @@ enum AppointmentEventType {
   COMPLETED
   NO_SHOW
   CONFIRMED
+}
+
+enum PatientAuditAction {
+  CREATED
+  UPDATED
+  LINK_REQUESTED
+  LINKED
+  MERGED
+}
+
+enum WaitlistStatus {
+  WAITING
+  BOOKED
+  REMOVED
+}
+
+enum WaitlistOfferStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  RELEASED
 }
 
 enum NotificationChannel {
@@ -175,12 +197,19 @@ model ClinicPatient {
   email            String?  @db.VarChar(254)
   // Consentimiento registrado por la clínica (pacientes telefónicos).
   whatsappConsentAt DateTime? @db.Timestamptz(3)
+  // Etiquetas libres de la clínica (p. ej. «diabetes», «VIP»).
+  tags             String[] @default([])
+  // Ficha fusionada en otra: queda oculta y sólo se conserva para auditoría.
+  mergedIntoId     String?  @db.Uuid
   createdAt        DateTime @default(now()) @db.Timestamptz(3)
   updatedAt        DateTime @updatedAt @db.Timestamptz(3)
 
   clinic         Clinic          @relation(fields: [clinicId], references: [id])
   patientAccount PatientAccount? @relation(fields: [patientAccountId], references: [id])
   appointments   Appointment[]
+  notes          PatientNote[]
+  audit          PatientAudit[]
+  waitlist       WaitlistEntry[]
 
   @@unique([clinicId, patientAccountId])
   @@unique([id, clinicId])
@@ -288,6 +317,8 @@ model Appointment {
   cancelReason    String?           @db.VarChar(200)
   // El paciente confirmó su asistencia (se reinicia al reprogramar).
   confirmedAt     DateTime?         @db.Timestamptz(3)
+  // Cita subsecuente: la cita atendida de la que se agendó.
+  followUpOfId    String?           @db.Uuid
   createdAt       DateTime          @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime          @updatedAt @db.Timestamptz(3)
 
@@ -413,4 +444,98 @@ model NotificationLog {
 
   @@index([appointmentId])
   @@index([clinicId, createdAt])
+}
+
+// Nota interna de la clínica sobre un paciente. No se edita ni se borra (auditoría).
+model PatientNote {
+  id              String   @id @default(uuid()) @db.Uuid
+  clinicId        String   @db.Uuid
+  clinicPatientId String   @db.Uuid
+  authorId        String   @db.Uuid
+  authorName      String   @db.VarChar(120)
+  body            String   @db.VarChar(2000)
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+
+  clinicPatient ClinicPatient @relation(fields: [clinicPatientId], references: [id])
+
+  @@index([clinicPatientId, createdAt])
+}
+
+// Bitácora de cambios a la ficha: edición, vinculación con cuenta en línea y fusiones.
+model PatientAudit {
+  id              String             @id @default(uuid()) @db.Uuid
+  clinicId        String             @db.Uuid
+  clinicPatientId String             @db.Uuid
+  action          PatientAuditAction
+  actorKind       ActorKind
+  actorId         String             @db.Uuid
+  actorName       String             @db.VarChar(120)
+  details         Json
+  createdAt       DateTime           @default(now()) @db.Timestamptz(3)
+
+  clinicPatient ClinicPatient @relation(fields: [clinicPatientId], references: [id])
+
+  @@index([clinicPatientId, createdAt])
+}
+
+// Solicitud de la clínica para vincular una ficha telefónica con la cuenta en línea del paciente.
+// El paciente la confirma con el enlace que llega a su correo.
+model PatientLinkRequest {
+  id               String    @id @default(uuid()) @db.Uuid
+  clinicId         String    @db.Uuid
+  clinicPatientId  String    @db.Uuid
+  patientAccountId String    @db.Uuid
+  tokenHash        String    @unique @db.Char(64)
+  requestedById    String    @db.Uuid
+  expiresAt        DateTime  @db.Timestamptz(3)
+  usedAt           DateTime? @db.Timestamptz(3)
+  createdAt        DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([clinicPatientId])
+}
+
+// Lista de espera por médico y servicio, en orden de llegada.
+model WaitlistEntry {
+  id              String         @id @default(uuid()) @db.Uuid
+  clinicId        String         @db.Uuid
+  doctorId        String         @db.Uuid
+  serviceId       String         @db.Uuid
+  clinicPatientId String         @db.Uuid
+  // Rango de fechas locales que le sirven al paciente (opcional).
+  fromDate        String?        @db.Char(10)
+  toDate          String?        @db.Char(10)
+  notes           String?        @db.VarChar(300)
+  status          WaitlistStatus @default(WAITING)
+  appointmentId   String?        @db.Uuid
+  createdByKind   ActorKind
+  createdById     String         @db.Uuid
+  createdAt       DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime       @updatedAt @db.Timestamptz(3)
+
+  clinicPatient ClinicPatient   @relation(fields: [clinicPatientId], references: [id])
+  offers        WaitlistOffer[]
+
+  @@index([doctorId, status, createdAt])
+  @@index([clinicId, status])
+}
+
+// Horario liberado que se aparta a una persona de la lista de espera mientras decide.
+// Una oferta PENDING vigente bloquea ese horario para cualquier otra reserva.
+model WaitlistOffer {
+  id            String              @id @default(uuid()) @db.Uuid
+  clinicId      String              @db.Uuid
+  entryId       String              @db.Uuid
+  doctorId      String              @db.Uuid
+  startsAt      DateTime            @db.Timestamptz(3)
+  endsAt        DateTime            @db.Timestamptz(3)
+  expiresAt     DateTime            @db.Timestamptz(3)
+  tokenHash     String              @unique @db.Char(64)
+  status        WaitlistOfferStatus @default(PENDING)
+  appointmentId String?             @db.Uuid
+  createdAt     DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime            @updatedAt @db.Timestamptz(3)
+
+  entry WaitlistEntry @relation(fields: [entryId], references: [id])
+
+  @@index([doctorId, status, startsAt])
 }
