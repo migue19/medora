@@ -36,6 +36,8 @@ class UpdateClinicDto {
   @Max(10080, { each: true }) reminderOffsets?: number[];
   @IsOptional() @IsBoolean() whatsappEnabled?: boolean;
   @IsOptional() @IsBoolean() reviewsEnabled?: boolean;
+  /** Aparecer en el directorio público de Medora. */
+  @IsOptional() @IsBoolean() directoryEnabled?: boolean;
 }
 
 class InviteDto {

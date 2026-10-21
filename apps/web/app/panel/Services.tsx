@@ -27,6 +27,7 @@ export function Services() {
     if (priceCents === null) { setError('Precio inválido'); return; }
     const body: Record<string, unknown> = {
       name: f.get('name'), durationMinutes: Number(f.get('duration')), priceCents, visitType: f.get('visitType'),
+      telemedicine: f.get('telemedicine') === 'on',
     };
     if (s) body.active = f.get('active') === 'on';
     setError(null);
@@ -48,6 +49,7 @@ export function Services() {
           {Object.entries(VISIT_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
       </label>
+      <label className="check"><input type="checkbox" name="telemedicine" defaultChecked={s?.telemedicine ?? false} />También por videoconsulta</label>
     </>
   );
 
@@ -76,7 +78,7 @@ export function Services() {
               </td></tr>
             ) : (
               <tr key={s.id}>
-                <td>{s.name}{s.visitType !== 'ANY' && <div className="small muted">{VISIT_LABEL[s.visitType]}</div>}</td>
+                <td>{s.name}{s.visitType !== 'ANY' && <div className="small muted">{VISIT_LABEL[s.visitType]}</div>}{s.telemedicine && <div className="small muted">Videoconsulta</div>}</td>
                 <td>{s.durationMinutes} min</td><td>{money(s.priceCents)}</td>
                 <td>{s.active ? 'Activo' : <span className="muted">Inactivo</span>}</td>
                 <td><div className="row"><button className="ghost" onClick={() => setEditing(s.id)}>Editar</button>

@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Header } from '@/components/Header';
 import { SlotPicker } from '@/components/SlotPicker';
 import { PatientAuthForm } from '@/components/PatientAuthForm';
@@ -57,7 +57,7 @@ interface Props {
   embedded?: boolean;
 }
 
-const CHANNELS = ['google', 'instagram', 'widget'] as const;
+const CHANNELS = ['google', 'instagram', 'widget', 'directorio'] as const;
 
 export function BookingPage({ slug, initialProfile, doctorSlug, embedded = false }: Props) {
   const [profile, setProfile] = useState<Profile | null>(initialProfile ?? null);
@@ -88,6 +88,28 @@ export function BookingPage({ slug, initialProfile, doctorSlug, embedded = false
     const origin = new URLSearchParams(window.location.search).get('origen');
     if (origin && (CHANNELS as readonly string[]).includes(origin)) setChannel(origin);
   }, [embedded]);
+
+  // Desde el directorio: llega con el servicio (?servicio=) y, si eligió uno, el horario (?hora=&sede=) ya marcados.
+  const preselected = useRef(false);
+  useEffect(() => {
+    if (!profile || preselected.current || !doctorSlug) return;
+    preselected.current = true;
+    const q = new URLSearchParams(window.location.search);
+    const d = profile.doctors.find((x) => x.slug === doctorSlug);
+    const s = d?.services.find((x) => x.id === q.get('servicio'));
+    if (!d || !s || !profile.clinic.bookingEnabled) return;
+    chooseDoctor(d, s);
+    const sede = q.get('sede');
+    if (sede && d.locationIds.includes(sede)) setLocationId(sede);
+    const hora = q.get('hora');
+    const withTime = !!hora && !Number.isNaN(Date.parse(hora)) && Date.parse(hora) > Date.now();
+    if (withTime) {
+      setSlot({ startsAt: new Date(hora!).toISOString(), time: fmtTime(hora!, profile.clinic.timezone) });
+    }
+    // Tras cargar los horarios (que cambian la altura de la página), lleva al paso siguiente.
+    const target = withTime ? 'confirmar' : 'horarios';
+    setTimeout(() => document.getElementById(target)?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 600);
+  }, [profile, doctorSlug]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const tz = profile?.clinic.timezone ?? 'America/Mexico_City';
   const today = useMemo(() => todayIn(tz), [tz]);
@@ -222,7 +244,7 @@ export function BookingPage({ slug, initialProfile, doctorSlug, embedded = false
             {focus && focus.rating && focus.rating.count > 0 && <DoctorReviews slug={clinic.slug} doctor={focus} tz={tz} />}
 
             {doctor && service && (
-              <section className="card stack">
+              <section className="card stack" id="horarios">
                 <h2>2. Elige fecha y hora</h2>
                 {doctor.locationIds.length > 1 && (
                   <div className="stack" style={{ gap: 6 }}>
@@ -248,7 +270,7 @@ export function BookingPage({ slug, initialProfile, doctorSlug, embedded = false
             )}
 
             {slot && doctor && service && (
-              <section className="card stack">
+              <section className="card stack" id="confirmar">
                 <h2>3. Confirma tu cita</h2>
                 <p><strong>{doctor.displayName}</strong> · {service.name} · {priceLabel(service, locationId)}</p>
                 {place(locationId) && (

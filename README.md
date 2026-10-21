@@ -88,7 +88,9 @@ Entregado. Al marcar una cita como «Atendida» se programa la invitación (2 h 
 - Promedio y número de opiniones en el perfil público y en schema.org.
 - **Terminado cuando**: no es posible publicar una opinión sin haber tenido una cita atendida y todo cambio de moderación queda auditado.
 
-### Sprint 8 · Directorio y búsqueda
+### Sprint 8 · Directorio y búsqueda ✅
+
+Entregado. `/directorio` busca entre las clínicas que activan «Aparecer en el directorio» (Configuración, o en el alta de clínica). Un texto que es una especialidad o un padecimiento del catálogo (con sinónimos: «pediatra», «presión alta») se busca como tal; lo demás, por texto con tolerancia a errores de dedo (`pg_trgm`). Cada resultado muestra precio «desde», opiniones, zona y la próxima disponibilidad con horarios que llevan directo al paso de confirmar. Disparadores de PostgreSQL mantienen la especialidad y los padecimientos del catálogo de cada médico en cualquier alta o edición. Páginas indexables por especialidad y por especialidad + ciudad. Detalle en [SPRINT8_RESULTS.md](SPRINT8_RESULTS.md).
 
 - Directorio público entre clínicas que activen su participación, con búsqueda por especialidad, padecimiento, ciudad o colonia, aseguradora, precio, primera disponibilidad y videoconsulta.
 - Búsqueda de texto completo con `pg_trgm` y filtros geográficos (PostGIS o una búsqueda por radio).
@@ -358,6 +360,9 @@ La API escucha en 127.0.0.1:6010 y Next en 127.0.0.1:6011. `WEB_ORIGIN` debe coi
 | POST / DELETE | /api/clinic/doctors/:id/photo | OWNER, ADMIN o el propio médico (JPEG, PNG o WebP, máx. 900 KB) |
 | GET | /api/public/doctors/:id/photo | Público, caché inmutable (la URL lleva la versión) |
 | GET | /api/public/sitemap | Público: clínicas activas y médicos con agenda (para `sitemap.xml`) |
+| GET | /api/public/directory | Público: especialidades y ciudades con médicos en el directorio |
+| GET | /api/public/directory/search | Público: `q`, `especialidad`, `padecimiento`, `ciudad`, `colonia`, `aseguradora`, `precioMax`, `videoconsulta`, `cuando`, `lat`/`lng`/`radioKm`, `orden`, `pagina` |
+| GET | /api/public/directory/suggest · catalog | Público: sugerencias y catálogo de especialidades y padecimientos |
 | POST | /api/public/reviews/inspect · /api/public/reviews | Público con el token de la invitación; Origin |
 | GET | /api/public/reviews/clinics/:slug/doctors/:doctorSlug?page | Público: opiniones publicadas (10 por página) |
 | POST | /api/patient/appointments/:id/review | Paciente: opinar sobre su cita atendida |

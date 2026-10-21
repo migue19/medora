@@ -11,6 +11,8 @@ import { SchedulingController } from './scheduling/scheduling.controller';
 import { AppointmentsService } from './appointments/appointments.service';
 import { StaffAppointmentsController } from './appointments/staff-appointments.controller';
 import { DoctorPhotoController, PublicController, SitemapController } from './public/public.controller';
+import { DirectoryController } from './directory/directory.controller';
+import { DirectoryService } from './directory/directory.service';
 import { HealthController } from './health.controller';
 import { AuthTokensService } from './auth/auth-tokens.service';
 import { InvitationsController } from './auth/invitations.controller';
@@ -41,7 +43,7 @@ export function buildAppModule(config: AppConfig = loadConfig(), transports: Tra
       HealthController, StaffAuthController, PatientAuthController, PatientAppointmentsController,
       ClinicController, SchedulingController, StaffAppointmentsController, PublicController, InvitationsController,
       AppointmentActionsController, PatientsController, PatientLinksController, StaffWaitlistController,
-      PatientWaitlistController, LocationsController, DoctorPhotoController, SitemapController,
+      PatientWaitlistController, LocationsController, DoctorPhotoController, SitemapController, DirectoryController,
       PublicReviewsController, PatientReviewsController, StaffReviewsController, OnboardingController,
     ],
     providers: [
@@ -49,7 +51,7 @@ export function buildAppModule(config: AppConfig = loadConfig(), transports: Tra
       { provide: MAIL_TRANSPORT, useValue: transports.mail ?? createTransport(config.mail) },
       { provide: WHATSAPP_TRANSPORT, useValue: transports.whatsapp ?? createWhatsApp(config.whatsapp) },
       PrismaService, TokensService, StaffGuard, PatientGuard, AppointmentsService,
-      AuthTokensService, JobsService, MailService, RemindersService, PatientsService, WaitlistService, ReviewsService, OnboardingService,
+      AuthTokensService, JobsService, MailService, RemindersService, PatientsService, WaitlistService, ReviewsService, OnboardingService, DirectoryService,
     ],
   })
   class AppModule {}

@@ -1,3 +1,4 @@
+import { coordinatesFromMapUrl } from '../locations/locations.controller';
 import {
   BadRequestException, ConflictException, Inject, Injectable, NotFoundException,
 } from '@nestjs/common';
@@ -159,7 +160,7 @@ export class OnboardingService {
           patientCancelMinMinutes: d.rules.patientCancelMinMinutes,
           remindersEnabled: d.communication.reminderOffsets.length > 0,
           reminderOffsets: d.communication.reminderOffsets.length ? [...d.communication.reminderOffsets].sort((a, b) => b - a) : [1440, 120],
-          reviewsEnabled: d.communication.reviewsEnabled,
+          reviewsEnabled: d.communication.reviewsEnabled, directoryEnabled: d.privacy.directory,
           whatsappEnabled: d.communication.whatsapp && this.config.whatsapp !== null,
         },
       });
@@ -170,6 +171,8 @@ export class OnboardingService {
         const loc = await tx.location.create({
           data: {
             clinicId: clinic.id, name: l.name, address: l.address || null, phone: l.phone || null, mapUrl: l.mapUrl || null, sortOrder: i,
+            neighborhood: l.neighborhood || null, city: l.city || null, postalCode: /^\d{5}$/.test(l.postalCode) ? l.postalCode : null,
+            ...coordinatesFromMapUrl(l.mapUrl),
           },
         });
         locationId.set(l.key, loc.id);
@@ -197,7 +200,7 @@ export class OnboardingService {
 
       for (const s of d.services) {
         const service = await tx.service.create({
-          data: { clinicId: clinic.id, name: s.name, durationMinutes: s.durationMinutes, priceCents: s.priceCents, visitType: s.visitType },
+          data: { clinicId: clinic.id, name: s.name, durationMinutes: s.durationMinutes, priceCents: s.priceCents, visitType: s.visitType, telemedicine: s.telemedicine },
         });
         await tx.doctorService.createMany({ data: s.doctorKeys.map((k) => ({ doctorId: doctorId.get(k)!, serviceId: service.id, clinicId: clinic.id })) });
         if (s.prices.length) {

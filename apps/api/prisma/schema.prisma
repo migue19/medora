@@ -1,4 +1,4 @@
-// Medora · Sprint 7
+// Medora · Sprint 8
 // Todas las entidades de negocio llevan clinicId y se consultan siempre
 // filtradas por la clínica obtenida de la sesión.
 
@@ -132,6 +132,8 @@ model Clinic {
   whatsappEnabled         Boolean  @default(false)
   // Invitar a opinar a los pacientes después de una cita atendida.
   reviewsEnabled          Boolean  @default(true)
+  // Aparecer en el directorio público de Medora (búsqueda entre clínicas).
+  directoryEnabled        Boolean  @default(false)
   createdAt               DateTime @default(now()) @db.Timestamptz(3)
   updatedAt               DateTime @updatedAt @db.Timestamptz(3)
 
@@ -252,6 +254,10 @@ model Doctor {
   // URL pública del médico: /c/<clínica>/<slug>. Estable aunque cambie el nombre.
   slug         String   @db.VarChar(80)
   specialty    String   @db.VarChar(120)
+  // Especialidad del catálogo (se deduce del texto de la especialidad al guardar).
+  specialtyId  String?  @db.Uuid
+  // Texto normalizado (sin acentos, minúsculas) para la búsqueda de texto completo.
+  searchText   String   @default("")
   licenseNumber String? @db.VarChar(30)
   bio          String?  @db.VarChar(1000)
   // Perfil profesional (listas cortas de texto).
@@ -271,6 +277,8 @@ model Doctor {
   timeOffs     TimeOff[]
   appointments Appointment[]
   photo        DoctorPhoto?
+  specialtyRef Specialty?        @relation(fields: [specialtyId], references: [id])
+  conditionRefs DoctorCondition[]
 
   @@unique([id, clinicId])
   @@unique([membershipId, clinicId])
@@ -286,6 +294,8 @@ model Service {
   priceCents      Int
   // Primera vez, subsecuente o cualquiera (se exige en reservas en línea).
   visitType       VisitType @default(ANY)
+  // Se atiende por videoconsulta (filtro del directorio; la sala llega en el Sprint 10).
+  telemedicine    Boolean   @default(false)
   active          Boolean  @default(true)
   createdAt       DateTime @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime @updatedAt @db.Timestamptz(3)
@@ -605,6 +615,13 @@ model Location {
   phone     String?  @db.VarChar(30)
   // Enlace a Google Maps u otro mapa.
   mapUrl    String?  @db.VarChar(500)
+  // Zona para el directorio: colonia, ciudad, estado, código postal y coordenadas (búsqueda por radio).
+  neighborhood String? @db.VarChar(80)
+  city         String? @db.VarChar(80)
+  state        String? @db.VarChar(60)
+  postalCode   String? @db.VarChar(10)
+  latitude     Float?
+  longitude    Float?
   active    Boolean  @default(true)
   sortOrder Int      @default(0)
   createdAt DateTime @default(now()) @db.Timestamptz(3)
@@ -765,4 +782,48 @@ model OnboardingPhoto {
   onboarding ClinicOnboarding @relation(fields: [onboardingId], references: [id])
 
   @@id([onboardingId, doctorKey])
+}
+
+// Catálogo normalizado de especialidades (con sinónimos para la búsqueda).
+model Specialty {
+  id       String   @id @default(uuid()) @db.Uuid
+  slug     String   @unique @db.VarChar(80)
+  name     String   @db.VarChar(120)
+  synonyms String[] @default([])
+
+  doctors    Doctor[]
+  conditions ConditionSpecialty[]
+}
+
+// Catálogo normalizado de padecimientos, ligados a las especialidades que los atienden.
+model Condition {
+  id       String   @id @default(uuid()) @db.Uuid
+  slug     String   @unique @db.VarChar(80)
+  name     String   @db.VarChar(120)
+  synonyms String[] @default([])
+
+  specialties ConditionSpecialty[]
+  doctors     DoctorCondition[]
+}
+
+model ConditionSpecialty {
+  conditionId String @db.Uuid
+  specialtyId String @db.Uuid
+
+  condition Condition @relation(fields: [conditionId], references: [id])
+  specialty Specialty @relation(fields: [specialtyId], references: [id])
+
+  @@id([conditionId, specialtyId])
+}
+
+// Padecimientos del catálogo que atiende un médico (deducidos de su lista de padecimientos).
+model DoctorCondition {
+  doctorId    String @db.Uuid
+  conditionId String @db.Uuid
+
+  doctor    Doctor    @relation(fields: [doctorId], references: [id])
+  condition Condition @relation(fields: [conditionId], references: [id])
+
+  @@id([doctorId, conditionId])
+  @@index([conditionId])
 }

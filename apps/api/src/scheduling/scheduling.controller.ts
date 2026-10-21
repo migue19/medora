@@ -25,6 +25,8 @@ class CreateServiceDto {
   @IsInt() @Min(5) @Max(480) durationMinutes: number;
   @IsInt() @Min(0) @Max(99999999) priceCents: number;
   @IsOptional() @IsEnum(VisitType) visitType?: VisitType;
+  /** También se ofrece por videoconsulta (filtro del directorio). */
+  @IsOptional() @IsBoolean() telemedicine?: boolean;
 }
 
 class PriceDto {
@@ -56,6 +58,7 @@ class UpdateServiceDto {
   @IsOptional() @IsInt() @Min(5) @Max(480) durationMinutes?: number;
   @IsOptional() @IsInt() @Min(0) @Max(99999999) priceCents?: number;
   @IsOptional() @IsEnum(VisitType) visitType?: VisitType;
+  @IsOptional() @IsBoolean() telemedicine?: boolean;
   @IsOptional() @IsBoolean() active?: boolean;
 }
 
@@ -225,7 +228,7 @@ export class SchedulingController {
     return rows.map((d) => ({
       id: d.id, displayName: d.displayName, slug: d.slug, specialty: d.specialty, licenseNumber: d.licenseNumber, bio: d.bio,
       education: d.education, certifications: d.certifications, languages: d.languages, conditions: d.conditions,
-      insurers: d.insurers,
+      insurers: d.insurers, inCatalog: d.specialtyId !== null,
       active: d.active, membership: d.membership,
       photoUrl: d.photo ? `/api/public/doctors/${d.id}/photo?v=${d.photo.updatedAt.getTime()}` : null,
       serviceIds: d.services.map((s) => s.serviceId),

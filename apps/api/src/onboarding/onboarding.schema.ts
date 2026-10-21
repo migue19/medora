@@ -25,14 +25,14 @@ export interface OnboardingData {
     education: string[]; certifications: string[]; languages: string[]; conditions: string[]; insurers: string[];
   }[];
   services: {
-    key: string; name: string; durationMinutes: number; priceCents: number; visitType: (typeof VISIT_TYPES)[number];
+    key: string; name: string; durationMinutes: number; priceCents: number; visitType: (typeof VISIT_TYPES)[number]; telemedicine: boolean;
     doctorKeys: string[]; prices: { doctorKey: string; locationKey: string; priceCents: number }[];
   }[];
   schedules: { doctorKey: string; weekday: number; startMinute: number; endMinute: number; locationKey: string; room: string }[];
   timeOff: { doctorKey: string; from: string; to: string; reason: string }[];
   rules: { bookingEnabled: boolean; minNoticeMinutes: number; horizonDays: number; patientCancelMinMinutes: number };
   communication: { reminderOffsets: number[]; reviewsEnabled: boolean; whatsapp: boolean; moderator: string };
-  privacy: { noticeUrl: string; noticeText: string; officerName: string; officerEmail: string; approved: boolean };
+  privacy: { noticeUrl: string; noticeText: string; officerName: string; officerEmail: string; approved: boolean; directory: boolean };
   contacts: { responsibleName: string; responsiblePhone: string; responsibleEmail: string; receptionName: string; receptionPhone: string };
 }
 
@@ -93,6 +93,7 @@ export function clean(raw: unknown): OnboardingData {
         key: key(s.key), name: str(s.name, 120), durationMinutes: int(s.durationMinutes, 0, 480, 30),
         priceCents: int(s.priceCents, 0, 99_999_999, 0),
         visitType: (VISIT_TYPES as readonly string[]).includes(s.visitType as string) ? (s.visitType as OnboardingData['services'][number]['visitType']) : 'ANY',
+        telemedicine: bool(s.telemedicine, false),
         doctorKeys: list(s.doctorKeys, 50, key).filter(Boolean),
         prices: list(s.prices, 100, (y) => {
           const q = obj(y);
@@ -122,7 +123,7 @@ export function clean(raw: unknown): OnboardingData {
     },
     privacy: {
       noticeUrl: str(p.noticeUrl, 500), noticeText: str(p.noticeText, 20000), officerName: str(p.officerName, 120),
-      officerEmail: str(p.officerEmail, 254).toLowerCase(), approved: bool(p.approved, false),
+      officerEmail: str(p.officerEmail, 254).toLowerCase(), approved: bool(p.approved, false), directory: bool(p.directory, true),
     },
     contacts: {
       responsibleName: str(k.responsibleName, 120), responsiblePhone: str(k.responsiblePhone, 30),

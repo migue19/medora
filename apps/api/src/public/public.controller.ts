@@ -23,7 +23,7 @@ class AvailabilityDto {
 }
 
 /** Canales de reserva en línea que se registran en la cita (para reportes de origen). */
-export const BOOKING_CHANNELS = ['web', 'widget', 'google', 'instagram'] as const;
+export const BOOKING_CHANNELS = ['web', 'widget', 'google', 'instagram', 'directorio'] as const;
 
 class BookDto {
   @IsOptional() @IsIn(BOOKING_CHANNELS) channel?: (typeof BOOKING_CHANNELS)[number];

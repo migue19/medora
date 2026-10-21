@@ -36,7 +36,8 @@ export function Locations() {
             <div className="row">
               <div className="stack" style={{ gap: 2, flex: 1 }}>
                 <strong>{l.name} {!l.active && <span className="badge">Inactiva</span>}</strong>
-                <span className="small muted">{[l.address, l.phone].filter(Boolean).join(' · ') || 'Sin dirección'}{l.mapUrl ? <> · <a href={l.mapUrl} target="_blank" rel="noreferrer">Mapa</a></> : null}</span>
+                <span className="small muted">{[l.address, l.neighborhood, l.city, l.phone].filter(Boolean).join(' · ') || 'Sin dirección'}{l.mapUrl ? <> · <a href={l.mapUrl} target="_blank" rel="noreferrer">Mapa</a></> : null}</span>
+                {!l.city && <span className="small" style={{ color: 'var(--warn)' }}>Agrega la ciudad para aparecer en las búsquedas por zona del directorio.</span>}
               </div>
               <button className="ghost" onClick={() => setEditing(l.id)}>Editar</button>
               <button className="ghost" onClick={() => run(() => staffSession.patch(`/api/clinic/locations/${l.id}`, { active: !l.active }), l.active ? 'Sede desactivada.' : 'Sede activada.')}>{l.active ? 'Desactivar' : 'Activar'}</button>
@@ -61,10 +62,19 @@ export function Locations() {
 }
 
 function LocationForm({ location, onSave, onCancel }: { location?: Location; onSave: (body: object) => void; onCancel: () => void }) {
+  const [coordsError, setCoordsError] = useState<string | null>(null);
   function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
-    onSave({ name: f.get('name'), address: f.get('address'), phone: f.get('phone'), mapUrl: f.get('mapUrl') });
+    const coords = String(f.get('coords') ?? '').trim();
+    const m = /^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/.exec(coords);
+    if (coords && !m) { setCoordsError('Escribe latitud y longitud separadas por coma, p. ej. 19.3867, -99.1656'); return; }
+    onSave({
+      name: f.get('name'), address: f.get('address'), phone: f.get('phone'), mapUrl: f.get('mapUrl'),
+      neighborhood: f.get('neighborhood'), city: f.get('city'), state: f.get('state'), postalCode: f.get('postalCode'),
+      // Vacío: se toman del enlace del mapa si las trae (o se borran).
+      ...(m ? { latitude: Number(m[1]), longitude: Number(m[2]) } : location?.latitude != null && !f.get('mapUrl') ? { latitude: null, longitude: null } : {}),
+    });
   }
   return (
     <form className="stack" onSubmit={submit}>
@@ -73,7 +83,17 @@ function LocationForm({ location, onSave, onCancel }: { location?: Location; onS
         <label>Dirección<input name="address" maxLength={240} defaultValue={location?.address ?? ''} /></label>
         <label>Teléfono<input name="phone" maxLength={30} inputMode="tel" defaultValue={location?.phone ?? ''} /></label>
         <label>Enlace del mapa<input name="mapUrl" type="url" maxLength={500} pattern="https://.*" defaultValue={location?.mapUrl ?? ''} placeholder="https://maps.app.goo.gl/…" /></label>
+        <label>Colonia<input name="neighborhood" maxLength={80} defaultValue={location?.neighborhood ?? ''} /></label>
+        <label>Ciudad o alcaldía<input name="city" maxLength={80} defaultValue={location?.city ?? ''} placeholder="Ciudad de México" /></label>
+        <label>Estado<input name="state" maxLength={60} defaultValue={location?.state ?? ''} /></label>
+        <label>Código postal<input name="postalCode" maxLength={5} inputMode="numeric" pattern="\d{5}" defaultValue={location?.postalCode ?? ''} /></label>
+        <label>Coordenadas (para «cerca de mí»)
+          <input name="coords" maxLength={40} placeholder="19.3867, -99.1656" onChange={() => setCoordsError(null)}
+            defaultValue={location?.latitude != null ? `${location.latitude}, ${location.longitude}` : ''} />
+        </label>
       </div>
+      <p className="small muted" style={{ margin: 0 }}>Coordenadas: en Google Maps, clic derecho sobre la sede y copia los números. Si pegas el enlace largo del mapa, se toman solas.</p>
+      {coordsError && <div className="alert error small">{coordsError}</div>}
       <div className="row"><button className="primary">Guardar</button><button type="button" onClick={onCancel}>Cancelar</button></div>
     </form>
   );

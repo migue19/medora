@@ -51,6 +51,7 @@ export function Doctors({ session }: { session: StaffSessionData }) {
               <div>
               <h3 style={{ margin: 0 }}>{d.displayName} {!d.active && <span className="badge">Inactivo</span>}</h3>
               <div className="muted small">{d.specialty}{d.licenseNumber ? ` · Céd. ${d.licenseNumber}` : ''}</div>
+              {d.inCatalog === false && <div className="small" style={{ color: 'var(--warn)' }}>Especialidad fuera del catálogo: no aparece al buscar por especialidad en el directorio.</div>}
               {d.membership && <div className="muted small">Usuario: {d.membership.user.email}</div>}
               </div>
             </div>
@@ -162,7 +163,9 @@ function DoctorForm({ doctor, services, members, onDone, canPhoto }: { doctor: D
       <h2>{doctor ? 'Editar médico' : 'Nuevo médico'}</h2>
       <div className="grid">
         <label>Nombre a mostrar<input name="displayName" required minLength={2} maxLength={120} defaultValue={doctor?.displayName} placeholder="Dra. Ana López" /></label>
-        <label>Especialidad<input name="specialty" required minLength={2} maxLength={120} defaultValue={doctor?.specialty} /></label>
+        <label>Especialidad<input name="specialty" required minLength={2} maxLength={120} defaultValue={doctor?.specialty} list="catalogo-especialidades" autoComplete="off" />
+          <CatalogList id="catalogo-especialidades" kind="specialties" />
+        </label>
         <label>Cédula profesional<input name="licenseNumber" maxLength={30} defaultValue={doctor?.licenseNumber ?? ''} /></label>
         {doctor && (
           <label>Dirección de su página (/c/…/<em>esto</em>)
@@ -183,7 +186,7 @@ function DoctorForm({ doctor, services, members, onDone, canPhoto }: { doctor: D
         <label>Formación<textarea name="education" defaultValue={(doctor?.education ?? []).join('\n')} placeholder={'Médico Cirujano, UNAM\nEspecialidad en Cardiología, IMSS'} /></label>
         <label>Certificaciones de consejo<textarea name="certifications" defaultValue={(doctor?.certifications ?? []).join('\n')} placeholder="Consejo Mexicano de Cardiología" /></label>
         <label>Idiomas<textarea name="languages" defaultValue={(doctor?.languages ?? []).join('\n')} placeholder={'Español\nInglés'} /></label>
-        <label>Padecimientos que atiende<textarea name="conditions" defaultValue={(doctor?.conditions ?? []).join('\n')} placeholder={'Hipertensión\nArritmias'} /></label>
+        <label>Padecimientos que atiende (uno por renglón; los del catálogo mejoran la búsqueda)<textarea name="conditions" defaultValue={(doctor?.conditions ?? []).join('\n')} placeholder={'Hipertensión\nArritmias'} /></label>
         <label>Aseguradoras aceptadas<textarea name="insurers" defaultValue={(doctor?.insurers ?? []).join('\n')} placeholder={'GNP\nAXA'} /></label>
       </div>
       <fieldset className="stack" style={{ border: 0, padding: 0, margin: 0 }}>
@@ -332,4 +335,16 @@ function TimeOffEditor({ doctor, tz, canEdit }: { doctor: Doctor; tz: string; ca
       )}
     </section>
   );
+}
+
+let catalogCache: Promise<{ specialties: { name: string }[]; conditions: { name: string }[] }> | null = null;
+
+/** Sugerencias del catálogo del directorio para escribir la especialidad como la buscan los pacientes. */
+function CatalogList({ id, kind }: { id: string; kind: 'specialties' | 'conditions' }) {
+  const [names, setNames] = useState<string[]>([]);
+  useEffect(() => {
+    catalogCache ??= fetch('/api/public/directory/catalog').then((r) => (r.ok ? r.json() : { specialties: [], conditions: [] }));
+    catalogCache.then((c) => setNames(c[kind].map((x) => x.name))).catch(() => undefined);
+  }, [kind]);
+  return <datalist id={id}>{names.map((n) => <option key={n} value={n} />)}</datalist>;
 }

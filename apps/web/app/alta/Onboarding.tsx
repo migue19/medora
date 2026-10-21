@@ -20,7 +20,7 @@ interface Doctor {
   education: string[]; certifications: string[]; languages: string[]; conditions: string[]; insurers: string[];
 }
 interface Service {
-  key: string; name: string; durationMinutes: number; priceCents: number; visitType: 'ANY' | 'FIRST' | 'FOLLOW_UP';
+  key: string; name: string; durationMinutes: number; priceCents: number; visitType: 'ANY' | 'FIRST' | 'FOLLOW_UP'; telemedicine: boolean;
   doctorKeys: string[]; prices: { doctorKey: string; locationKey: string; priceCents: number }[];
 }
 interface Schedule extends Block { doctorKey: string; locationKey: string; room: string }
@@ -30,7 +30,7 @@ interface Data {
   timeOff: { doctorKey: string; from: string; to: string; reason: string }[];
   rules: { bookingEnabled: boolean; minNoticeMinutes: number; horizonDays: number; patientCancelMinMinutes: number };
   communication: { reminderOffsets: number[]; reviewsEnabled: boolean; whatsapp: boolean; moderator: string };
-  privacy: { noticeUrl: string; noticeText: string; officerName: string; officerEmail: string; approved: boolean };
+  privacy: { noticeUrl: string; noticeText: string; officerName: string; officerEmail: string; approved: boolean; directory: boolean };
   contacts: { responsibleName: string; responsiblePhone: string; responsibleEmail: string; receptionName: string; receptionPhone: string };
 }
 interface Issue { section: string; message: string; required: boolean }
@@ -450,6 +450,7 @@ function ServicesSection({ d, change, issues }: SectionProps) {
             <label>Para<select value={s.visitType} onChange={(e) => set(i, { visitType: e.target.value as Service['visitType'] })}>
               {Object.entries(VISIT).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
           </div>
+          <label className="check"><input type="checkbox" checked={s.telemedicine} onChange={(e) => set(i, { telemedicine: e.target.checked })} />También por videoconsulta</label>
           <fieldset className="row" style={{ border: 0, padding: 0, margin: 0 }}>
             <legend className="small" style={{ fontWeight: 600 }}>Médicos que lo ofrecen *</legend>
             {d.doctors.length === 0 && <span className="small muted">Primero agrega los médicos.</span>}
@@ -477,7 +478,7 @@ function ServicesSection({ d, change, issues }: SectionProps) {
         </div>
       ))}
       <div><button type="button" className="primary" onClick={() => change((x) => ({ ...x, services: [...x.services, {
-        key: newKey(), name: '', durationMinutes: 30, priceCents: 0, visitType: 'ANY', doctorKeys: x.doctors.length === 1 ? [x.doctors[0].key] : [], prices: [],
+        key: newKey(), name: '', durationMinutes: 30, priceCents: 0, visitType: 'ANY', telemedicine: false, doctorKeys: x.doctors.length === 1 ? [x.doctors[0].key] : [], prices: [],
       }] }))}>+ Agregar servicio</button></div>
     </div>
   );
@@ -594,6 +595,7 @@ function PrivacySection({ d, change, issues }: SectionProps) {
         <label>Su correo *<input type="email" value={p.officerEmail} maxLength={254} onChange={(e) => set({ officerEmail: e.target.value })} /></label>
       </div>
       <label className="check"><input type="checkbox" checked={p.approved} onChange={(e) => set({ approved: e.target.checked })} />* La dirección de la clínica autoriza publicar su página, sus médicos y las opiniones verificadas.</label>
+      <label className="check"><input type="checkbox" checked={p.directory} onChange={(e) => set({ directory: e.target.checked })} />Aparecer también en el directorio de Medora, donde los pacientes buscan médico por especialidad y zona.</label>
     </div>
   );
 }

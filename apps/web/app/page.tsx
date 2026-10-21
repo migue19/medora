@@ -5,6 +5,7 @@ export default function Home() {
   return (
     <>
       <Header>
+        <Link className="btn ghost" href="/directorio">Buscar médico</Link>
         <Link className="btn ghost" href="/paciente">Mis citas</Link>
         <Link className="btn" href="/login">Acceso clínica</Link>
       </Header>
@@ -19,6 +20,14 @@ export default function Home() {
             <Link className="btn primary" href="/login">Entrar al panel</Link>
             <Link className="btn" href="/paciente">Soy paciente</Link>
           </div>
+        </section>
+        <section className="card stack">
+          <h2>¿Buscas médico?</h2>
+          <p className="muted">Encuentra especialistas por padecimiento o zona, compara precios y opiniones verificadas, y reserva en línea.</p>
+          <form action="/directorio" method="get" role="search" className="row">
+            <input name="q" aria-label="Especialidad, padecimiento o médico" placeholder="Ej. pediatra, presión alta" style={{ flex: '1 1 240px' }} />
+            <button type="submit" className="primary">Buscar</button>
+          </form>
         </section>
         <section className="grid section">
           <div className="card"><h3>Reservas 24/7</h3><p className="muted">Cada clínica tiene su página pública con médicos, servicios y horarios disponibles.</p></div>

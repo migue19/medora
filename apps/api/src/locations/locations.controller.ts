@@ -5,8 +5,8 @@ import {
 import { Prisma } from '@prisma/client';
 import { Transform, Type } from 'class-transformer';
 import {
-  ArrayMaxSize, IsArray, IsBoolean, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength, ValidateIf,
-  ValidateNested,
+  ArrayMaxSize, IsArray, IsBoolean, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength,
+  ValidateIf, ValidateNested,
 } from 'class-validator';
 import { PrismaService, Tx } from '../prisma.service';
 import { Roles, Staff, StaffContext, StaffGuard } from '../auth/guards';
@@ -16,7 +16,41 @@ const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? val
 const emptyToNull = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? (value.trim() === '' ? null : value.trim()) : value;
 
-class LocationDto {
+/** Zona de la sede para el directorio (búsqueda por colonia, ciudad y radio). */
+class ZoneFields {
+  @IsOptional() @Transform(emptyToNull) @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(80) neighborhood?: string | null;
+  @IsOptional() @Transform(emptyToNull) @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(80) city?: string | null;
+  @IsOptional() @Transform(emptyToNull) @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(60) state?: string | null;
+  @IsOptional() @Transform(emptyToNull) @ValidateIf((_, v) => v !== null)
+  @IsString() @Matches(/^\d{5}$/, { message: 'El código postal tiene 5 dígitos' }) postalCode?: string | null;
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsNumber() @Min(-90) @Max(90) latitude?: number | null;
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsNumber() @Min(-180) @Max(180) longitude?: number | null;
+}
+
+/** Coordenadas dentro de un enlace largo de Google Maps (…/@19.43,-99.13,17z o …!3d19.43!4d-99.13). */
+export function coordinatesFromMapUrl(url: string | null | undefined): { latitude: number; longitude: number } | null {
+  if (!url) return null;
+  const m = /!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/.exec(url)
+    ?? /@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/.exec(url)
+    ?? /[?&](?:q|query|ll)=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/.exec(decodeURIComponent(url));
+  if (!m) return null;
+  const latitude = Number(m[1]); const longitude = Number(m[2]);
+  return Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180 ? { latitude, longitude } : null;
+}
+
+/** Latitud y longitud van juntas; si faltan y el enlace del mapa las trae, se toman de ahí. */
+function withCoordinates<T extends ZoneFields & { mapUrl?: string | null }>(dto: T): T {
+  if ((dto.latitude === undefined) !== (dto.longitude === undefined) || (dto.latitude === null) !== (dto.longitude === null)) {
+    throw new BadRequestException('Indica latitud y longitud juntas');
+  }
+  if (dto.latitude === undefined && dto.mapUrl) {
+    const c = coordinatesFromMapUrl(dto.mapUrl);
+    if (c) return { ...dto, ...c };
+  }
+  return dto;
+}
+
+class LocationDto extends ZoneFields {
   @Transform(trim) @IsString() @MinLength(2) @MaxLength(120) name: string;
   @IsOptional() @Transform(emptyToNull) @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(240) address?: string | null;
   @IsOptional() @Transform(emptyToNull) @ValidateIf((_, v) => v !== null)
@@ -26,7 +60,7 @@ class LocationDto {
   mapUrl?: string | null;
 }
 
-class UpdateLocationDto {
+class UpdateLocationDto extends ZoneFields {
   @IsOptional() @Transform(trim) @IsString() @MinLength(2) @MaxLength(120) name?: string;
   @IsOptional() @Transform(emptyToNull) @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(240) address?: string | null;
   @IsOptional() @Transform(emptyToNull) @ValidateIf((_, v) => v !== null)
@@ -73,6 +107,7 @@ const INCLUDE = {
 function serialize(l: Prisma.LocationGetPayload<{ include: typeof INCLUDE }>) {
   return {
     id: l.id, name: l.name, address: l.address, phone: l.phone, mapUrl: l.mapUrl, active: l.active, sortOrder: l.sortOrder,
+    neighborhood: l.neighborhood, city: l.city, state: l.state, postalCode: l.postalCode, latitude: l.latitude, longitude: l.longitude,
     hours: l.hours.map(({ weekday, startMinute, endMinute }) => ({ weekday, startMinute, endMinute })),
     rooms: l.rooms.map(({ id, name, active }) => ({ id, name, active })),
   };
@@ -96,7 +131,7 @@ export class LocationsController {
   @Roles('OWNER', 'ADMIN')
   async create(@Staff() staff: StaffContext, @Body() dto: LocationDto) {
     return this.unique(async () => serialize(await this.prisma.location.create({
-      data: { ...dto, clinicId: staff.clinicId }, include: INCLUDE,
+      data: { ...withCoordinates(dto), clinicId: staff.clinicId }, include: INCLUDE,
     })));
   }
 
@@ -114,7 +149,7 @@ export class LocationsController {
         throw new ConflictException('La sede tiene horarios de médicos o citas próximas. Muévelos antes de desactivarla.');
       }
     }
-    return this.unique(async () => serialize(await this.prisma.location.update({ where: { id }, data: dto, include: INCLUDE })));
+    return this.unique(async () => serialize(await this.prisma.location.update({ where: { id }, data: withCoordinates(dto), include: INCLUDE })));
   }
 
   /** Horario de atención de la sede. Los bloques de los médicos en la sede deben quedar dentro. */

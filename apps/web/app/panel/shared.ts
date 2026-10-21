@@ -1,17 +1,21 @@
 export type VisitType = 'ANY' | 'FIRST' | 'FOLLOW_UP';
-export interface Service { id: string; name: string; durationMinutes: number; priceCents: number; active: boolean; visitType: VisitType }
+export interface Service { id: string; name: string; durationMinutes: number; priceCents: number; active: boolean; visitType: VisitType; telemedicine?: boolean }
 export interface Rule { weekday: number; startMinute: number; endMinute: number; locationId?: string; roomId?: string | null }
 export interface Hours { weekday: number; startMinute: number; endMinute: number }
 export interface Room { id: string; name: string; active: boolean }
 export interface Location {
   id: string; name: string; address: string | null; phone: string | null; mapUrl: string | null; active: boolean;
   sortOrder: number; hours: Hours[]; rooms: Room[];
+  neighborhood?: string | null; city?: string | null; state?: string | null; postalCode?: string | null;
+  latitude?: number | null; longitude?: number | null;
 }
 export interface Doctor {
   id: string; displayName: string; specialty: string; licenseNumber: string | null; bio: string | null; active: boolean;
   serviceIds: string[]; rules: Rule[]; photoUrl?: string | null; slug?: string;
   education?: string[]; certifications?: string[]; languages?: string[]; conditions?: string[]; insurers?: string[];
   membership: { id: string; user: { name: string; email: string } } | null;
+  /** La especialidad coincide con el catálogo del directorio. */
+  inCatalog?: boolean;
 }
 export interface ClinicPatient {
   id: string; name: string; phone: string; email: string | null; patientAccountId: string | null; whatsappConsent?: boolean;
