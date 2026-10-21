@@ -6,10 +6,16 @@ export interface PublicService {
   id: string; name: string; durationMinutes: number; priceCents: number; visitType: 'ANY' | 'FIRST' | 'FOLLOW_UP';
   priceByLocation: Record<string, number>;
 }
+export interface PublicReview {
+  id: string; authorName: string; rating: number; ratings: { punctuality: number; treatment: number; facilities: number };
+  comment: string | null; createdAt: string; reply: { text: string; at: string; by: string } | null;
+}
+export interface PublicRating { count: number; average: number; punctuality: number; treatment: number; facilities: number }
 export interface PublicDoctor {
   id: string; displayName: string; slug: string; specialty: string; licenseNumber: string | null; bio: string | null;
   services: PublicService[]; photoUrl: string | null; locationIds: string[];
   education: string[]; certifications: string[]; languages: string[]; conditions: string[]; insurers: string[];
+  rating: PublicRating | null; reviews: PublicReview[];
 }
 export interface PublicLocation {
   id: string; name: string; address: string | null; phone: string | null; mapUrl: string | null;

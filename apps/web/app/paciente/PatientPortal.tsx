@@ -5,6 +5,7 @@ import { Header } from '@/components/Header';
 import { PatientAuthForm } from '@/components/PatientAuthForm';
 import { SlotPicker } from '@/components/SlotPicker';
 import { VerifyEmailNotice } from '@/components/VerifyEmailNotice';
+import { ReviewForm } from '@/components/ReviewForm';
 import { ApiError, errorMessage, patientSession } from '@/lib/api';
 import { useSession } from '@/lib/hooks';
 import { STATUS_LABEL, fmtDate, fmtTime, money, todayIn } from '@/lib/format';
@@ -15,6 +16,7 @@ interface Appt {
   clinic: { name: string; slug: string; timezone: string; phone: string | null; address: string | null; patientCancelMinMinutes: number };
   doctor: { id: string; displayName: string; specialty: string };
   location?: { name: string; address: string | null; phone: string | null; mapUrl: string | null };
+  reviewed?: boolean; canReview?: boolean;
 }
 
 export function PatientPortal() {
@@ -92,7 +94,13 @@ export function PatientPortal() {
                 {list.past.length > 0 && (
                   <section className="stack">
                     <h2>Historial</h2>
-                    {list.past.map((a) => <div key={a.id} className="card"><ApptSummary a={a} /></div>)}
+                    {list.past.map((a) => (
+                      <div key={a.id} className="card stack">
+                        <ApptSummary a={a} />
+                        {a.canReview && <ReviewInline a={a} publicName={session.patient.name} onDone={reload} />}
+                        {a.reviewed && <span className="small muted">Ya dejaste tu opinión. ¡Gracias!</span>}
+                      </div>
+                    ))}
                   </section>
                 )}
               </>
@@ -208,5 +216,18 @@ function MyWaitlist() {
         </div>
       ))}
     </section>
+  );
+}
+
+function ReviewInline({ a, publicName, onDone }: { a: Appt; publicName: string; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const parts = publicName.trim().split(/\s+/);
+  const shortName = parts.length > 1 ? `${parts[0]} ${parts[parts.length > 2 ? parts.length - 2 : 1][0]}.` : parts[0];
+  if (!open) return <div><button onClick={() => setOpen(true)}>Calificar esta consulta</button></div>;
+  return (
+    <ReviewForm publicName={shortName} onCancel={() => setOpen(false)} onSubmit={async (body) => {
+      await patientSession.post(`/api/patient/appointments/${a.id}/review`, body);
+      onDone();
+    }} />
   );
 }

@@ -29,9 +29,10 @@ export class PatientAppointmentsController {
   async list(@Patient() patient: PatientContext) {
     const now = new Date();
     const include = {
-      clinic: { select: { name: true, slug: true, timezone: true, phone: true, address: true, patientCancelMinMinutes: true, bookingEnabled: true } },
+      clinic: { select: { name: true, slug: true, timezone: true, phone: true, address: true, patientCancelMinMinutes: true, bookingEnabled: true, reviewsEnabled: true } },
       doctor: { select: { id: true, displayName: true, specialty: true } },
       location: { select: { name: true, address: true, phone: true, mapUrl: true } },
+      review: { select: { id: true } },
     } as const;
     const where = { clinicPatient: { patientAccountId: patient.id } };
     const [upcoming, past] = await Promise.all([
@@ -48,6 +49,8 @@ export class PatientAppointmentsController {
       id: a.id, startsAt: a.startsAt, endsAt: a.endsAt, status: a.status, serviceId: a.serviceId,
       serviceName: a.serviceName, durationMinutes: a.durationMinutes, priceCents: a.priceCents,
       patientNotes: a.patientNotes, cancelReason: a.cancelReason, clinic: a.clinic, doctor: a.doctor, location: a.location,
+      reviewed: a.review !== null,
+      canReview: a.status === 'COMPLETED' && a.review === null && a.clinic.reviewsEnabled,
       canChangeOnline:
         a.status === 'BOOKED' && a.clinic.bookingEnabled &&
         a.startsAt.getTime() - now.getTime() >= a.clinic.patientCancelMinMinutes * 60_000,

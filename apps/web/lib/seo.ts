@@ -46,7 +46,12 @@ export function clinicJsonLd(p: PublicProfile, url: string, site: string) {
     location: p.locations.length > 1 ? p.locations.map(place) : undefined,
     medicalSpecialty: [...new Set(p.doctors.map((d) => d.specialty))],
     potentialAction: p.clinic.bookingEnabled ? { '@type': 'ReserveAction', target: url } : undefined,
-    member: p.doctors.map((d) => ({ '@type': 'Physician', name: d.displayName, url: `${site}/c/${p.clinic.slug}/${d.slug}` })),
+    member: p.doctors.map((d) => ({
+      '@type': 'Physician', name: d.displayName, url: `${site}/c/${p.clinic.slug}/${d.slug}`,
+      aggregateRating: d.rating && d.rating.count > 0
+        ? { '@type': 'AggregateRating', ratingValue: d.rating.average, reviewCount: d.rating.count, bestRating: 5 }
+        : undefined,
+    })),
   };
 }
 
@@ -69,6 +74,17 @@ export function doctorJsonLd(p: PublicProfile, d: PublicDoctor, url: string, sit
     location: locations.length > 1 ? locations.map(place) : undefined,
     hospitalAffiliation: { '@type': 'MedicalClinic', name: p.clinic.name, url: `${site}/c/${p.clinic.slug}` },
     availableService: d.services.map((s) => ({ '@type': 'MedicalProcedure', name: s.name })),
+    // Sólo opiniones verificadas (de citas atendidas) y publicadas.
+    aggregateRating: d.rating && d.rating.count > 0
+      ? { '@type': 'AggregateRating', ratingValue: d.rating.average, reviewCount: d.rating.count, bestRating: 5, worstRating: 1 }
+      : undefined,
+    review: d.reviews.length ? d.reviews.map((r) => ({
+      '@type': 'Review',
+      author: { '@type': 'Person', name: r.authorName },
+      datePublished: r.createdAt.slice(0, 10),
+      reviewBody: r.comment ?? undefined,
+      reviewRating: { '@type': 'Rating', ratingValue: r.rating, bestRating: 5, worstRating: 1 },
+    })) : undefined,
     potentialAction: p.clinic.bookingEnabled ? { '@type': 'ReserveAction', target: url } : undefined,
   };
 }
@@ -93,8 +109,9 @@ export function clinicMetadata(p: PublicProfile, url: string, site: string): Met
 
 export function doctorMetadata(p: PublicProfile, d: PublicDoctor, url: string, site: string): Metadata {
   const range = priceRange(d);
+  const stars = d.rating && d.rating.count > 0 ? ` ★ ${d.rating.average.toFixed(1)} (${d.rating.count} ${d.rating.count === 1 ? 'opinión' : 'opiniones'}).` : '';
   const description = truncate(
-    `${d.displayName}, ${d.specialty} en ${p.clinic.name}.${d.conditions.length ? ` Atiende ${d.conditions.slice(0, 3).join(', ')}.` : ''}${range ? ` Consulta desde ${range.split(' – ')[0]}.` : ''} Agenda tu cita en línea.`,
+    `${d.displayName}, ${d.specialty} en ${p.clinic.name}.${stars}${d.conditions.length ? ` Atiende ${d.conditions.slice(0, 3).join(', ')}.` : ''}${range ? ` Consulta desde ${range.split(' – ')[0]}.` : ''} Agenda tu cita en línea.`,
   );
   const title = `${d.displayName} · ${d.specialty}`;
   const image = d.photoUrl ? `${site}${d.photoUrl}` : `${site}/icons/icon-512.png`;

@@ -7,7 +7,7 @@ import { buildIcs } from './ics';
 import { OutgoingEmail } from './mail.transport';
 import {
   AppointmentEmailKind, RenderedEmail, appointmentEmail, patientLinkRequest, resetPassword, staffInvitation, verifyEmail,
-  waitlistOffer,
+  reviewInvitation, reviewModerated, waitlistOffer,
 } from './templates';
 
 /**
@@ -51,6 +51,16 @@ export class MailService {
     await this.enqueue(tx, p.email, patientLinkRequest({
       patientName: p.patientName, clinicName: p.clinicName, link: this.link('/vincular', p.token),
     }));
+  }
+
+  async reviewInvitation(tx: Tx | PrismaService, p: { email: string; token: string } & Omit<Parameters<typeof reviewInvitation>[0], 'link'>) {
+    const { email, token, ...data } = p;
+    await this.enqueue(tx, email, reviewInvitation({ ...data, link: this.link('/opinion', token) }));
+  }
+
+  async reviewModerated(tx: Tx | PrismaService, p: { email: string } & Parameters<typeof reviewModerated>[0]) {
+    const { email, ...data } = p;
+    await this.enqueue(tx, email, reviewModerated(data));
   }
 
   /** Correo al paciente por un evento de su cita (creación, reprogramación o cancelación). */

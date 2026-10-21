@@ -145,3 +145,7 @@ dialog::backdrop { background: rgb(0 0 0 / 40%); }
   .hero h1 { font-size: 1.6rem; }
   .card { padding: 12px; }
 }
+
+.visually-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.star-option { flex-direction: row; font-weight: 400; position: relative; }
+.star-option:has(input:focus-visible) span[aria-hidden] { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }

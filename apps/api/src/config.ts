@@ -20,6 +20,8 @@ export interface WhatsAppConfig {
   phoneNumberId: string;
   /** Plantilla aprobada para el recordatorio y su idioma. */
   template: string;
+  /** Plantilla aprobada para invitar a opinar tras una cita atendida. */
+  reviewTemplate: string;
   language: string;
   apiVersion: string;
   /** Lada que se antepone a teléfonos de 10 dígitos. */
@@ -71,6 +73,7 @@ function loadWhatsAppConfig(): WhatsAppConfig | null {
     token,
     phoneNumberId: required('WHATSAPP_PHONE_NUMBER_ID'),
     template: process.env.WHATSAPP_TEMPLATE?.trim() || 'recordatorio_cita',
+    reviewTemplate: process.env.WHATSAPP_REVIEW_TEMPLATE?.trim() || 'invitacion_opinion',
     language: process.env.WHATSAPP_TEMPLATE_LANG?.trim() || 'es_MX',
     apiVersion: process.env.WHATSAPP_API_VERSION?.trim() || 'v21.0',
     defaultCountryCode: process.env.WHATSAPP_DEFAULT_COUNTRY?.trim() || '52',

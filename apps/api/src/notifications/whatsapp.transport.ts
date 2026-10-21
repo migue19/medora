@@ -7,6 +7,8 @@ export interface WhatsAppTemplateMessage {
   bodyParams: string[];
   /** Sufijo del botón de URL dinámica (el token del enlace). */
   buttonParam: string;
+  /** Plantilla a usar; por omisión la del recordatorio. */
+  template?: string;
 }
 
 export interface WhatsAppTransport {
@@ -33,7 +35,7 @@ export class CloudApiWhatsApp implements WhatsAppTransport {
         to: m.to,
         type: 'template',
         template: {
-          name: this.config.template,
+          name: m.template ?? this.config.template,
           language: { code: this.config.language },
           components: [
             { type: 'body', parameters: m.bodyParams.map((text) => ({ type: 'text', text })) },

@@ -7,6 +7,7 @@ interface Clinic {
   name: string; slug: string; phone: string | null; address: string | null; timezone: string; bookingEnabled: boolean;
   minNoticeMinutes: number; horizonDays: number; patientCancelMinMinutes: number;
   remindersEnabled: boolean; reminderOffsets: number[]; whatsappEnabled: boolean; whatsappAvailable: boolean;
+  reviewsEnabled: boolean;
 }
 
 /** Anticipaciones disponibles para los recordatorios (máximo 3). */
@@ -34,6 +35,7 @@ export function ClinicSettings() {
         minNoticeMinutes: Math.round(Number(f.get('minNoticeHours')) * 60),
         horizonDays: Number(f.get('horizonDays')),
         patientCancelMinMinutes: Math.round(Number(f.get('cancelHours')) * 60),
+        reviewsEnabled: f.get('reviewsEnabled') === 'on',
       });
       setClinic(updated);
       setMsg({ ok: true, text: 'Configuración guardada.' });
@@ -61,6 +63,7 @@ export function ClinicSettings() {
           <label>Cancelar/reprogramar en línea hasta (horas antes)<input name="cancelHours" type="number" min={0} max={168} step={0.5} defaultValue={clinic.patientCancelMinMinutes / 60} /></label>
         </div>
         <label className="check"><input type="checkbox" name="bookingEnabled" defaultChecked={clinic.bookingEnabled} />Aceptar reservas en línea</label>
+        <label className="check"><input type="checkbox" name="reviewsEnabled" defaultChecked={clinic.reviewsEnabled} />Invitar a opinar tras cada cita atendida y mostrar las opiniones verificadas</label>
         <p className="muted small">Zona horaria: {clinic.timezone}</p>
         {msg && <div className={`alert ${msg.ok ? 'ok' : 'error'}`}>{msg.text}</div>}
         <div><button className="primary">Guardar</button></div>

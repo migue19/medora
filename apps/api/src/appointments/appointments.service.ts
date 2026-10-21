@@ -10,6 +10,7 @@ import { pricesFor, resolvePrice } from '../scheduling/pricing';
 import { MailService } from '../mail/mail.service';
 import { RemindersService } from '../notifications/reminders.service';
 import { JobsService } from '../jobs/jobs.service';
+import { ReviewsService } from '../reviews/reviews.service';
 
 /** Trabajo que ofrece un horario liberado a la lista de espera (lo atiende WaitlistService). */
 export const WAITLIST_OFFER_JOB = 'waitlist.offer';
@@ -62,6 +63,7 @@ export class AppointmentsService {
     private readonly mail: MailService,
     private readonly reminders: RemindersService,
     private readonly jobs: JobsService,
+    private readonly reviews: ReviewsService,
   ) {}
 
   /** Horarios apartados vigentes de la lista de espera que se traslapan con el rango. */
@@ -391,6 +393,10 @@ export class AppointmentsService {
         throw new ConflictException('Sólo puedes registrar asistencia cuando la cita ya comenzó');
       }
       const updated = await tx.appointment.update({ where: { id: current.id }, data: { status: params.status } });
+      if (params.status === 'COMPLETED') {
+        const clinic = await tx.clinic.findUniqueOrThrow({ where: { id: current.clinicId } });
+        await this.reviews.scheduleInvite(tx, updated, clinic);
+      }
       await tx.appointmentEvent.create({
         data: {
           appointmentId: current.id, type: params.status, actorKind: params.actor.kind,

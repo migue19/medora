@@ -1,4 +1,4 @@
-// Medora · Sprint 6
+// Medora · Sprint 7
 // Todas las entidades de negocio llevan clinicId y se consultan siempre
 // filtradas por la clínica obtenida de la sesión.
 
@@ -84,6 +84,19 @@ enum VisitType {
   FOLLOW_UP
 }
 
+enum ReviewStatus {
+  PUBLISHED
+  HIDDEN
+}
+
+enum ReviewEventType {
+  CREATED
+  HIDDEN
+  RESTORED
+  REPLIED
+  REPLY_REMOVED
+}
+
 enum NotificationChannel {
   EMAIL
   WHATSAPP
@@ -111,6 +124,8 @@ model Clinic {
   // Minutos antes de la cita (por defecto 24 h y 2 h).
   reminderOffsets         Int[]    @default([1440, 120])
   whatsappEnabled         Boolean  @default(false)
+  // Invitar a opinar a los pacientes después de una cita atendida.
+  reviewsEnabled          Boolean  @default(true)
   createdAt               DateTime @default(now()) @db.Timestamptz(3)
   updatedAt               DateTime @updatedAt @db.Timestamptz(3)
 
@@ -361,6 +376,7 @@ model Appointment {
   notifications NotificationLog[]
   location      Location           @relation(fields: [locationId], references: [id])
   room          Room?              @relation(fields: [roomId], references: [id])
+  review        Review?
 
   @@index([clinicId, startsAt])
   @@index([doctorId, startsAt])
@@ -650,4 +666,63 @@ model ServicePrice {
   location Location? @relation(fields: [locationId], references: [id])
 
   @@index([serviceId])
+}
+
+// Opinión verificada: sólo existe para una cita atendida y hay una por cita.
+model Review {
+  id                 String       @id @default(uuid()) @db.Uuid
+  clinicId           String       @db.Uuid
+  doctorId           String       @db.Uuid
+  appointmentId      String       @unique @db.Uuid
+  clinicPatientId    String       @db.Uuid
+  ratingPunctuality  Int
+  ratingTreatment    Int
+  ratingFacilities   Int
+  comment            String?      @db.VarChar(1000)
+  // Nombre público: «Ana P.» o «Paciente verificado» si lo pidió anónimo.
+  anonymous          Boolean      @default(false)
+  authorName         String       @db.VarChar(60)
+  status             ReviewStatus @default(PUBLISHED)
+  // Moderación vigente (también queda en ReviewEvent).
+  hiddenReason       String?      @db.VarChar(30)
+  reply              String?      @db.VarChar(1000)
+  replyAt            DateTime?    @db.Timestamptz(3)
+  replyByName        String?      @db.VarChar(120)
+  createdAt          DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime     @updatedAt @db.Timestamptz(3)
+
+  appointment Appointment   @relation(fields: [appointmentId], references: [id])
+  events      ReviewEvent[]
+
+  @@index([doctorId, status, createdAt])
+  @@index([clinicId, createdAt])
+}
+
+// Bitácora de cada cambio a una opinión: nada se borra en silencio.
+model ReviewEvent {
+  id        String          @id @default(uuid()) @db.Uuid
+  reviewId  String          @db.Uuid
+  type      ReviewEventType
+  actorKind ActorKind
+  actorId   String          @db.Uuid
+  actorName String          @db.VarChar(120)
+  reason    String?         @db.VarChar(30)
+  note      String?         @db.VarChar(500)
+  createdAt DateTime        @default(now()) @db.Timestamptz(3)
+
+  review Review @relation(fields: [reviewId], references: [id])
+
+  @@index([reviewId, createdAt])
+}
+
+// Enlace personal para opinar sobre una cita atendida. Sólo se guarda su SHA-256.
+model ReviewInvitation {
+  id            String    @id @default(uuid()) @db.Uuid
+  appointmentId String    @db.Uuid
+  tokenHash     String    @unique @db.Char(64)
+  expiresAt     DateTime  @db.Timestamptz(3)
+  usedAt        DateTime? @db.Timestamptz(3)
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([appointmentId])
 }

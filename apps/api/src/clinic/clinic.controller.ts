@@ -35,6 +35,7 @@ class UpdateClinicDto {
   @IsOptional() @IsArray() @ArrayMaxSize(3) @ArrayUnique() @IsInt({ each: true }) @Min(30, { each: true })
   @Max(10080, { each: true }) reminderOffsets?: number[];
   @IsOptional() @IsBoolean() whatsappEnabled?: boolean;
+  @IsOptional() @IsBoolean() reviewsEnabled?: boolean;
 }
 
 class InviteDto {

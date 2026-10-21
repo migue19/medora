@@ -233,3 +233,41 @@ export function patientLinkRequest(p: {
     footer: ['El enlace vence en 7 días. Si no reconoces esta clínica, ignora este mensaje.'],
   });
 }
+
+export function reviewInvitation(p: {
+  patientName: string; clinicName: string; doctorName: string; when: string; link: string;
+}): RenderedEmail {
+  return layout({
+    subject: `¿Cómo fue tu consulta con ${p.doctorName}?`,
+    greeting: `Hola, ${p.patientName}:`,
+    paragraphs: [
+      `Gracias por tu visita a ${p.clinicName}. Tu opinión ayuda a otros pacientes y a la clínica a mejorar.`,
+      'Te toma un minuto: califica puntualidad, trato e instalaciones y, si quieres, deja un comentario.',
+    ],
+    details: [{ label: 'Médico', value: p.doctorName }, { label: 'Cita', value: p.when }],
+    action: { label: 'Dejar mi opinión', url: p.link },
+    footer: [
+      'Sólo publicamos opiniones de citas atendidas. Puedes publicar con tu nombre de pila e inicial, o como «Paciente verificado».',
+      'El enlace es personal y vence en 30 días.',
+    ],
+  });
+}
+
+export function reviewModerated(p: {
+  patientName: string; clinicName: string; doctorName: string; hidden: boolean; reason: string; note: string | null;
+}): RenderedEmail {
+  return layout({
+    subject: p.hidden ? `Tu opinión sobre ${p.doctorName} fue ocultada` : `Tu opinión sobre ${p.doctorName} volvió a publicarse`,
+    greeting: `Hola, ${p.patientName}:`,
+    paragraphs: [
+      p.hidden
+        ? `${p.clinicName} ocultó tu opinión de su página pública. No se borró: queda guardada junto con el motivo.`
+        : `${p.clinicName} volvió a publicar tu opinión en su página.`,
+    ],
+    details: [
+      ...(p.hidden ? [{ label: 'Motivo', value: p.reason }] : []),
+      ...(p.note ? [{ label: 'Nota de la clínica', value: p.note }] : []),
+    ],
+    footer: ['Si crees que es un error, comunícate con la clínica.'],
+  });
+}

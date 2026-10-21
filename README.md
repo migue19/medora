@@ -1,4 +1,4 @@
-# Medora · Sprint 6
+# Medora · Sprint 7
 
 Agenda y reservas de citas médicas en línea para clínicas y consultorios (SaaS multi-clínica). Monorepo npm con Next.js 16 / React 19 (PWA), NestJS 11, Prisma 6 y PostgreSQL 17. Node.js 24 LTS recomendado. Mismo stack y criterios de seguridad que Tavixo.
 
@@ -14,7 +14,7 @@ Objetivo: llegar a la funcionalidad de una plataforma tipo Doctoralia sobre una 
 | 4 | Ficha del paciente, vinculación de cuentas y lista de espera | ✅ Entregado |
 | 5 | Sedes, consultorios y perfil profesional completo | ✅ Entregado |
 | 6 | Perfil público, SEO y widget de reservas | ✅ Entregado |
-| 7 | Opiniones verificadas | Pendiente |
+| 7 | Opiniones verificadas | ✅ Entregado |
 | 8 | Directorio público y búsqueda de médicos | Pendiente |
 | 9 | Pagos en línea y políticas de inasistencia | Pendiente |
 | 10 | Telemedicina (videoconsulta) | Pendiente |
@@ -79,7 +79,9 @@ Entregado. Lighthouse en `/c/<clínica>` y `/c/<clínica>/<médico>`: rendimient
 - Widget «Reservar cita» para insertar en el sitio web de la clínica, más un botón para Google Maps e Instagram.
 - **Terminado cuando**: las páginas pasan Lighthouse (SEO, accesibilidad ≥ 90) y el widget reserva desde un sitio externo.
 
-### Sprint 7 · Opiniones verificadas
+### Sprint 7 · Opiniones verificadas ✅
+
+Entregado. Al marcar una cita como «Atendida» se programa la invitación (2 h después) por correo y, si la clínica lo activó y el paciente dio su consentimiento, por WhatsApp con la plantilla `invitacion_opinion`. Además de la aplicación, un disparador de PostgreSQL rechaza cualquier opinión cuya cita no esté atendida, y un índice único garantiza una opinión por cita. El paciente también puede opinar desde «Mis citas». Detalle en [SPRINT7_RESULTS.md](SPRINT7_RESULTS.md).
 
 - Sólo pueden opinar pacientes con una cita en estado «Atendida», una opinión por cita, mediante una invitación por correo o WhatsApp tras la consulta.
 - Calificación (puntualidad, trato, instalaciones) y comentario. Moderación por la clínica con motivos y sin borrar en silencio, más una respuesta pública del médico.
@@ -248,7 +250,8 @@ Opcional. Sin `WHATSAPP_TOKEN` el canal queda desactivado y los recordatorios sa
 | `WHATSAPP_TEMPLATE_LANG` | `es_MX` |
 | `WHATSAPP_DEFAULT_COUNTRY` | `52` (se antepone a teléfonos de 10 dígitos) |
 
-4. En el panel, «Clínica → Recordatorios», activar «También por WhatsApp». Sólo reciben WhatsApp los pacientes con consentimiento: los de cuenta en línea lo activan en su registro o en «Mis citas»; para fichas telefónicas lo registra recepción.
+4. Opcional, para invitar a opinar por WhatsApp: plantilla `invitacion_opinion` (Utilidad, `es_MX`), cuerpo `Hola {{1}}, ¿cómo te fue con {{2}} en {{3}}? Tu opinión ayuda a otros pacientes.` y botón URL dinámica `https://medora.nut.com.mx/opinion?t={{1}}`. Variable `WHATSAPP_REVIEW_TEMPLATE` si usas otro nombre.
+5. En el panel, «Clínica → Recordatorios», activar «También por WhatsApp». Sólo reciben WhatsApp los pacientes con consentimiento: los de cuenta en línea lo activan en su registro o en «Mis citas»; para fichas telefónicas lo registra recepción.
 
 ## Arranque con Docker Compose (local)
 
@@ -338,6 +341,12 @@ La API escucha en 127.0.0.1:6010 y Next en 127.0.0.1:6011. `WEB_ORIGIN` debe coi
 | POST / DELETE | /api/clinic/doctors/:id/photo | OWNER, ADMIN o el propio médico (JPEG, PNG o WebP, máx. 900 KB) |
 | GET | /api/public/doctors/:id/photo | Público, caché inmutable (la URL lleva la versión) |
 | GET | /api/public/sitemap | Público: clínicas activas y médicos con agenda (para `sitemap.xml`) |
+| POST | /api/public/reviews/inspect · /api/public/reviews | Público con el token de la invitación; Origin |
+| GET | /api/public/reviews/clinics/:slug/doctors/:doctorSlug?page | Público: opiniones publicadas (10 por página) |
+| POST | /api/patient/appointments/:id/review | Paciente: opinar sobre su cita atendida |
+| GET | /api/clinic/reviews?status&doctorId | Personal (médico: las suyas) |
+| POST | /api/clinic/reviews/:id/hide · restore | OWNER, ADMIN (motivo obligatorio al ocultar; se avisa al paciente) |
+| PUT / DELETE | /api/clinic/reviews/:id/reply | El médico de la cita, OWNER o ADMIN |
 | GET / POST | /api/clinic/waitlist | Personal (médico: la suya) / OWNER, ADMIN, RECEPTION |
 | POST | /api/clinic/waitlist/:id/remove · offers/:id/accept · offers/:id/release | OWNER, ADMIN, RECEPTION |
 | POST | /api/public/clinics/:slug/waitlist | Paciente con correo confirmado (máx. 3 listas) |

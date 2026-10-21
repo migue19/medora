@@ -52,7 +52,8 @@ export async function startHarness(): Promise<Harness> {
     rateLimitEnabled: false,
     mail: { from: 'Medora <no-reply@test.mx>', smtp: null },
     whatsapp: {
-      token: 'prueba', phoneNumberId: '123', template: 'recordatorio_cita', language: 'es_MX', apiVersion: 'v21.0',
+      token: 'prueba', phoneNumberId: '123', template: 'recordatorio_cita', reviewTemplate: 'invitacion_opinion',
+      language: 'es_MX', apiVersion: 'v21.0',
       defaultCountryCode: '52',
     },
     jobsPollMs: 0,
@@ -108,7 +109,7 @@ export class Client {
 }
 
 export async function resetDb(prisma: PrismaClient): Promise<void> {
-  await prisma.$executeRawUnsafe(`TRUNCATE "WaitlistOffer", "WaitlistEntry", "PatientLinkRequest", "PatientAudit", "PatientNote", "NotificationLog", "AppointmentActionToken", "Job", "AuthToken", "StaffInvitation", "AppointmentEvent", "Appointment", "TimeOff", "ScheduleRule",
+  await prisma.$executeRawUnsafe(`TRUNCATE "ReviewEvent", "Review", "ReviewInvitation", "WaitlistOffer", "WaitlistEntry", "PatientLinkRequest", "PatientAudit", "PatientNote", "NotificationLog", "AppointmentActionToken", "Job", "AuthToken", "StaffInvitation", "AppointmentEvent", "Appointment", "TimeOff", "ScheduleRule",
     "DoctorService", "Service", "Doctor", "ClinicPatient", "RefreshSession", "PatientAccount", "Membership",
     "User", "Clinic" CASCADE`);
 }

@@ -7,6 +7,7 @@ import { PatientAuthForm } from '@/components/PatientAuthForm';
 import { VerifyEmailNotice } from '@/components/VerifyEmailNotice';
 import { ApiError, errorMessage, patientSession, publicGet } from '@/lib/api';
 import { useSession } from '@/lib/hooks';
+import { RatingSummaryLine, Stars } from '@/components/Stars';
 import { fmtDate, fmtTime, money, todayIn, uuid, weeklyLabel } from '@/lib/format';
 
 interface Service {
@@ -17,6 +18,12 @@ interface Doctor {
   id: string; displayName: string; slug: string; specialty: string; licenseNumber: string | null; bio: string | null;
   services: Service[]; photoUrl: string | null; locationIds: string[];
   education: string[]; certifications: string[]; languages: string[]; conditions: string[]; insurers: string[];
+  rating: { count: number; average: number; punctuality: number; treatment: number; facilities: number } | null;
+  reviews: Review[];
+}
+interface Review {
+  id: string; authorName: string; rating: number; comment: string | null; createdAt: string;
+  reply: { text: string; by: string } | null;
 }
 interface Place {
   id: string; name: string; address: string | null; phone: string | null; mapUrl: string | null;
@@ -192,6 +199,7 @@ export function BookingPage({ slug, initialProfile, doctorSlug, embedded = false
                         <h3 style={{ margin: 0 }}>{focus ? d.displayName : <Link href={`${base}/${clinic.slug}/${d.slug}`}>{d.displayName}</Link>}</h3>
                         <div className="muted small">{d.specialty}{d.licenseNumber ? ` · Céd. ${d.licenseNumber}` : ''}</div>
                         {profile.locations.length > 1 && <div className="muted small">{d.locationIds.map((id) => place(id)?.name).filter(Boolean).join(' · ')}</div>}
+                        <RatingSummaryLine rating={d.rating} />
                       </div>
                     </div>
                     {d.bio && <p className="small">{d.bio}</p>}
@@ -210,6 +218,8 @@ export function BookingPage({ slug, initialProfile, doctorSlug, embedded = false
                 ))}
               </div>
             </section>
+
+            {focus && focus.rating && focus.rating.count > 0 && <DoctorReviews slug={clinic.slug} doctor={focus} tz={tz} />}
 
             {doctor && service && (
               <section className="card stack">
@@ -339,5 +349,37 @@ function DoctorDetails({ d }: { d: Doctor }) {
         ))}
       </div>
     </details>
+  );
+}
+
+/** Opiniones verificadas del médico: las primeras llegan en el HTML; el resto se cargan por páginas. */
+function DoctorReviews({ slug, doctor, tz }: { slug: string; doctor: Doctor; tz: string }) {
+  const [reviews, setReviews] = useState<Review[]>(doctor.reviews);
+  // Página siguiente de la API (10 por página); la 1 reemplaza las 5 que vinieron en el HTML.
+  const [nextPage, setNextPage] = useState(1);
+  const [more, setMore] = useState(doctor.rating!.count > doctor.reviews.length);
+  const r = doctor.rating!;
+  async function loadMore() {
+    const res = await publicGet<{ reviews: Review[]; hasMore: boolean }>(`/api/public/reviews/clinics/${slug}/doctors/${doctor.slug}?page=${nextPage}`);
+    setReviews(nextPage === 1 ? res.reviews : [...reviews, ...res.reviews]);
+    setNextPage(nextPage + 1);
+    setMore(res.hasMore);
+  }
+  return (
+    <section className="card stack" aria-labelledby="opiniones">
+      <h2 id="opiniones">Opiniones verificadas</h2>
+      <div className="row"><Stars value={r.average} size={20} /> <strong>{r.average.toFixed(1)}</strong>
+        <span className="muted small">de {r.count} {r.count === 1 ? 'paciente atendido' : 'pacientes atendidos'}</span></div>
+      <p className="small muted">Puntualidad {r.punctuality.toFixed(1)} · Trato {r.treatment.toFixed(1)} · Instalaciones {r.facilities.toFixed(1)}. Sólo opinan pacientes con una cita atendida.</p>
+      {reviews.map((x) => (
+        <article key={x.id} className="stack" style={{ gap: 4, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+          <div className="row"><Stars value={x.rating} /> <strong className="small">{x.authorName}</strong>
+            <span className="small muted">{fmtDate(x.createdAt, tz)}</span></div>
+          {x.comment && <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{x.comment}</p>}
+          {x.reply && <p className="small" style={{ margin: 0, paddingLeft: 12, borderLeft: '3px solid var(--primary)' }}><strong>Respuesta de {x.reply.by}:</strong> {x.reply.text}</p>}
+        </article>
+      ))}
+      {more && <div><button onClick={() => void loadMore()}>Ver más opiniones</button></div>}
+    </section>
   );
 }

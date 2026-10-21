@@ -3,6 +3,7 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { pricesFor } from '../scheduling/pricing';
+import { ReviewsService } from '../reviews/reviews.service';
 import { Transform, Type } from 'class-transformer';
 import { IsIn, IsISO8601, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 import { PrismaService } from '../prisma.service';
@@ -39,7 +40,11 @@ const publicLimiter = new RateLimiter(120, 60_000);
 
 @Controller('api/public/clinics')
 export class PublicController {
-  constructor(private readonly prisma: PrismaService, private readonly appointments: AppointmentsService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly appointments: AppointmentsService,
+    private readonly reviews: ReviewsService,
+  ) {}
 
   private async clinic(slug: string) {
     if (!SLUG.test(slug) || slug.length > 60) throw new NotFoundException('Clínica no encontrada');
@@ -79,6 +84,11 @@ export class PublicController {
       })));
       return { d, locationIds, services };
     }));
+    const ratings = await this.reviews.summaries(withPrices.map(({ d }) => d.id));
+    const latest = await this.prisma.review.findMany({
+      where: { doctorId: { in: withPrices.map(({ d }) => d.id) }, status: 'PUBLISHED' },
+      orderBy: { createdAt: 'desc' }, take: 50,
+    });
     return {
       clinic: {
         name: clinic.name, slug: clinic.slug, phone: clinic.phone, address: clinic.address,
@@ -95,6 +105,9 @@ export class PublicController {
         insurers: d.insurers,
         photoUrl: d.photo ? `/api/public/doctors/${d.id}/photo?v=${d.photo.updatedAt.getTime()}` : null,
         locationIds,
+        rating: ratings.get(d.id) ?? null,
+        // Las opiniones más recientes (hasta 5) para la página del médico y schema.org.
+        reviews: latest.filter((r) => r.doctorId === d.id).slice(0, 5).map((r) => this.reviews.serializePublic(r)),
         services: services.sort((a, b) => a.name.localeCompare(b.name, 'es')),
       })),
     };
