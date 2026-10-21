@@ -49,6 +49,8 @@ export interface BookingInput {
   waitlistOfferId?: string;
   /** Cita atendida de la que esta es subsecuente. */
   followUpOfId?: string | null;
+  /** Canal de una reserva en línea (web, widget, google, instagram). No forma parte del reintento idempotente. */
+  channel?: string | null;
 }
 
 const HELD = 'Ese horario está apartado para una persona de la lista de espera.';
@@ -233,7 +235,7 @@ export class AppointmentsService {
             serviceName: service.name, durationMinutes: service.durationMinutes,
             priceCents: await resolvePrice(tx, service, doctor.id, rule.locationId),
             patientNotes: input.notes, requestKey, requestHash, followUpOfId: input.followUpOfId ?? null,
-            locationId: rule.locationId, roomId: rule.roomId,
+            locationId: rule.locationId, roomId: rule.roomId, channel: input.channel ?? null,
           },
         });
         if (offer) {

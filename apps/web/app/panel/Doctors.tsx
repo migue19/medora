@@ -148,7 +148,7 @@ function DoctorForm({ doctor, services, members, onDone, canPhoto }: { doctor: D
       education: lines(f.get('education')), certifications: lines(f.get('certifications')), languages: lines(f.get('languages')),
       conditions: lines(f.get('conditions')), insurers: lines(f.get('insurers')),
     };
-    if (doctor) body.active = f.get('active') === 'on';
+    if (doctor) { body.active = f.get('active') === 'on'; body.slug = String(f.get('slug') ?? '').trim(); }
     setBusy(true); setError(null);
     try {
       if (doctor) await staffSession.patch(`/api/clinic/doctors/${doctor.id}`, body);
@@ -164,6 +164,11 @@ function DoctorForm({ doctor, services, members, onDone, canPhoto }: { doctor: D
         <label>Nombre a mostrar<input name="displayName" required minLength={2} maxLength={120} defaultValue={doctor?.displayName} placeholder="Dra. Ana López" /></label>
         <label>Especialidad<input name="specialty" required minLength={2} maxLength={120} defaultValue={doctor?.specialty} /></label>
         <label>Cédula profesional<input name="licenseNumber" maxLength={30} defaultValue={doctor?.licenseNumber ?? ''} /></label>
+        {doctor && (
+          <label>Dirección de su página (/c/…/<em>esto</em>)
+            <input name="slug" required minLength={2} maxLength={80} pattern="[a-z0-9]+(-[a-z0-9]+)*" defaultValue={doctor.slug} autoCapitalize="none" />
+          </label>
+        )}
         <label>Usuario vinculado (rol Médico)
           <select name="membershipId" defaultValue={doctor?.membership?.id ?? ''}>
             <option value="">Sin usuario</option>

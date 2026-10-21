@@ -163,8 +163,8 @@ function WhatsAppPreference({ session }: { session: { name: string; phone: strin
   async function toggle(value: boolean) {
     setBusy(true); setError(null);
     try {
-      await patientSession.patch('/api/patient/me', { name: session.name, phone: session.phone, whatsappConsent: value });
-      await patientSession.refresh();
+      const me = await patientSession.patch('/api/patient/me', { name: session.name, phone: session.phone, whatsappConsent: value });
+      patientSession.update({ patient: me });
     } catch (e) { setError(errorMessage(e)); } finally { setBusy(false); }
   }
   return (

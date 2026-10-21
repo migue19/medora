@@ -6,10 +6,11 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { Prisma, VisitType } from '@prisma/client';
 import { Transform, Type } from 'class-transformer';
 import {
-  ArrayMaxSize, IsArray, IsBoolean, IsEnum, IsISO8601, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min,
+  ArrayMaxSize, IsArray, IsBoolean, IsEnum, IsISO8601, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min,
   MinLength, ValidateIf, ValidateNested,
 } from 'class-validator';
 import { defaultLocation, withinHours } from '../locations/locations.controller';
+import { SLUG_PATTERN, slugify, uniqueDoctorSlug } from '../common/slug';
 import { DateTime } from 'luxon';
 import { PrismaService, Tx } from '../prisma.service';
 import { Roles, Staff, StaffContext, StaffGuard } from '../auth/guards';
@@ -58,8 +59,11 @@ class UpdateServiceDto {
   @IsOptional() @IsBoolean() active?: boolean;
 }
 
+const SLUG_MESSAGE = 'El identificador sólo admite minúsculas, números y guiones';
+
 class DoctorDto extends ProfileFields {
   @Transform(trim) @IsString() @MinLength(2) @MaxLength(120) displayName: string;
+  @IsOptional() @IsString() @MinLength(2) @MaxLength(80) @Matches(SLUG_PATTERN, { message: SLUG_MESSAGE }) slug?: string;
   @Transform(trim) @IsString() @MinLength(2) @MaxLength(120) specialty: string;
   @IsOptional() @Transform(emptyToNull) @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(30)
   licenseNumber?: string | null;
@@ -71,6 +75,7 @@ class DoctorDto extends ProfileFields {
 
 class UpdateDoctorDto extends ProfileFields {
   @IsOptional() @Transform(trim) @IsString() @MinLength(2) @MaxLength(120) displayName?: string;
+  @IsOptional() @IsString() @MinLength(2) @MaxLength(80) @Matches(SLUG_PATTERN, { message: SLUG_MESSAGE }) slug?: string;
   @IsOptional() @Transform(trim) @IsString() @MinLength(2) @MaxLength(120) specialty?: string;
   @IsOptional() @Transform(emptyToNull) @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(30)
   licenseNumber?: string | null;
@@ -218,7 +223,7 @@ export class SchedulingController {
       orderBy: { displayName: 'asc' },
     });
     return rows.map((d) => ({
-      id: d.id, displayName: d.displayName, specialty: d.specialty, licenseNumber: d.licenseNumber, bio: d.bio,
+      id: d.id, displayName: d.displayName, slug: d.slug, specialty: d.specialty, licenseNumber: d.licenseNumber, bio: d.bio,
       education: d.education, certifications: d.certifications, languages: d.languages, conditions: d.conditions,
       insurers: d.insurers,
       active: d.active, membership: d.membership,
@@ -233,11 +238,12 @@ export class SchedulingController {
   @Post('doctors')
   @Roles('OWNER', 'ADMIN')
   async createDoctor(@Staff() staff: StaffContext, @Body() dto: DoctorDto) {
-    return this.prisma.$transaction(async (tx) => {
+    return this.uniqueSlug(() => this.prisma.$transaction(async (tx) => {
       await this.assertDoctorLinks(tx, staff.clinicId, dto.membershipId ?? null, dto.serviceIds, null);
       const doctor = await tx.doctor.create({
         data: {
           clinicId: staff.clinicId, displayName: dto.displayName, specialty: dto.specialty,
+          slug: dto.slug ?? (await uniqueDoctorSlug(tx, staff.clinicId, slugify(dto.displayName))),
           licenseNumber: dto.licenseNumber ?? null, bio: dto.bio ?? null, membershipId: dto.membershipId ?? null,
           education: dto.education ?? [], certifications: dto.certifications ?? [], languages: dto.languages ?? [],
           conditions: dto.conditions ?? [], insurers: dto.insurers ?? [],
@@ -251,7 +257,7 @@ export class SchedulingController {
         });
       }
       return doctor;
-    });
+    }));
   }
 
   @Patch('doctors/:id')
@@ -259,7 +265,7 @@ export class SchedulingController {
   async updateDoctor(
     @Staff() staff: StaffContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateDoctorDto,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    return this.uniqueSlug(() => this.prisma.$transaction(async (tx) => {
       const doctor = await tx.doctor.findFirst({ where: { id, clinicId: staff.clinicId } });
       if (!doctor) throw new NotFoundException('Médico no encontrado');
       await this.assertDoctorLinks(
@@ -276,7 +282,7 @@ export class SchedulingController {
         }
       }
       return updated;
-    });
+    }));
   }
 
   private async assertDoctorLinks(
@@ -441,6 +447,17 @@ export class SchedulingController {
   private assertOwnDoctor(staff: StaffContext, doctorId: string) {
     if (staff.role === 'DOCTOR' && staff.doctorId !== doctorId) {
       throw new ForbiddenException('Sólo puedes modificar tu propia agenda');
+    }
+  }
+
+  private async uniqueSlug<T>(fn: () => Promise<T>): Promise<T> {
+    try {
+      return await fn();
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        throw new ConflictException('Ese identificador de URL ya lo usa otro médico de la clínica');
+      }
+      throw e;
     }
   }
 

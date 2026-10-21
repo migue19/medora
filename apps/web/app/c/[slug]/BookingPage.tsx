@@ -14,8 +14,8 @@ interface Service {
   priceByLocation: Record<string, number>;
 }
 interface Doctor {
-  id: string; displayName: string; specialty: string; licenseNumber: string | null; bio: string | null; services: Service[];
-  photoUrl: string | null; locationIds: string[];
+  id: string; displayName: string; slug: string; specialty: string; licenseNumber: string | null; bio: string | null;
+  services: Service[]; photoUrl: string | null; locationIds: string[];
   education: string[]; certifications: string[]; languages: string[]; conditions: string[]; insurers: string[];
 }
 interface Place {
@@ -40,8 +40,21 @@ function priceLabel(s: Service, locationId: string | null): string {
 
 const initials = (name: string) => name.replace(/^(Dr|Dra)\.?\s+/i, '').split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
 
-export function BookingPage({ slug }: { slug: string }) {
-  const [profile, setProfile] = useState<Profile | null>(null);
+interface Props {
+  slug: string;
+  /** Perfil ya cargado en el servidor: la página llega completa en el HTML (indexable y sin parpadeo). */
+  initialProfile?: Profile | null;
+  /** Página de un médico: muestra sólo a ese médico. */
+  doctorSlug?: string;
+  /** Dentro del widget en el sitio de la clínica (iframe). */
+  embedded?: boolean;
+}
+
+const CHANNELS = ['google', 'instagram', 'widget'] as const;
+
+export function BookingPage({ slug, initialProfile, doctorSlug, embedded = false }: Props) {
+  const [profile, setProfile] = useState<Profile | null>(initialProfile ?? null);
+  const [channel, setChannel] = useState<string>(embedded ? 'widget' : 'web');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [doctor, setDoctor] = useState<Doctor | null>(null);
   const [service, setService] = useState<Service | null>(null);
@@ -56,10 +69,18 @@ export function BookingPage({ slug }: { slug: string }) {
   const { data: patient } = useSession(patientSession);
 
   useEffect(() => {
+    if (initialProfile) return;
     publicGet<Profile>(`/api/public/clinics/${encodeURIComponent(slug)}`)
       .then(setProfile)
       .catch((e) => setLoadError(e instanceof ApiError && e.status === 404 ? 'No encontramos esta clínica.' : errorMessage(e)));
-  }, [slug]);
+  }, [slug, initialProfile]);
+
+  // Origen de la visita (?origen=google|instagram) para saber de dónde llegan las reservas.
+  useEffect(() => {
+    if (embedded) return;
+    const origin = new URLSearchParams(window.location.search).get('origen');
+    if (origin && (CHANNELS as readonly string[]).includes(origin)) setChannel(origin);
+  }, [embedded]);
 
   const tz = profile?.clinic.timezone ?? 'America/Mexico_City';
   const today = useMemo(() => todayIn(tz), [tz]);
@@ -83,7 +104,7 @@ export function BookingPage({ slug }: { slug: string }) {
     setError(null);
     try {
       const res = await patientSession.post(`/api/public/clinics/${encodeURIComponent(slug)}/appointments`, {
-        requestId, doctorId: doctor.id, serviceId: service.id, startsAt: slot.startsAt, notes: notes.trim() || null,
+        requestId, doctorId: doctor.id, serviceId: service.id, startsAt: slot.startsAt, notes: notes.trim() || null, channel,
       });
       setBooked({ startsAt: res.appointment.startsAt });
     } catch (e) {
@@ -103,15 +124,31 @@ export function BookingPage({ slug }: { slug: string }) {
 
   const { clinic } = profile;
 
+  const base = embedded ? '/embed' : '/c';
+  const focus = doctorSlug ? profile.doctors.find((d) => d.slug === doctorSlug) ?? null : null;
+  const doctors = focus ? [focus] : profile.doctors;
+  const external = embedded ? { target: '_blank', rel: 'noopener' } : {};
+
   return (
     <>
-      <Header><Link className="btn ghost" href="/paciente">Mis citas</Link></Header>
+      {embedded ? (
+        <header className="topbar"><div className="container">
+          <strong>{clinic.name}</strong><span className="spacer" />
+          <a className="btn ghost small" href="/paciente" {...external}>Mis citas</a>
+        </div></header>
+      ) : <Header><Link className="btn ghost" href="/paciente">Mis citas</Link></Header>}
       <main className="container section stack">
         <div>
-          <h1>{clinic.name}</h1>
-          <p className="muted">{profile.locations.length > 1 ? `${profile.locations.length} sedes` : [profile.locations[0]?.address ?? clinic.address, clinic.phone].filter(Boolean).join(' · ') || 'Reserva tu cita en línea'}</p>
+          {focus ? (
+            <>
+              <p className="small"><Link href={`${base}/${clinic.slug}`}>← Todos los médicos de {clinic.name}</Link></p>
+              <h1>{focus.displayName}</h1>
+              <p className="muted">{focus.specialty} · {clinic.name}</p>
+            </>
+          ) : <h1>{clinic.name}</h1>}
+          {!focus && <p className="muted">{profile.locations.length > 1 ? `${profile.locations.length} sedes` : [profile.locations[0]?.address ?? clinic.address, clinic.phone].filter(Boolean).join(' · ') || 'Reserva tu cita en línea'}</p>}
         </div>
-        {profile.locations.length > 1 && (
+        {profile.locations.length > 1 && !focus && (
           <div className="grid">
             {profile.locations.map((l) => (
               <div key={l.id} className="card stack" style={{ gap: 4 }}>
@@ -135,7 +172,7 @@ export function BookingPage({ slug }: { slug: string }) {
             <p><strong>{fmtDate(booked.startsAt, tz)}</strong> a las <strong>{fmtTime(booked.startsAt, tz)}</strong> (hora de la clínica)</p>
             <p className="muted small">Te enviamos la confirmación por correo con un archivo para agregarla a tu calendario.</p>
             <div className="row">
-              <Link className="btn primary" href="/paciente">Ver mis citas</Link>
+              <a className="btn primary" href="/paciente" {...external}>Ver mis citas</a>
               <button onClick={() => { setBooked(null); setSlot(null); setRequestId(uuid()); setReloadKey((k) => k + 1); }}>Agendar otra</button>
             </div>
           </div>
@@ -143,16 +180,16 @@ export function BookingPage({ slug }: { slug: string }) {
           <>
             <section className="stack">
               <h2>1. Elige médico y servicio</h2>
-              {profile.doctors.length === 0 && <p className="muted">Aún no hay médicos con agenda en línea.</p>}
+              {doctors.length === 0 && <p className="muted">Aún no hay médicos con agenda en línea.</p>}
               <div className="grid">
-                {profile.doctors.map((d) => (
+                {doctors.map((d) => (
                   <div key={d.id} className="card stack">
                     <div className="doctor">
                       {d.photoUrl
                         ? <img className="avatar" src={d.photoUrl} alt={`Foto de ${d.displayName}`} width={48} height={48} style={{ objectFit: 'cover' }} />
                         : <div className="avatar" aria-hidden>{initials(d.displayName)}</div>}
                       <div>
-                        <h3 style={{ margin: 0 }}>{d.displayName}</h3>
+                        <h3 style={{ margin: 0 }}>{focus ? d.displayName : <Link href={`${base}/${clinic.slug}/${d.slug}`}>{d.displayName}</Link>}</h3>
                         <div className="muted small">{d.specialty}{d.licenseNumber ? ` · Céd. ${d.licenseNumber}` : ''}</div>
                         {profile.locations.length > 1 && <div className="muted small">{d.locationIds.map((id) => place(id)?.name).filter(Boolean).join(' · ')}</div>}
                       </div>

@@ -82,7 +82,11 @@ export class StaffAuthController {
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     assertOrigin(req, this.config);
     const token = req.cookies?.[STAFF_COOKIE];
-    if (typeof token !== 'string' || !token) throw new UnauthorizedException('Sin sesión');
+    // Sin cookie no hay sesión que restaurar: 204 en vez de error (visitantes anónimos de páginas públicas).
+    if (typeof token !== 'string' || !token) {
+      res.status(204);
+      return;
+    }
     const result = await this.tokens.rotate(token, 'STAFF');
     if (result.reused) {
       res.clearCookie(STAFF_COOKIE, { path: STAFF_COOKIE_PATH });

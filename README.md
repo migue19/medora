@@ -1,4 +1,4 @@
-# Medora · Sprint 5
+# Medora · Sprint 6
 
 Agenda y reservas de citas médicas en línea para clínicas y consultorios (SaaS multi-clínica). Monorepo npm con Next.js 16 / React 19 (PWA), NestJS 11, Prisma 6 y PostgreSQL 17. Node.js 24 LTS recomendado. Mismo stack y criterios de seguridad que Tavixo.
 
@@ -13,7 +13,7 @@ Objetivo: llegar a la funcionalidad de una plataforma tipo Doctoralia sobre una 
 | 3 | Recordatorios y confirmación de asistencia (WhatsApp y correo) | ✅ Entregado |
 | 4 | Ficha del paciente, vinculación de cuentas y lista de espera | ✅ Entregado |
 | 5 | Sedes, consultorios y perfil profesional completo | ✅ Entregado |
-| 6 | Perfil público, SEO y widget de reservas | Pendiente |
+| 6 | Perfil público, SEO y widget de reservas | ✅ Entregado |
 | 7 | Opiniones verificadas | Pendiente |
 | 8 | Directorio público y búsqueda de médicos | Pendiente |
 | 9 | Pagos en línea y políticas de inasistencia | Pendiente |
@@ -70,7 +70,9 @@ Entregado. La sede y el consultorio de cada cita salen del bloque del horario se
 - Servicios con precio por sede y por médico, y servicios sólo para primera vez o subsecuente.
 - **Terminado cuando**: una clínica con dos sedes publica horarios correctos por sede y no hay choques de consultorio.
 
-### Sprint 6 · Perfil público, SEO y widget
+### Sprint 6 · Perfil público, SEO y widget ✅
+
+Entregado. Lighthouse en `/c/<clínica>` y `/c/<clínica>/<médico>`: rendimiento 99, accesibilidad 100, buenas prácticas 100 y SEO 100. El widget reservó desde otro origen dentro de un iframe. Ver [Widget y SEO](#widget-y-seo) y [SPRINT6_RESULTS.md](SPRINT6_RESULTS.md).
 
 - Páginas públicas con renderizado en servidor, indexables, con URLs legibles (`/c/<clinica>/<medico>`), metadatos, Open Graph y schema.org (`Physician`, `MedicalClinic`).
 - Mapa del sitio y página de cada médico con su agenda en línea.
@@ -214,6 +216,20 @@ SELECT type, payload->>'to' AS para, attempts, "lastError", "completedAt", "fail
 FROM "Job" ORDER BY "createdAt" DESC LIMIT 20;
 ```
 
+## Widget y SEO
+
+- Páginas públicas renderizadas en el servidor (caché de 60 s): `/c/<clínica>` y `/c/<clínica>/<médico>`, con título, descripción, URL canónica, Open Graph y JSON-LD (`MedicalClinic`, `Physician`). `sitemap.xml` y `robots.txt` se generan al pedirlos con `SITE_URL` (en Compose, `WEB_ORIGIN`). La web consulta la API por `API_INTERNAL_URL` en tiempo de ejecución.
+- La URL de cada médico usa un identificador generado de su nombre (sin título ni acentos) que se puede editar en «Médicos» y no cambia si cambia el nombre.
+- Widget para el sitio de la clínica (código listo en «Clínica → Compartir»):
+
+```html
+<script src="https://medora.nut.com.mx/widget.js" data-clinica="mi-clinica" async></script>
+<!-- opcionales: data-medico="ana-lopez" data-posicion="flotante" data-texto="Agenda tu cita" data-color="#0f766e" -->
+```
+
+  Abre `/embed/<clínica>[/<médico>]` en un iframe. Sólo `/embed/*` permite incrustarse (`frame-ancestors *`); el resto responde `X-Frame-Options: DENY` y `frame-ancestors 'none'`. Dentro del iframe el navegador no guarda la cookie de sesión (es de un tercero), así que el paciente inicia sesión ahí y la sesión dura mientras tenga abierta la ventana.
+- Canal de origen en cada reserva en línea: `web`, `widget`, `google` (`?origen=google`) o `instagram` (`?origen=instagram`); se ve en la agenda.
+
 ## WhatsApp Business
 
 Opcional. Sin `WHATSAPP_TOKEN` el canal queda desactivado y los recordatorios salen sólo por correo.
@@ -321,6 +337,7 @@ La API escucha en 127.0.0.1:6010 y Next en 127.0.0.1:6011. `WEB_ORIGIN` debe coi
 | GET / PUT | /api/clinic/services/:id/prices | Personal / OWNER, ADMIN: precios por sede y médico |
 | POST / DELETE | /api/clinic/doctors/:id/photo | OWNER, ADMIN o el propio médico (JPEG, PNG o WebP, máx. 900 KB) |
 | GET | /api/public/doctors/:id/photo | Público, caché inmutable (la URL lleva la versión) |
+| GET | /api/public/sitemap | Público: clínicas activas y médicos con agenda (para `sitemap.xml`) |
 | GET / POST | /api/clinic/waitlist | Personal (médico: la suya) / OWNER, ADMIN, RECEPTION |
 | POST | /api/clinic/waitlist/:id/remove · offers/:id/accept · offers/:id/release | OWNER, ADMIN, RECEPTION |
 | POST | /api/public/clinics/:slug/waitlist | Paciente con correo confirmado (máx. 3 listas) |

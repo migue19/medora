@@ -4,7 +4,7 @@ import {
 import type { Request, Response } from 'express';
 import { pricesFor } from '../scheduling/pricing';
 import { Transform, Type } from 'class-transformer';
-import { IsISO8601, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
+import { IsIn, IsISO8601, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 import { PrismaService } from '../prisma.service';
 import { Patient, PatientContext, PatientGuard } from '../auth/guards';
 import { AppointmentsService } from '../appointments/appointments.service';
@@ -21,7 +21,11 @@ class AvailabilityDto {
   @IsOptional() @IsUUID() locationId?: string;
 }
 
+/** Canales de reserva en línea que se registran en la cita (para reportes de origen). */
+export const BOOKING_CHANNELS = ['web', 'widget', 'google', 'instagram'] as const;
+
 class BookDto {
+  @IsOptional() @IsIn(BOOKING_CHANNELS) channel?: (typeof BOOKING_CHANNELS)[number];
   @IsUUID() requestId: string;
   @IsUUID() doctorId: string;
   @IsUUID() serviceId: string;
@@ -86,7 +90,7 @@ export class PublicController {
         hours: l.hours.map(({ weekday, startMinute, endMinute }) => ({ weekday, startMinute, endMinute })),
       })),
       doctors: withPrices.map(({ d, locationIds, services }) => ({
-        id: d.id, displayName: d.displayName, specialty: d.specialty, licenseNumber: d.licenseNumber, bio: d.bio,
+        id: d.id, displayName: d.displayName, slug: d.slug, specialty: d.specialty, licenseNumber: d.licenseNumber, bio: d.bio,
         education: d.education, certifications: d.certifications, languages: d.languages, conditions: d.conditions,
         insurers: d.insurers,
         photoUrl: d.photo ? `/api/public/doctors/${d.id}/photo?v=${d.photo.updatedAt.getTime()}` : null,
@@ -130,7 +134,7 @@ export class PublicController {
     const { appointment, replayed } = await this.appointments.book({
       clinicId: clinic.id, doctorId: dto.doctorId, serviceId: dto.serviceId, clinicPatientId: clinicPatient.id,
       startsAt: new Date(dto.startsAt), notes: dto.notes ?? null, source: 'ONLINE', requestId: dto.requestId,
-      actor: { kind: 'PATIENT', id: patient.id, name: patient.name },
+      actor: { kind: 'PATIENT', id: patient.id, name: patient.name }, channel: dto.channel ?? 'web',
     });
     return { appointment, replayed };
   }
@@ -150,5 +154,28 @@ export class DoctorPhotoController {
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     res.setHeader('Content-Disposition', 'inline');
     res.send(Buffer.from(photo.data));
+  }
+
+}
+
+/** Datos para el mapa del sitio: clínicas activas y sus médicos con agenda en línea. */
+@Controller('api/public/sitemap')
+export class SitemapController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @Get()
+  async sitemap() {
+    const clinics = await this.prisma.clinic.findMany({
+      where: { active: true },
+      select: {
+        slug: true, updatedAt: true,
+        doctors: {
+          where: { active: true, services: { some: { service: { active: true } } } },
+          select: { slug: true, updatedAt: true },
+        },
+      },
+      orderBy: { slug: 'asc' },
+    });
+    return clinics;
   }
 }

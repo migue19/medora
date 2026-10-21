@@ -189,7 +189,7 @@ type Row = {
   id: string; startsAt: Date; endsAt: Date; status: string; source: string; serviceName: string;
   durationMinutes: number; priceCents: number; patientNotes: string | null; cancelReason: string | null;
   createdAt: Date; serviceId: string; confirmedAt: Date | null; followUpOfId: string | null;
-  location: { id: string; name: string }; room: { id: string; name: string } | null;
+  location: { id: string; name: string }; room: { id: string; name: string } | null; channel: string | null;
   notifications: { channel: string; offsetMinutes: number | null; status: string; error: string | null; createdAt: Date; startsAt: Date }[];
   doctor: { id: string; displayName: string };
   clinicPatient: { id: string; name: string; phone: string; email: string | null };
@@ -200,7 +200,7 @@ function serialize(a: Row) {
     id: a.id, startsAt: a.startsAt, endsAt: a.endsAt, status: a.status, source: a.source,
     serviceId: a.serviceId, serviceName: a.serviceName, durationMinutes: a.durationMinutes, priceCents: a.priceCents,
     patientNotes: a.patientNotes, cancelReason: a.cancelReason, createdAt: a.createdAt, confirmedAt: a.confirmedAt,
-    followUpOfId: a.followUpOfId, location: a.location, room: a.room,
+    followUpOfId: a.followUpOfId, location: a.location, room: a.room, channel: a.channel,
     doctor: a.doctor, patient: a.clinicPatient,
     // Sólo los envíos del horario vigente (los de un horario anterior ya no aplican).
     reminders: a.notifications

@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { errorMessage, patientSession } from '@/lib/api';
+import { PatientSessionData, errorMessage, patientSession } from '@/lib/api';
 
 /** Aviso para pacientes con el correo sin confirmar: reenviar el enlace o actualizar tras confirmarlo. */
 export function VerifyEmailNotice({ email }: { email: string }) {
@@ -17,8 +17,12 @@ export function VerifyEmailNotice({ email }: { email: string }) {
 
   async function check() {
     setBusy(true); setMsg(null);
-    await patientSession.refresh();
-    if (!patientSession.data?.patient.emailVerified) setMsg({ ok: false, text: 'Todavía no vemos tu correo confirmado. Abre el enlace que te enviamos.' });
+    // Se relee el perfil con el token vigente: también funciona dentro del widget, donde no hay cookie de sesión.
+    try {
+      const me = await patientSession.get<PatientSessionData['patient']>('/api/patient/me');
+      patientSession.update({ patient: me });
+      if (!me.emailVerified) setMsg({ ok: false, text: 'Todavía no vemos tu correo confirmado. Abre el enlace que te enviamos.' });
+    } catch (e) { setMsg({ ok: false, text: errorMessage(e) }); }
     setBusy(false);
   }
 

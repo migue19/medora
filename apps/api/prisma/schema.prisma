@@ -1,4 +1,4 @@
-// Medora · Sprint 5
+// Medora · Sprint 6
 // Todas las entidades de negocio llevan clinicId y se consultan siempre
 // filtradas por la clínica obtenida de la sesión.
 
@@ -228,6 +228,8 @@ model Doctor {
   clinicId     String   @db.Uuid
   membershipId String?  @unique @db.Uuid
   displayName  String   @db.VarChar(120)
+  // URL pública del médico: /c/<clínica>/<slug>. Estable aunque cambie el nombre.
+  slug         String   @db.VarChar(80)
   specialty    String   @db.VarChar(120)
   licenseNumber String? @db.VarChar(30)
   bio          String?  @db.VarChar(1000)
@@ -251,6 +253,7 @@ model Doctor {
 
   @@unique([id, clinicId])
   @@unique([membershipId, clinicId])
+  @@unique([clinicId, slug])
   @@index([clinicId])
 }
 
@@ -341,6 +344,8 @@ model Appointment {
   confirmedAt     DateTime?         @db.Timestamptz(3)
   // Cita subsecuente: la cita atendida de la que se agendó.
   followUpOfId    String?           @db.Uuid
+  // Canal por el que llegó una reserva en línea: web, widget, google o instagram.
+  channel         String?           @db.VarChar(20)
   // Sede y consultorio del bloque del horario en que cae la cita.
   locationId      String            @db.Uuid
   roomId          String?           @db.Uuid

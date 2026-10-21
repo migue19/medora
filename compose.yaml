@@ -58,6 +58,10 @@ services:
     restart: unless-stopped
     depends_on:
       api: { condition: service_healthy }
+    environment:
+      # Páginas públicas renderizadas en el servidor: consultan la API por la red interna.
+      API_INTERNAL_URL: ${API_INTERNAL_URL:-http://api:3000}
+      SITE_URL: ${WEB_ORIGIN:-http://localhost:6011}
     ports:
       - "127.0.0.1:6011:3000"
     networks: [frontend]

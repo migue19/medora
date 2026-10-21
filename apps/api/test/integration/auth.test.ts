@@ -29,6 +29,9 @@ test('login del personal: origen, credenciales y clínica', async () => {
 
 test('rotación de refresh, detección de reutilización y logout', async () => {
   const { email, password } = await createClinicWithOwner(h.prisma, 'clinica-a');
+  // Sin cookie no hay nada que restaurar: 204, no un error.
+  assert.equal((await new Client(h.base).post('/api/auth/refresh')).status, 204);
+  assert.equal((await new Client(h.base).post('/api/patient/auth/refresh')).status, 204);
   const c = await loginStaff(h.base, email, password, 'clinica-a');
   const firstCookie = c.cookies.get('medora_staff_rt')!;
   const r1 = await c.post('/api/auth/refresh');

@@ -49,7 +49,7 @@ async function main() {
             create: { clinicId: clinic.id, name: 'Consulta general (demo)', durationMinutes: 30, priceCents: 50000 },
           });
           const doctor = await tx.doctor.create({
-            data: { clinicId: clinic.id, displayName: 'Dra. Demo Medora', specialty: 'Medicina general' },
+            data: { clinicId: clinic.id, displayName: 'Dra. Demo Medora', slug: 'demo-medora', specialty: 'Medicina general' },
           });
           await tx.doctorService.create({ data: { doctorId: doctor.id, serviceId: service.id, clinicId: clinic.id } });
           const location = (await tx.location.findFirst({ where: { clinicId: clinic.id } }))

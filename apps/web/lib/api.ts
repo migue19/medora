@@ -32,6 +32,13 @@ export class Session<T = unknown> {
     this.listeners.forEach((l) => l());
   }
 
+  /** Actualiza los datos de la sesión sin tocar el token (p. ej. tras confirmar el correo). */
+  update(patch: Partial<T>) {
+    if (!this.data) return;
+    this.data = { ...this.data, ...patch };
+    this.listeners.forEach((l) => l());
+  }
+
   clear() {
     this.token = null;
     this.data = null;
@@ -43,7 +50,8 @@ export class Session<T = unknown> {
     this.refreshing ??= (async () => {
       try {
         const res = await fetch(REFRESH[this.kind], { method: 'POST', credentials: 'same-origin' });
-        if (!res.ok) { this.clear(); return false; }
+        // 204: no hay sesión guardada (visitante sin cuenta o sin cookie, p. ej. dentro del widget).
+        if (!res.ok || res.status === 204) { this.clear(); return false; }
         this.set(await res.json());
         return true;
       } catch {

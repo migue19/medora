@@ -110,6 +110,7 @@ export function Agenda({ session }: { session: StaffSessionData }) {
                     {a.status === 'BOOKED' && a.confirmedAt && <span className="badge COMPLETED">Confirmada por el paciente</span>}
                     {a.source === 'ONLINE' && <span className="badge">En línea</span>}
                     {a.followUpOfId && <span className="badge">Subsecuente</span>}
+                    {a.channel && a.channel !== 'web' && <span className="badge">{CHANNEL_LABEL[a.channel] ?? a.channel}</span>}
                   </div>
                   <span className="small">{a.serviceName} · {a.doctor.displayName} · {money(a.priceCents)}</span>
                   {a.location && <span className="small muted">{a.location.name}{a.room ? ` · ${a.room.name}` : ''}</span>}
@@ -156,6 +157,7 @@ export function Agenda({ session }: { session: StaffSessionData }) {
 }
 
 const CHANNEL: Record<string, string> = { EMAIL: 'correo', WHATSAPP: 'WhatsApp' };
+const CHANNEL_LABEL: Record<string, string> = { widget: 'Desde su sitio web', google: 'Desde Google', instagram: 'Desde Instagram' };
 const STATE: Record<string, string> = { SENT: 'enviado', FAILED: 'falló', SKIPPED: 'no enviado' };
 
 function offsetLabel(minutes: number | null) {

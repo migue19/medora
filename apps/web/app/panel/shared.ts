@@ -9,7 +9,7 @@ export interface Location {
 }
 export interface Doctor {
   id: string; displayName: string; specialty: string; licenseNumber: string | null; bio: string | null; active: boolean;
-  serviceIds: string[]; rules: Rule[]; photoUrl?: string | null;
+  serviceIds: string[]; rules: Rule[]; photoUrl?: string | null; slug?: string;
   education?: string[]; certifications?: string[]; languages?: string[]; conditions?: string[]; insurers?: string[];
   membership: { id: string; user: { name: string; email: string } } | null;
 }
@@ -23,5 +23,5 @@ export interface Appointment {
   serviceId: string; serviceName: string; durationMinutes: number; priceCents: number; patientNotes: string | null;
   cancelReason: string | null; doctor: { id: string; displayName: string }; patient: ClinicPatient;
   confirmedAt: string | null; reminders: ReminderLog[]; followUpOfId: string | null;
-  location?: { id: string; name: string }; room?: { id: string; name: string } | null;
+  location?: { id: string; name: string }; room?: { id: string; name: string } | null; channel?: string | null;
 }
