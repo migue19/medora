@@ -26,6 +26,8 @@ import { WaitlistService } from './waitlist/waitlist.service';
 import { LocationsController } from './locations/locations.controller';
 import { PatientReviewsController, PublicReviewsController, StaffReviewsController } from './reviews/reviews.controller';
 import { ReviewsService } from './reviews/reviews.service';
+import { OnboardingController } from './onboarding/onboarding.controller';
+import { OnboardingService } from './onboarding/onboarding.service';
 import { WHATSAPP_TRANSPORT, WhatsAppTransport, createWhatsApp } from './notifications/whatsapp.transport';
 
 export interface Transports {
@@ -40,14 +42,14 @@ export function buildAppModule(config: AppConfig = loadConfig(), transports: Tra
       ClinicController, SchedulingController, StaffAppointmentsController, PublicController, InvitationsController,
       AppointmentActionsController, PatientsController, PatientLinksController, StaffWaitlistController,
       PatientWaitlistController, LocationsController, DoctorPhotoController, SitemapController,
-      PublicReviewsController, PatientReviewsController, StaffReviewsController,
+      PublicReviewsController, PatientReviewsController, StaffReviewsController, OnboardingController,
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
       { provide: MAIL_TRANSPORT, useValue: transports.mail ?? createTransport(config.mail) },
       { provide: WHATSAPP_TRANSPORT, useValue: transports.whatsapp ?? createWhatsApp(config.whatsapp) },
       PrismaService, TokensService, StaffGuard, PatientGuard, AppointmentsService,
-      AuthTokensService, JobsService, MailService, RemindersService, PatientsService, WaitlistService, ReviewsService,
+      AuthTokensService, JobsService, MailService, RemindersService, PatientsService, WaitlistService, ReviewsService, OnboardingService,
     ],
   })
   class AppModule {}

@@ -44,6 +44,7 @@ services:
       WHATSAPP_TEMPLATE_LANG: ${WHATSAPP_TEMPLATE_LANG:-es_MX}
       WHATSAPP_REVIEW_TEMPLATE: ${WHATSAPP_REVIEW_TEMPLATE:-invitacion_opinion}
       WHATSAPP_DEFAULT_COUNTRY: ${WHATSAPP_DEFAULT_COUNTRY:-52}
+      ONBOARDING_NOTIFY_EMAIL: ${ONBOARDING_NOTIFY_EMAIL:-}
     ports:
       - "127.0.0.1:6010:3000"
     networks: [backend, frontend]
@@ -76,6 +77,11 @@ services:
       db: { condition: service_healthy }
     environment:
       DATABASE_URL: ${DATABASE_URL:?Define DATABASE_URL}
+      # Alta de clínicas (onboarding-cli): genera enlaces y encola correos; los envía la API.
+      APP_ENV: ${APP_ENV:-development}
+      JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET}
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:6011}
+      JOBS_POLL_MS: "0"
       SEED_CLINIC_SLUG: ${SEED_CLINIC_SLUG:-}
       SEED_CLINIC_NAME: ${SEED_CLINIC_NAME:-}
       SEED_OWNER_EMAIL: ${SEED_OWNER_EMAIL:-}

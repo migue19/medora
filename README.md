@@ -280,6 +280,23 @@ docker compose logs --tail=100 api web db
 docker compose stop          # down conserva el volumen; no usar down -v con datos reales
 ```
 
+## Alta de clínicas
+
+Cada clínica nueva llena un formulario guiado en `/alta` (sedes, equipo, médicos con foto, servicios y precios, horarios con consultorio, reglas, recordatorios, privacidad y contacto). Se guarda solo y se puede retomar con el mismo enlace privado (90 días). Al enviarlo se valida todo: traslapes, horarios fuera de la sede, consultorios ocupados por dos médicos, un solo propietario, etc.
+
+```sh
+# En el VPS, desde /opt/medora
+docker compose --profile tools run --rm tools node dist/onboarding-cli.js crear "Clínica del Valle" contacto@clinica.mx
+docker compose --profile tools run --rm tools node dist/onboarding-cli.js listar
+docker compose --profile tools run --rm tools node dist/onboarding-cli.js ver <id>
+docker compose --profile tools run --rm tools node dist/onboarding-cli.js importar <id>
+```
+
+- `crear` imprime el enlace para la clínica (el token va en el `#`, nunca llega a los registros del servidor).
+- `importar` crea en una sola transacción la clínica, sedes, consultorios, médicos (con foto y perfil), servicios, precios, horarios y días bloqueados. El propietario recibe un correo para elegir su contraseña; el resto del equipo, su invitación (los médicos quedan vinculados a su perfil al aceptarla).
+- Con `ONBOARDING_NOTIFY_EMAIL` en `.env`, llega un aviso cada vez que una clínica envía su alta.
+- El formulario no pide contraseñas ni datos de pacientes.
+
 ## Respaldos
 
 `scripts/backup-db.sh` genera un `pg_dump` en formato custom en `/var/backups/medora` (modo 600), comprueba que `pg_restore` puede leerlo y borra los de más de 14 días (`BACKUP_KEEP_DAYS`). `scripts/restore-check.sh` restaura el más reciente en un PostgreSQL temporal sin red y cuenta registros. En el VPS, `/etc/cron.d/medora-backup` ejecuta el respaldo a diario a las 03:15 (Ciudad de México) y la prueba de restauración cada domingo; la bitácora está en `/var/log/medora-backup.log`.

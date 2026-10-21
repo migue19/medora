@@ -271,3 +271,30 @@ export function reviewModerated(p: {
     footer: ['Si crees que es un error, comunícate con la clínica.'],
   });
 }
+
+export function ownerActivation(p: { name: string; clinicName: string; slug: string; link: string; site: string; existing: boolean }): RenderedEmail {
+  return layout({
+    subject: p.existing ? `${p.clinicName} ya está en Medora` : `${p.clinicName} ya está en Medora: activa tu cuenta`,
+    greeting: `Hola, ${p.name}:`,
+    paragraphs: [
+      p.existing
+        ? `Cargamos la información de ${p.clinicName} y eres su propietario. Entra con tu correo y tu contraseña de Medora.`
+        : `Cargamos la información de ${p.clinicName}. Eres la persona propietaria de la cuenta: elige tu contraseña para entrar al panel.`,
+      `Para iniciar sesión usa el identificador de clínica «${p.slug}». Tu página de reservas es ${p.site}/c/${p.slug}.`,
+    ],
+    action: { label: p.existing ? 'Entrar al panel' : 'Elegir mi contraseña', url: p.link },
+    footer: p.existing
+      ? ['El resto del equipo recibirá su propia invitación.']
+      : ['El enlace vence en 7 días y sirve una sola vez. El resto del equipo recibirá su propia invitación.'],
+  });
+}
+
+export function onboardingSubmitted(p: { label: string; clinicName: string; contact: string; id: string }): RenderedEmail {
+  return layout({
+    subject: `Alta enviada: ${p.clinicName || p.label}`,
+    greeting: 'Hola:',
+    paragraphs: [`${p.clinicName || p.label} terminó de llenar el alta de Medora y la envió para revisión.`],
+    details: [{ label: 'Contacto', value: p.contact || 'sin dato' }, { label: 'Alta', value: p.id }],
+    footer: ['Revísala e impórtala con el comando del alta (README, sección «Alta de clínicas»).'],
+  });
+}

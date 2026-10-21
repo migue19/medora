@@ -88,6 +88,13 @@ export class InvitationsController {
         await tx.staffInvitation.update({
           where: { id: invitation.id }, data: { acceptedAt: new Date(), membershipId: membership.id },
         });
+        // Alta de clínica: el médico queda vinculado a su perfil (si nadie lo tomó antes).
+        if (invitation.doctorId && invitation.role === 'DOCTOR') {
+          await tx.doctor.updateMany({
+            where: { id: invitation.doctorId, clinicId: invitation.clinicId, membershipId: null },
+            data: { membershipId: membership.id },
+          });
+        }
         return { clinic: { name: invitation.clinic.name, slug: invitation.clinic.slug }, email: user.email, existingUser };
       });
     } catch (e) {

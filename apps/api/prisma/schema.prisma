@@ -97,6 +97,12 @@ enum ReviewEventType {
   REPLY_REMOVED
 }
 
+enum OnboardingStatus {
+  DRAFT
+  SUBMITTED
+  IMPORTED
+}
+
 enum NotificationChannel {
   EMAIL
   WHATSAPP
@@ -433,6 +439,8 @@ model StaffInvitation {
   acceptedAt   DateTime? @db.Timestamptz(3)
   revokedAt    DateTime? @db.Timestamptz(3)
   membershipId String?   @db.Uuid
+  // Al aceptar, el usuario queda vinculado a este perfil de médico (alta de clínica).
+  doctorId     String?   @db.Uuid
   createdAt    DateTime  @default(now()) @db.Timestamptz(3)
 
   clinic Clinic @relation(fields: [clinicId], references: [id])
@@ -725,4 +733,36 @@ model ReviewInvitation {
   createdAt     DateTime  @default(now()) @db.Timestamptz(3)
 
   @@index([appointmentId])
+}
+
+// Alta de una clínica nueva: formulario público con enlace privado que la clínica llena
+// (se guarda solo); al enviarlo, un comando lo revisa e importa a Medora.
+model ClinicOnboarding {
+  id           String           @id @default(uuid()) @db.Uuid
+  tokenHash    String           @unique @db.Char(64)
+  label        String           @db.VarChar(120)
+  contactEmail String?          @db.VarChar(254)
+  data         Json             @default("{}")
+  status       OnboardingStatus @default(DRAFT)
+  expiresAt    DateTime         @db.Timestamptz(3)
+  submittedAt  DateTime?        @db.Timestamptz(3)
+  importedAt   DateTime?        @db.Timestamptz(3)
+  clinicId     String?          @db.Uuid
+  createdAt    DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime         @updatedAt @db.Timestamptz(3)
+
+  photos OnboardingPhoto[]
+}
+
+// Foto de un médico subida durante el alta (se copia a DoctorPhoto al importar).
+model OnboardingPhoto {
+  onboardingId String   @db.Uuid
+  doctorKey    String   @db.VarChar(40)
+  mimeType     String   @db.VarChar(20)
+  data         Bytes
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+
+  onboarding ClinicOnboarding @relation(fields: [onboardingId], references: [id])
+
+  @@id([onboardingId, doctorKey])
 }

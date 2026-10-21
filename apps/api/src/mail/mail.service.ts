@@ -7,7 +7,7 @@ import { buildIcs } from './ics';
 import { OutgoingEmail } from './mail.transport';
 import {
   AppointmentEmailKind, RenderedEmail, appointmentEmail, patientLinkRequest, resetPassword, staffInvitation, verifyEmail,
-  reviewInvitation, reviewModerated, waitlistOffer,
+  onboardingSubmitted, ownerActivation, reviewInvitation, reviewModerated, waitlistOffer,
 } from './templates';
 
 /**
@@ -61,6 +61,19 @@ export class MailService {
   async reviewModerated(tx: Tx | PrismaService, p: { email: string } & Parameters<typeof reviewModerated>[0]) {
     const { email, ...data } = p;
     await this.enqueue(tx, email, reviewModerated(data));
+  }
+
+  /** Sin token: ya tenía cuenta de personal, el enlace lleva al inicio de sesión. */
+  async ownerActivation(tx: Tx | PrismaService, p: { email: string; name: string; clinicName: string; slug: string; token: string | null }) {
+    await this.enqueue(tx, p.email, ownerActivation({
+      name: p.name, clinicName: p.clinicName, slug: p.slug, site: this.config.webOrigin, existing: p.token === null,
+      link: p.token ? this.link('/restablecer?tipo=personal', p.token) : this.link(`/login?clinica=${encodeURIComponent(p.slug)}`),
+    }));
+  }
+
+  async onboardingSubmitted(tx: Tx | PrismaService, p: { email: string } & Parameters<typeof onboardingSubmitted>[0]) {
+    const { email, ...data } = p;
+    await this.enqueue(tx, email, onboardingSubmitted(data));
   }
 
   /** Correo al paciente por un evento de su cita (creación, reprogramación o cancelación). */

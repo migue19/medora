@@ -17,6 +17,7 @@ export async function createApp(
   });
   // Un único salto de proxy (Nginx o el proxy de Next) para obtener la IP del cliente.
   if (config.trustProxy) app.set('trust proxy', 1);
+  app.useBodyParser('json', { limit: '300kb' });
   app.disable('x-powered-by');
   app.use(helmet());
   app.use(cookieParser());
