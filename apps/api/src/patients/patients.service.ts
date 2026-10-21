@@ -270,7 +270,7 @@ export class PatientsService {
       this.prisma.clinicPatient.findUniqueOrThrow({ where: { id: req.clinicPatientId } }),
     ]);
     const upcoming = await this.prisma.appointment.count({
-      where: { clinicPatientId: patient.id, status: 'BOOKED', startsAt: { gt: new Date() } },
+      where: { clinicPatientId: patient.id, status: { in: ['BOOKED', 'PENDING_PAYMENT'] }, startsAt: { gt: new Date() } },
     });
     return { clinic: { name: clinic.name }, patientName: patient.name, phoneEnd: patient.phone.replace(/\D/g, '').slice(-4), upcoming };
   }

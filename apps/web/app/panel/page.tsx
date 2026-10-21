@@ -9,6 +9,7 @@ import { Agenda } from './Agenda';
 import { Patients } from './Patients';
 import { Waitlist } from './Waitlist';
 import { Reviews } from './Reviews';
+import { Payments } from './Payments';
 import { Doctors } from './Doctors';
 import { Services } from './Services';
 import { Team } from './Team';
@@ -23,6 +24,7 @@ const TABS: { id: string; label: string; roles: Role[] }[] = [
   { id: 'doctors', label: 'Médicos y horarios', roles: ['OWNER', 'ADMIN', 'RECEPTION', 'DOCTOR'] },
   { id: 'reviews', label: 'Opiniones', roles: ['OWNER', 'ADMIN', 'RECEPTION', 'DOCTOR'] },
   { id: 'services', label: 'Servicios', roles: ['OWNER', 'ADMIN'] },
+  { id: 'payments', label: 'Pagos', roles: ['OWNER', 'ADMIN'] },
   { id: 'team', label: 'Equipo', roles: ['OWNER', 'ADMIN'] },
   { id: 'clinic', label: 'Clínica', roles: ['OWNER', 'ADMIN'] },
   { id: 'account', label: 'Mi cuenta', roles: ['OWNER', 'ADMIN', 'RECEPTION', 'DOCTOR'] },
@@ -64,6 +66,7 @@ export default function Panel() {
         {tab === 'reviews' && <Reviews session={session} />}
         {tab === 'doctors' && <Doctors session={session} />}
         {tab === 'services' && <Services />}
+        {tab === 'payments' && <Payments />}
         {tab === 'team' && <Team session={session} />}
         {tab === 'clinic' && <ClinicSettings />}
         {tab === 'account' && <Account />}

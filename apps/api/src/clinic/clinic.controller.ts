@@ -2,7 +2,7 @@ import {
   BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, HttpCode, Inject, NotFoundException,
   Param, ParseUUIDPipe, Patch, Post, Query, UseGuards,
 } from '@nestjs/common';
-import { StaffInvitation, StaffRole } from '@prisma/client';
+import { PaymentMode, StaffInvitation, StaffRole } from '@prisma/client';
 import { Transform } from 'class-transformer';
 import {
   ArrayMaxSize, ArrayUnique, IsArray, IsBoolean, IsEmail, IsEnum, IsInt, IsOptional, IsString, Matches, Max, MaxLength,
@@ -38,6 +38,10 @@ class UpdateClinicDto {
   @IsOptional() @IsBoolean() reviewsEnabled?: boolean;
   /** Aparecer en el directorio público de Medora. */
   @IsOptional() @IsBoolean() directoryEnabled?: boolean;
+  @IsOptional() @IsEnum(PaymentMode) paymentMode?: PaymentMode;
+  @IsOptional() @IsInt() @Min(10) @Max(100) depositPercent?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(10080) refundMinMinutes?: number;
+  @IsOptional() @IsBoolean() asyncPaymentsEnabled?: boolean;
 }
 
 class InviteDto {
@@ -79,16 +83,19 @@ export class ClinicController {
   @Get()
   async get(@Staff() staff: StaffContext) {
     const clinic = await this.prisma.clinic.findUniqueOrThrow({ where: { id: staff.clinicId } });
-    return { ...clinic, whatsappAvailable: this.config.whatsapp !== null };
+    return { ...clinic, whatsappAvailable: this.config.whatsapp !== null, paymentsAvailable: this.config.payments !== null };
   }
 
   @Patch()
   @Roles('OWNER', 'ADMIN')
   async update(@Staff() staff: StaffContext, @Body() dto: UpdateClinicDto) {
     if (Object.keys(dto).length === 0) throw new BadRequestException('Sin cambios');
+    if (dto.paymentMode && dto.paymentMode !== 'OFF' && !this.config.payments) {
+      throw new ConflictException('Los pagos en línea aún no están configurados en Medora');
+    }
     const data = dto.reminderOffsets ? { ...dto, reminderOffsets: [...dto.reminderOffsets].sort((a, b) => b - a) } : dto;
     const clinic = await this.prisma.clinic.update({ where: { id: staff.clinicId }, data });
-    return { ...clinic, whatsappAvailable: this.config.whatsapp !== null };
+    return { ...clinic, whatsappAvailable: this.config.whatsapp !== null, paymentsAvailable: this.config.payments !== null };
   }
 
   // ---------------------------------------------------------------- Equipo

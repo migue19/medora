@@ -1,5 +1,5 @@
 import {
-  BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException,
+  BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException,
 } from '@nestjs/common';
 import { ActorKind, Appointment, AppointmentSource, Prisma } from '@prisma/client';
 import { DateTime } from 'luxon';
@@ -11,11 +11,17 @@ import { MailService } from '../mail/mail.service';
 import { RemindersService } from '../notifications/reminders.service';
 import { JobsService } from '../jobs/jobs.service';
 import { ReviewsService } from '../reviews/reviews.service';
+import { APP_CONFIG, AppConfig } from '../config';
+import { PAYMENT_EXPIRE_JOB, PAYMENT_HOLD_MINUTES, requiresPayment, settleOnCancel } from '../payments/policy';
 
 /** Trabajo que ofrece un horario liberado a la lista de espera (lo atiende WaitlistService). */
 export const WAITLIST_OFFER_JOB = 'waitlist.offer';
 
 export const MAX_FUTURE_ONLINE_APPOINTMENTS = 3;
+/** Citas vigentes: agendadas o apartadas en espera de pago. */
+export const ACTIVE_STATUSES = ['BOOKED', 'PENDING_PAYMENT'] as const;
+/** Actor de los procesos automáticos (vencimiento de pagos). */
+export const SYSTEM_ACTOR = { kind: 'SYSTEM' as const, id: '00000000-0000-0000-0000-000000000000', name: 'Medora' };
 export const MAX_AVAILABILITY_DAYS = 14;
 
 export interface Actor {
@@ -59,6 +65,7 @@ const HELD = 'Ese horario está apartado para una persona de la lista de espera.
 @Injectable()
 export class AppointmentsService {
   constructor(
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
     private readonly reminders: RemindersService,
@@ -207,7 +214,7 @@ export class AppointmentsService {
           if (!clinic.bookingEnabled) throw new ForbiddenException('La clínica no acepta reservas en línea por ahora');
           await this.assertOnlineSlot(tx, clinic, doctor.id, service.durationMinutes, startsAt, now, null, offer?.id ?? null);
           const future = await tx.appointment.count({
-            where: { clinicPatientId: input.clinicPatientId, status: 'BOOKED', startsAt: { gt: now } },
+            where: { clinicPatientId: input.clinicPatientId, status: { in: [...ACTIVE_STATUSES] }, startsAt: { gt: now } },
           });
           if (future >= MAX_FUTURE_ONLINE_APPOINTMENTS) {
             throw new ConflictException(
@@ -224,18 +231,22 @@ export class AppointmentsService {
 
         const patientOverlap = await tx.appointment.count({
           where: {
-            clinicPatientId: input.clinicPatientId, status: 'BOOKED',
+            clinicPatientId: input.clinicPatientId, status: { in: [...ACTIVE_STATUSES] },
             startsAt: { lt: endsAt }, endsAt: { gt: startsAt },
           },
         });
         if (patientOverlap > 0) throw new ConflictException('El paciente ya tiene una cita en ese horario');
 
+        const priceCents = await resolvePrice(tx, service, doctor.id, rule.locationId);
+        // Pago obligatorio: la reserva en línea aparta el horario hasta que se pague (o vence y se libera).
+        const pending = input.source === 'ONLINE' && !offer && requiresPayment(this.config.payments !== null, clinic, priceCents);
+        const paymentDueAt = pending ? new Date(now.getTime() + PAYMENT_HOLD_MINUTES * 60_000) : null;
         const created = await tx.appointment.create({
           data: {
             clinicId: input.clinicId, doctorId: doctor.id, serviceId: service.id,
             clinicPatientId: input.clinicPatientId, startsAt, endsAt, source: input.source,
             serviceName: service.name, durationMinutes: service.durationMinutes,
-            priceCents: await resolvePrice(tx, service, doctor.id, rule.locationId),
+            priceCents, status: pending ? 'PENDING_PAYMENT' : 'BOOKED', paymentDueAt,
             patientNotes: input.notes, requestKey, requestHash, followUpOfId: input.followUpOfId ?? null,
             locationId: rule.locationId, roomId: rule.roomId, channel: input.channel ?? null,
           },
@@ -250,8 +261,13 @@ export class AppointmentsService {
             actorId: input.actor.id, actorName: input.actor.name, toStartsAt: startsAt,
           },
         });
-        await this.mail.appointmentEvent(tx, event.id);
-        await this.reminders.schedule(tx, created, clinic, now);
+        if (pending) {
+          // La confirmación y los recordatorios salen cuando llega el pago.
+          await this.enqueueExpiry(tx, created.id, paymentDueAt!);
+        } else {
+          await this.mail.appointmentEvent(tx, event.id);
+          await this.reminders.schedule(tx, created, clinic, now);
+        }
         return created;
       });
       return { appointment, replayed: false };
@@ -274,25 +290,74 @@ export class AppointmentsService {
       await lockDoctor(tx, appointment.doctorId);
       const current = await tx.appointment.findUniqueOrThrow({ where: { id: appointment.id } });
       if (current.status === 'CANCELLED') return current;
-      if (current.status !== 'BOOKED') throw new ConflictException('La cita ya fue atendida o marcada como no asistió');
+      if (current.status !== 'BOOKED' && current.status !== 'PENDING_PAYMENT') {
+        throw new ConflictException('La cita ya fue atendida o marcada como no asistió');
+      }
       const now = new Date();
       if (current.startsAt <= now) throw new ConflictException('La cita ya comenzó');
       if (params.minMinutesBefore !== null && current.startsAt.getTime() - now.getTime() < params.minMinutesBefore * 60_000) {
         throw new ConflictException('Ya no es posible cancelar en línea. Comunícate con la clínica.');
       }
-      const updated = await tx.appointment.update({
-        where: { id: current.id }, data: { status: 'CANCELLED', cancelReason: params.reason },
-      });
-      const event = await tx.appointmentEvent.create({
-        data: {
-          appointmentId: current.id, type: 'CANCELLED', actorKind: actor.kind, actorId: actor.id,
-          actorName: actor.name, reason: params.reason, fromStartsAt: current.startsAt,
-        },
-      });
-      await this.mail.appointmentEvent(tx, event.id);
-      await this.freed(tx, current);
-      return updated;
+      const clinic = await tx.clinic.findUniqueOrThrow({ where: { id: current.clinicId } });
+      return this.cancelLocked(tx, clinic, current, params.reason, actor, now);
     });
+  }
+
+  /** Cancela con el médico ya bloqueado: reembolso según la política, aviso por correo y horario liberado. */
+  private async cancelLocked(
+    tx: Tx, clinic: Prisma.ClinicGetPayload<object>, current: Appointment, reason: string, actor: Actor, now: Date,
+  ): Promise<Appointment> {
+    const updated = await tx.appointment.update({
+      where: { id: current.id }, data: { status: 'CANCELLED', cancelReason: reason, paymentDueAt: null },
+    });
+    await settleOnCancel(tx, this.jobs, clinic, current, actor, now);
+    const event = await tx.appointmentEvent.create({
+      data: {
+        appointmentId: current.id, type: 'CANCELLED', actorKind: actor.kind, actorId: actor.id,
+        actorName: actor.name, reason, fromStartsAt: current.startsAt,
+      },
+    });
+    await this.mail.appointmentEvent(tx, event.id);
+    await this.freed(tx, current);
+    return updated;
+  }
+
+  /** Programa (o reprograma, si el plazo cambió) la cancelación de una cita que no se pague a tiempo. */
+  async enqueueExpiry(tx: Tx, appointmentId: string, dueAt: Date) {
+    await this.jobs.enqueue(tx, {
+      type: PAYMENT_EXPIRE_JOB, payload: { appointmentId },
+      runAt: new Date(dueAt.getTime() + 60_000), dedupeKey: `payment-expire:${appointmentId}:${dueAt.getTime()}`,
+    });
+  }
+
+  /** Vence el apartado: si la cita sigue sin pagar y pasó su plazo, se cancela y el horario se libera. */
+  async expireUnpaid(appointmentId: string, now = new Date()): Promise<Appointment | null> {
+    const a = await this.prisma.appointment.findUnique({ where: { id: appointmentId } });
+    if (!a) return null;
+    return this.prisma.$transaction(async (tx) => {
+      await lockDoctor(tx, a.doctorId);
+      const current = await tx.appointment.findUniqueOrThrow({ where: { id: appointmentId } });
+      if (current.status !== 'PENDING_PAYMENT' || !current.paymentDueAt || current.paymentDueAt > now) return null;
+      const clinic = await tx.clinic.findUniqueOrThrow({ where: { id: current.clinicId } });
+      return this.cancelLocked(tx, clinic, current, 'No se recibió el pago a tiempo', SYSTEM_ACTOR, now);
+    });
+  }
+
+  /** Llegó el pago: la cita apartada queda agendada (confirmación por correo y recordatorios). */
+  async confirmPaid(tx: Tx, appointment: Appointment, amountCents: number, now: Date) {
+    const clinic = await tx.clinic.findUniqueOrThrow({ where: { id: appointment.clinicId } });
+    const updated = appointment.status === 'PENDING_PAYMENT'
+      ? await tx.appointment.update({ where: { id: appointment.id }, data: { status: 'BOOKED', paymentDueAt: null } })
+      : appointment;
+    const event = await tx.appointmentEvent.create({
+      data: {
+        appointmentId: appointment.id, type: 'PAID', actorKind: SYSTEM_ACTOR.kind, actorId: SYSTEM_ACTOR.id,
+        actorName: SYSTEM_ACTOR.name, reason: `Pago en línea de ${(amountCents / 100).toFixed(2)} MXN`, toStartsAt: appointment.startsAt,
+      },
+    });
+    await this.mail.appointmentEvent(tx, event.id);
+    if (appointment.status === 'PENDING_PAYMENT') await this.reminders.schedule(tx, updated, clinic, now);
+    return updated;
   }
 
   /**
@@ -332,7 +397,7 @@ export class AppointmentsService {
         const endsAt = new Date(params.startsAt.getTime() + current.durationMinutes * 60_000);
         const patientOverlap = await tx.appointment.count({
           where: {
-            clinicPatientId: current.clinicPatientId, status: 'BOOKED', id: { not: current.id },
+            clinicPatientId: current.clinicPatientId, status: { in: [...ACTIVE_STATUSES] }, id: { not: current.id },
             startsAt: { lt: endsAt }, endsAt: { gt: params.startsAt },
           },
         });

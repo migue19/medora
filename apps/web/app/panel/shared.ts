@@ -23,9 +23,11 @@ export interface ClinicPatient {
 }
 export interface ReminderLog { channel: 'EMAIL' | 'WHATSAPP'; offsetMinutes: number | null; status: 'SENT' | 'FAILED' | 'SKIPPED'; error: string | null; createdAt: string }
 export interface Appointment {
-  id: string; startsAt: string; endsAt: string; status: 'BOOKED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW'; source: string;
+  id: string; startsAt: string; endsAt: string; status: 'BOOKED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW' | 'PENDING_PAYMENT'; source: string;
   serviceId: string; serviceName: string; durationMinutes: number; priceCents: number; patientNotes: string | null;
   cancelReason: string | null; doctor: { id: string; displayName: string }; patient: ClinicPatient;
   confirmedAt: string | null; reminders: ReminderLog[]; followUpOfId: string | null;
   location?: { id: string; name: string }; room?: { id: string; name: string } | null; channel?: string | null;
+  payment?: PaymentSummary | null; paymentDueAt?: string | null;
 }
+export interface PaymentSummary { status: string; amountCents: number; refundedCents: number; method: string | null }

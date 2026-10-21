@@ -9,6 +9,7 @@ import {
 import { PrismaService } from '../prisma.service';
 import { Roles, Staff, StaffContext, StaffGuard } from '../auth/guards';
 import { Actor, AppointmentsService } from './appointments.service';
+import { PaymentSummary, PaymentsService } from '../payments/payments.service';
 import { parseLocalDate } from '../scheduling/availability';
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
@@ -59,7 +60,10 @@ const actorOf = (s: StaffContext): Actor => ({ kind: 'STAFF', id: s.userId, name
 @Controller('api/clinic')
 @UseGuards(StaffGuard)
 export class StaffAppointmentsController {
-  constructor(private readonly prisma: PrismaService, private readonly appointments: AppointmentsService) {}
+  constructor(
+    private readonly prisma: PrismaService, private readonly appointments: AppointmentsService,
+    private readonly payments: PaymentsService,
+  ) {}
 
   @Get('appointments')
   async list(@Staff() staff: StaffContext, @Query() q: ListDto) {
@@ -90,7 +94,8 @@ export class StaffAppointmentsController {
       orderBy: [{ startsAt: 'asc' }],
       take: 1000,
     });
-    return { timezone: clinic.timezone, appointments: rows.map(serialize) };
+    const payments = await this.payments.summaries(rows.map((r) => r.id));
+    return { timezone: clinic.timezone, appointments: rows.map((r) => serialize(r, payments.get(r.id))) };
   }
 
   @Get('appointments/:id')
@@ -109,7 +114,8 @@ export class StaffAppointmentsController {
         room: { select: { id: true, name: true } },
       },
     });
-    return { ...serialize(full), events };
+    const payments = await this.payments.summaries([full.id]);
+    return { ...serialize(full, payments.get(full.id)), events };
   }
 
   @Get('doctors/:doctorId/availability')
@@ -188,15 +194,16 @@ const NOTIFICATION_SELECT = {
 type Row = {
   id: string; startsAt: Date; endsAt: Date; status: string; source: string; serviceName: string;
   durationMinutes: number; priceCents: number; patientNotes: string | null; cancelReason: string | null;
-  createdAt: Date; serviceId: string; confirmedAt: Date | null; followUpOfId: string | null;
+  createdAt: Date; serviceId: string; confirmedAt: Date | null; followUpOfId: string | null; paymentDueAt: Date | null;
   location: { id: string; name: string }; room: { id: string; name: string } | null; channel: string | null;
   notifications: { channel: string; offsetMinutes: number | null; status: string; error: string | null; createdAt: Date; startsAt: Date }[];
   doctor: { id: string; displayName: string };
   clinicPatient: { id: string; name: string; phone: string; email: string | null };
 };
 
-function serialize(a: Row) {
+function serialize(a: Row, payment?: PaymentSummary) {
   return {
+    payment: payment ?? null, paymentDueAt: a.paymentDueAt,
     id: a.id, startsAt: a.startsAt, endsAt: a.endsAt, status: a.status, source: a.source,
     serviceId: a.serviceId, serviceName: a.serviceName, durationMinutes: a.durationMinutes, priceCents: a.priceCents,
     patientNotes: a.patientNotes, cancelReason: a.cancelReason, createdAt: a.createdAt, confirmedAt: a.confirmedAt,

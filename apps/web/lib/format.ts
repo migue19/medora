@@ -3,8 +3,15 @@ export const ROLE_LABEL: Record<string, string> = {
 };
 
 export const STATUS_LABEL: Record<string, string> = {
-  BOOKED: 'Agendada', CANCELLED: 'Cancelada', COMPLETED: 'Atendida', NO_SHOW: 'No asistió',
+  BOOKED: 'Agendada', CANCELLED: 'Cancelada', COMPLETED: 'Atendida', NO_SHOW: 'No asistió', PENDING_PAYMENT: 'Pendiente de pago',
 };
+
+export const PAYMENT_LABEL: Record<string, string> = {
+  OPEN: 'Pago iniciado', PROCESSING: 'Ficha de pago emitida', PAID: 'Pagado en línea', REFUND_PENDING: 'Reembolso en proceso',
+  REFUNDED: 'Reembolsado', EXPIRED: 'Pago vencido', FAILED: 'Pago rechazado',
+};
+
+export const PAY_METHOD_LABEL: Record<string, string> = { card: 'tarjeta', oxxo: 'OXXO', customer_balance: 'SPEI' };
 
 export const WEEKDAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 

@@ -8,6 +8,8 @@ interface Clinic {
   minNoticeMinutes: number; horizonDays: number; patientCancelMinMinutes: number;
   remindersEnabled: boolean; reminderOffsets: number[]; whatsappEnabled: boolean; whatsappAvailable: boolean;
   reviewsEnabled: boolean; directoryEnabled: boolean;
+  paymentMode: 'OFF' | 'OPTIONAL' | 'REQUIRED'; depositPercent: number; refundMinMinutes: number; asyncPaymentsEnabled: boolean;
+  paymentsAvailable: boolean;
 }
 
 /** Anticipaciones disponibles para los recordatorios (máximo 3). */
@@ -51,6 +53,7 @@ export function ClinicSettings() {
       <Share slug={clinic.slug} origin={origin} link={link} />
       <Locations />
       <Reminders clinic={clinic} onSaved={setClinic} />
+      <Payments clinic={clinic} onSaved={setClinic} />
       <form className="card stack" onSubmit={save}>
         <h3>Datos y reglas de reserva</h3>
         <div className="grid">
@@ -71,6 +74,61 @@ export function ClinicSettings() {
         <div><button className="primary">Guardar</button></div>
       </form>
     </div>
+  );
+}
+
+/** Pagos en línea con Stripe: modo, anticipo y política de reembolso. */
+function Payments({ clinic, onSaved }: { clinic: Clinic; onSaved: (c: Clinic) => void }) {
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [mode, setMode] = useState(clinic.paymentMode);
+
+  async function save(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    setMsg(null);
+    try {
+      const updated = await staffSession.patch<Clinic>('/api/clinic', {
+        paymentMode: f.get('paymentMode'), depositPercent: Number(f.get('depositPercent')),
+        refundMinMinutes: Math.round(Number(f.get('refundHours')) * 60), asyncPaymentsEnabled: f.get('async') === 'on',
+      });
+      onSaved(updated);
+      setMsg({ ok: true, text: 'Pagos guardados. Aplican a las reservas en línea desde ahora.' });
+    } catch (err) { setMsg({ ok: false, text: errorMessage(err) }); }
+  }
+
+  return (
+    <form className="card stack" onSubmit={save}>
+      <h3>Pagos en línea</h3>
+      {!clinic.paymentsAvailable && <div className="alert warn small">Los pagos en línea todavía no están activados en Medora.</div>}
+      <p className="small muted">Los pacientes pagan con Stripe al reservar. Medora recibe el dinero y te lo transfiere; verás cada cobro y reembolso en la pestaña «Pagos».</p>
+      <fieldset className="stack" style={{ border: 0, padding: 0, margin: 0 }} disabled={!clinic.paymentsAvailable}>
+        <label>Cobro al reservar en línea
+          <select name="paymentMode" value={mode} onChange={(e) => setMode(e.target.value as Clinic['paymentMode'])}>
+            <option value="OFF">No cobrar en línea</option>
+            <option value="OPTIONAL">Opcional: el paciente puede pagar en línea o en la clínica</option>
+            <option value="REQUIRED">Obligatorio: la cita se confirma al pagar (se aparta 35 min)</option>
+          </select>
+        </label>
+        {mode !== 'OFF' && (
+          <>
+            <div className="grid">
+              <label>Monto a cobrar (% del precio)
+                <select name="depositPercent" defaultValue={String(clinic.depositPercent)}>
+                  {[20, 30, 50, 100].map((p) => <option key={p} value={p}>{p === 100 ? 'Pago completo (100%)' : `Anticipo del ${p}%`}</option>)}
+                </select>
+              </label>
+              <label>Reembolso si cancela con al menos (horas)
+                <input name="refundHours" type="number" min={0} max={168} step={1} defaultValue={clinic.refundMinMinutes / 60} />
+              </label>
+            </div>
+            <label className="check"><input type="checkbox" name="async" defaultChecked={clinic.asyncPaymentsEnabled} />Aceptar OXXO y transferencia SPEI (sólo en citas con 3 días o más de anticipación)</label>
+            <p className="small muted">Si el paciente cancela después del plazo o no asiste, no hay reembolso. Si la clínica cancela, siempre se reembolsa completo. Cobros menores a $10 no se piden en línea.</p>
+          </>
+        )}
+      </fieldset>
+      {msg && <div className={`alert ${msg.ok ? 'ok' : 'error'}`}>{msg.text}</div>}
+      <div><button className="primary" disabled={!clinic.paymentsAvailable}>Guardar</button></div>
+    </form>
   );
 }
 

@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { ApiError, StaffSessionData, errorMessage, staffSession } from '@/lib/api';
-import { STATUS_LABEL, addDays, fmtDay, fmtTime, money, todayIn } from '@/lib/format';
+import { PAYMENT_LABEL, PAY_METHOD_LABEL, STATUS_LABEL, addDays, fmtDay, fmtTime, money, todayIn } from '@/lib/format';
 import { SlotPicker } from '@/components/SlotPicker';
 import { NewAppointment } from './NewAppointment';
 import type { Appointment, Doctor } from './shared';
@@ -111,7 +111,9 @@ export function Agenda({ session }: { session: StaffSessionData }) {
                     {a.source === 'ONLINE' && <span className="badge">En línea</span>}
                     {a.followUpOfId && <span className="badge">Subsecuente</span>}
                     {a.channel && a.channel !== 'web' && <span className="badge">{CHANNEL_LABEL[a.channel] ?? a.channel}</span>}
+                    {a.payment && <span className={`badge ${a.payment.status === 'PAID' ? 'PAID' : ''}`}>{PAYMENT_LABEL[a.payment.status]} {money(a.payment.amountCents)}{a.payment.method ? ` · ${PAY_METHOD_LABEL[a.payment.method] ?? a.payment.method}` : ''}</span>}
                   </div>
+                  {a.status === 'PENDING_PAYMENT' && a.paymentDueAt && <span className="small">Apartada: si no se paga antes de las {fmtTime(a.paymentDueAt, tz)} se libera sola.</span>}
                   <span className="small">{a.serviceName} · {a.doctor.displayName} · {money(a.priceCents)}</span>
                   {a.location && <span className="small muted">{a.location.name}{a.room ? ` · ${a.room.name}` : ''}</span>}
                   <span className="small muted"><a href={`tel:${a.patient.phone.replace(/[^+\d]/g, '')}`}>{a.patient.phone}</a>{a.patient.email ? ` · ${a.patient.email}` : ''}</span>
@@ -132,6 +134,9 @@ export function Agenda({ session }: { session: StaffSessionData }) {
                         </>
                       )}
                     </div>
+                  )}
+                  {a.status === 'PENDING_PAYMENT' && !started && (
+                    <div className="row"><button className="danger" onClick={() => setActive({ id: a.id, mode: 'cancel' })}>Liberar apartado</button></div>
                   )}
                   {a.status === 'COMPLETED' && canBook && (
                     <div className="row">
@@ -157,7 +162,7 @@ export function Agenda({ session }: { session: StaffSessionData }) {
 }
 
 const CHANNEL: Record<string, string> = { EMAIL: 'correo', WHATSAPP: 'WhatsApp' };
-const CHANNEL_LABEL: Record<string, string> = { widget: 'Desde su sitio web', google: 'Desde Google', instagram: 'Desde Instagram' };
+const CHANNEL_LABEL: Record<string, string> = { widget: 'Desde su sitio web', google: 'Desde Google', instagram: 'Desde Instagram', directorio: 'Desde el directorio' };
 const STATE: Record<string, string> = { SENT: 'enviado', FAILED: 'falló', SKIPPED: 'no enviado' };
 
 function offsetLabel(minutes: number | null) {

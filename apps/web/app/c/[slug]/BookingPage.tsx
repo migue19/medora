@@ -30,12 +30,26 @@ interface Place {
   hours: { weekday: number; startMinute: number; endMinute: number }[];
 }
 interface Profile {
-  clinic: { name: string; slug: string; phone: string | null; address: string | null; timezone: string; bookingEnabled: boolean; patientCancelMinMinutes: number };
+  clinic: {
+    name: string; slug: string; phone: string | null; address: string | null; timezone: string; bookingEnabled: boolean; patientCancelMinMinutes: number;
+    payment?: PaymentPolicy | null;
+  };
   locations: Place[];
   doctors: Doctor[];
 }
 
 const VISIT: Record<string, string> = { FIRST: 'Primera vez', FOLLOW_UP: 'Subsecuente' };
+
+interface PaymentPolicy { mode: 'OPTIONAL' | 'REQUIRED'; depositPercent: number; refundMinMinutes: number; asyncPayments: boolean; minChargeCents: number }
+
+/** Monto que se paga en línea por la cita (anticipo o total), o null si no aplica. */
+function onlineAmount(policy: PaymentPolicy | null | undefined, priceCents: number): number | null {
+  if (!policy) return null;
+  const amount = Math.round((priceCents * policy.depositPercent) / 100);
+  return amount >= policy.minChargeCents ? amount : null;
+}
+
+const hours = (minutes: number) => `${Math.round((minutes / 60) * 10) / 10} h`;
 
 /** Precio a mostrar: el de la sede elegida, o «desde» el menor si varía entre sedes. */
 function priceLabel(s: Service, locationId: string | null): string {
@@ -71,7 +85,8 @@ export function BookingPage({ slug, initialProfile, doctorSlug, embedded = false
   const [requestId, setRequestId] = useState(uuid);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [booked, setBooked] = useState<{ startsAt: string } | null>(null);
+  const [booked, setBooked] = useState<{ id: string; startsAt: string; status: string } | null>(null);
+  const [paying, setPaying] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const { data: patient } = useSession(patientSession);
 
@@ -135,7 +150,9 @@ export function BookingPage({ slug, initialProfile, doctorSlug, embedded = false
       const res = await patientSession.post(`/api/public/clinics/${encodeURIComponent(slug)}/appointments`, {
         requestId, doctorId: doctor.id, serviceId: service.id, startsAt: slot.startsAt, notes: notes.trim() || null, channel,
       });
-      setBooked({ startsAt: res.appointment.startsAt });
+      setBooked({ id: res.appointment.id, startsAt: res.appointment.startsAt, status: res.appointment.status });
+      // Pago obligatorio: la cita queda apartada y se paga en Stripe para confirmarla.
+      if (res.appointment.status === 'PENDING_PAYMENT') await pay(res.appointment.id);
     } catch (e) {
       setError(errorMessage(e));
       if (e instanceof ApiError && e.status === 409) {
@@ -144,6 +161,14 @@ export function BookingPage({ slug, initialProfile, doctorSlug, embedded = false
     } finally {
       setBusy(false);
     }
+  }
+
+  async function pay(appointmentId: string) {
+    setPaying(true); setError(null);
+    try {
+      const { url } = await patientSession.post<{ url: string }>(`/api/patient/appointments/${appointmentId}/checkout`, {});
+      window.location.assign(url);
+    } catch (e) { setError(errorMessage(e)); setPaying(false); }
   }
 
   if (loadError) {
@@ -194,12 +219,32 @@ export function BookingPage({ slug, initialProfile, doctorSlug, embedded = false
 
         {booked ? (
           <div className="card stack" role="status">
-            <div className="alert ok">¡Tu cita quedó agendada!</div>
+            {booked.status === 'PENDING_PAYMENT'
+              ? <div className="alert warn">Tu horario está apartado. {paying ? 'Abriendo la página de pago…' : 'Paga para confirmarlo; si no, se libera en unos minutos.'}</div>
+              : <div className="alert ok">¡Tu cita quedó agendada!</div>}
             <h2>{doctor?.displayName}</h2>
             <p>{service?.name} · {priceLabel(service!, locationId)}</p>
             {place(locationId) && <p className="small">{place(locationId)!.name}{place(locationId)!.address ? ` · ${place(locationId)!.address}` : ''}</p>}
             <p><strong>{fmtDate(booked.startsAt, tz)}</strong> a las <strong>{fmtTime(booked.startsAt, tz)}</strong> (hora de la clínica)</p>
-            <p className="muted small">Te enviamos la confirmación por correo con un archivo para agregarla a tu calendario.</p>
+            {booked.status === 'PENDING_PAYMENT' ? (
+              <>
+                {error && <div className="alert error" role="alert">{error}</div>}
+                <div><button className="primary" disabled={paying} onClick={() => pay(booked.id)}>{paying ? 'Abriendo pago…' : 'Pagar y confirmar'}</button></div>
+              </>
+            ) : (
+              <>
+                <p className="muted small">Te enviamos la confirmación por correo con un archivo para agregarla a tu calendario.</p>
+                {clinic.payment?.mode === 'OPTIONAL' && service && onlineAmount(clinic.payment, service.priceCents) && (
+                  <div className="row">
+                    <button className="primary" disabled={paying} onClick={() => pay(booked.id)}>
+                      {paying ? 'Abriendo pago…' : `Pagar en línea ahora (${money(onlineAmount(clinic.payment, service.priceCents)!)})`}
+                    </button>
+                    <span className="small muted">Opcional: también puedes pagar en la clínica.</span>
+                  </div>
+                )}
+                {error && <div className="alert error" role="alert">{error}</div>}
+              </>
+            )}
             <div className="row">
               <a className="btn primary" href="/paciente" {...external}>Ver mis citas</a>
               <button onClick={() => { setBooked(null); setSlot(null); setRequestId(uuid()); setReloadKey((k) => k + 1); }}>Agendar otra</button>
@@ -293,8 +338,16 @@ export function BookingPage({ slug, initialProfile, doctorSlug, embedded = false
                     <p className="muted small">
                       Podrás cancelar o reprogramar en línea hasta {Math.round(clinic.patientCancelMinMinutes / 60 * 10) / 10} h antes de la cita.
                     </p>
+                    {onlineAmount(clinic.payment, service.priceCents) !== null && (
+                      <div className="alert small">
+                        {clinic.payment!.mode === 'REQUIRED'
+                          ? <>Para confirmar se paga en línea {clinic.payment!.depositPercent < 100 ? `un anticipo de ` : ''}<strong>{money(onlineAmount(clinic.payment, service.priceCents)!)}</strong> con tarjeta{clinic.payment!.asyncPayments ? ' (u OXXO o transferencia SPEI si la cita es en 3 días o más)' : ''}. </>
+                          : <>Puedes pagar en línea {money(onlineAmount(clinic.payment, service.priceCents)!)} al reservar o pagar en la clínica. </>}
+                        Si cancelas con al menos {hours(clinic.payment!.refundMinMinutes)} de anticipación te lo reembolsamos; después, o si no asistes, no hay reembolso.
+                      </div>
+                    )}
                     {error && <div className="alert error" role="alert">{error}</div>}
-                    <button className="primary" onClick={confirm} disabled={busy || !patient.patient.emailVerified}>{busy ? 'Agendando…' : 'Confirmar cita'}</button>
+                    <button className="primary" onClick={confirm} disabled={busy || !patient.patient.emailVerified}>{busy ? 'Agendando…' : clinic.payment?.mode === 'REQUIRED' && onlineAmount(clinic.payment, service.priceCents) !== null ? 'Apartar y pagar' : 'Confirmar cita'}</button>
                   </>
                 )}
               </section>

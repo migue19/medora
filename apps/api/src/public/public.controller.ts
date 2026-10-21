@@ -11,6 +11,8 @@ import { Patient, PatientContext, PatientGuard } from '../auth/guards';
 import { AppointmentsService } from '../appointments/appointments.service';
 import { RateLimiter } from '../common/rate-limit';
 import { clientIp } from '../common/http';
+import { PaymentsService } from '../payments/payments.service';
+import { MIN_CHARGE_CENTS } from '../payments/policy';
 
 const emptyToNull = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? (value.trim() === '' ? null : value.trim()) : value;
@@ -44,6 +46,7 @@ export class PublicController {
     private readonly prisma: PrismaService,
     private readonly appointments: AppointmentsService,
     private readonly reviews: ReviewsService,
+    private readonly payments: PaymentsService,
   ) {}
 
   private async clinic(slug: string) {
@@ -94,6 +97,8 @@ export class PublicController {
         name: clinic.name, slug: clinic.slug, phone: clinic.phone, address: clinic.address,
         timezone: clinic.timezone, bookingEnabled: clinic.bookingEnabled,
         patientCancelMinMinutes: clinic.patientCancelMinMinutes,
+        // Pago en línea al reservar (null si la clínica no cobra en línea).
+        payment: this.payments.publicPolicy(clinic) && { ...this.payments.publicPolicy(clinic)!, minChargeCents: MIN_CHARGE_CENTS },
       },
       locations: locations.map((l) => ({
         id: l.id, name: l.name, address: l.address, phone: l.phone, mapUrl: l.mapUrl,

@@ -10,6 +10,8 @@ export interface AppConfig {
   rateLimitEnabled?: boolean;
   mail: MailConfig;
   whatsapp: WhatsAppConfig | null;
+  /** Stripe (cuenta de Medora). Sin llaves, los pagos en línea quedan desactivados. */
+  payments: PaymentsConfig | null;
   /** Intervalo del trabajador de la cola; 0 lo desactiva (pruebas). */
   jobsPollMs: number;
 }
@@ -26,6 +28,11 @@ export interface WhatsAppConfig {
   apiVersion: string;
   /** Lada que se antepone a teléfonos de 10 dígitos. */
   defaultCountryCode: string;
+}
+
+export interface PaymentsConfig {
+  secretKey: string;
+  webhookSecret: string;
 }
 
 export interface MailConfig {
@@ -54,6 +61,7 @@ export function loadConfig(): AppConfig {
   return {
     mail: loadMailConfig(production),
     whatsapp: loadWhatsAppConfig(),
+    payments: loadPaymentsConfig(production),
     jobsPollMs: Number(process.env.JOBS_POLL_MS ?? 2000),
     databaseUrl: required('DATABASE_URL'),
     jwtSecret: new TextEncoder().encode(jwtSecret),
@@ -64,6 +72,16 @@ export function loadConfig(): AppConfig {
     production,
     trustProxy: (process.env.TRUST_PROXY ?? 'true') === 'true',
   };
+}
+
+function loadPaymentsConfig(production: boolean): PaymentsConfig | null {
+  const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
+  if (!secretKey) return null;
+  if (!/^(sk|rk)_(test|live)_/.test(secretKey)) throw new Error('STRIPE_SECRET_KEY no parece una llave de Stripe');
+  if (!production && secretKey.includes('_live_')) throw new Error('Fuera de producción sólo se aceptan llaves de prueba de Stripe');
+  const webhookSecret = required('STRIPE_WEBHOOK_SECRET');
+  if (!webhookSecret.startsWith('whsec_')) throw new Error('STRIPE_WEBHOOK_SECRET debe empezar con whsec_');
+  return { secretKey, webhookSecret };
 }
 
 function loadWhatsAppConfig(): WhatsAppConfig | null {

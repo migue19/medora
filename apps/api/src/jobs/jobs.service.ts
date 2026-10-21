@@ -18,7 +18,8 @@ export interface JobInput {
   runAt?: Date;
 }
 
-export type JobHandler = (payload: Prisma.JsonValue) => Promise<void>;
+/** `now` es la hora con que corre la cola (la real, salvo en pruebas que simulan el paso del tiempo). */
+export type JobHandler = (payload: Prisma.JsonValue, now: Date) => Promise<void>;
 
 interface ClaimedJob {
   id: string;
@@ -113,7 +114,7 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
 
   private async execute(job: ClaimedJob, now: Date): Promise<void> {
     try {
-      await this.handle(job);
+      await this.handle(job, now);
       // El cuerpo puede llevar tokens y datos de la cita: se conserva sólo el destinatario y el asunto.
       await this.prisma.$executeRaw`
         UPDATE "Job" SET "completedAt" = now(), "lockedUntil" = NULL, "lastError" = NULL,
@@ -132,10 +133,10 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
     }
   }
 
-  private async handle(job: ClaimedJob): Promise<void> {
+  private async handle(job: ClaimedJob, now: Date): Promise<void> {
     const handler = this.handlers.get(job.type);
     if (!handler) throw new Error(`Tipo de trabajo desconocido: ${job.type}`);
-    await handler(job.payload);
+    await handler(job.payload, now);
   }
 }
 

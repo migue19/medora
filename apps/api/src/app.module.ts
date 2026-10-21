@@ -13,6 +13,9 @@ import { StaffAppointmentsController } from './appointments/staff-appointments.c
 import { DoctorPhotoController, PublicController, SitemapController } from './public/public.controller';
 import { DirectoryController } from './directory/directory.controller';
 import { DirectoryService } from './directory/directory.service';
+import { PaymentsService } from './payments/payments.service';
+import { ClinicPaymentsController, PatientPaymentsController, PaymentWebhookController } from './payments/payments.controller';
+import { PAYMENT_GATEWAY, PaymentGateway, createGateway } from './payments/gateway';
 import { HealthController } from './health.controller';
 import { AuthTokensService } from './auth/auth-tokens.service';
 import { InvitationsController } from './auth/invitations.controller';
@@ -35,6 +38,7 @@ import { WHATSAPP_TRANSPORT, WhatsAppTransport, createWhatsApp } from './notific
 export interface Transports {
   mail?: MailTransport;
   whatsapp?: WhatsAppTransport;
+  payments?: PaymentGateway;
 }
 
 export function buildAppModule(config: AppConfig = loadConfig(), transports: Transports = {}) {
@@ -44,14 +48,16 @@ export function buildAppModule(config: AppConfig = loadConfig(), transports: Tra
       ClinicController, SchedulingController, StaffAppointmentsController, PublicController, InvitationsController,
       AppointmentActionsController, PatientsController, PatientLinksController, StaffWaitlistController,
       PatientWaitlistController, LocationsController, DoctorPhotoController, SitemapController, DirectoryController,
+      PatientPaymentsController, PaymentWebhookController, ClinicPaymentsController,
       PublicReviewsController, PatientReviewsController, StaffReviewsController, OnboardingController,
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
       { provide: MAIL_TRANSPORT, useValue: transports.mail ?? createTransport(config.mail) },
       { provide: WHATSAPP_TRANSPORT, useValue: transports.whatsapp ?? createWhatsApp(config.whatsapp) },
+      { provide: PAYMENT_GATEWAY, useValue: transports.payments ?? createGateway(config.payments) },
       PrismaService, TokensService, StaffGuard, PatientGuard, AppointmentsService,
-      AuthTokensService, JobsService, MailService, RemindersService, PatientsService, WaitlistService, ReviewsService, OnboardingService, DirectoryService,
+      AuthTokensService, JobsService, MailService, RemindersService, PatientsService, WaitlistService, ReviewsService, OnboardingService, DirectoryService, PaymentsService,
     ],
   })
   class AppModule {}

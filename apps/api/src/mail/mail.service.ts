@@ -7,7 +7,7 @@ import { buildIcs } from './ics';
 import { OutgoingEmail } from './mail.transport';
 import {
   AppointmentEmailKind, RenderedEmail, appointmentEmail, patientLinkRequest, resetPassword, staffInvitation, verifyEmail,
-  onboardingSubmitted, ownerActivation, reviewInvitation, reviewModerated, waitlistOffer,
+  onboardingSubmitted, ownerActivation, refundEmail, reviewInvitation, reviewModerated, waitlistOffer,
 } from './templates';
 
 /**
@@ -91,11 +91,14 @@ export class MailService {
         },
       },
     });
-    if (event.type !== 'CREATED' && event.type !== 'RESCHEDULED' && event.type !== 'CANCELLED') return;
+    if (!['CREATED', 'RESCHEDULED', 'CANCELLED', 'PAID'].includes(event.type)) return;
     const a = event.appointment;
     const to = a.clinicPatient.email;
     if (!to) return;
-    const kind = event.type as AppointmentEmailKind;
+    // Al llegar el pago, el paciente recibe la confirmación de la cita (con su calendario).
+    const kind = (event.type === 'PAID' ? 'CREATED' : event.type) as AppointmentEmailKind;
+    const payments = await tx.payment.findMany({ where: { appointmentId: a.id, paidAt: { not: null } } });
+    const paid = payments.find((p) => p.status === 'PAID' || p.status === 'REFUND_PENDING' || p.status === 'REFUNDED');
     const startsAt = kind === 'CANCELLED' ? (event.fromStartsAt ?? a.startsAt) : (event.toStartsAt ?? a.startsAt);
     const endsAt = new Date(startsAt.getTime() + a.durationMinutes * 60_000);
     const rendered = appointmentEmail({
@@ -112,6 +115,8 @@ export class MailService {
       priceCents: a.priceCents,
       reason: event.reason,
       portalLink: a.clinicPatient.patientAccountId ? this.link('/paciente') : null,
+      paidCents: kind !== 'CANCELLED' && paid?.status === 'PAID' ? paid.amountCents : null,
+      refundCents: kind === 'CANCELLED' && paid ? (paid.status === 'PAID' ? 0 : paid.amountCents) : null,
     });
     // La secuencia del evento de calendario crece con cada cambio de la cita.
     const sequence = await tx.appointmentEvent.count({
@@ -138,6 +143,20 @@ export class MailService {
         content: ics,
       }],
     });
+  }
+
+  /** Aviso de reembolso completado. */
+  async paymentRefunded(tx: Tx, eventId: string, amountCents: number): Promise<void> {
+    const event = await tx.appointmentEvent.findUniqueOrThrow({
+      where: { id: eventId },
+      include: { appointment: { include: { clinic: true, clinicPatient: { select: { name: true, email: true } } } } },
+    });
+    const a = event.appointment;
+    if (!a.clinicPatient.email) return;
+    await this.enqueue(tx, a.clinicPatient.email, refundEmail({
+      patientName: a.clinicPatient.name, clinicName: a.clinic.name, amountCents, startsAt: a.startsAt,
+      timezone: a.clinic.timezone, serviceName: a.serviceName,
+    }), { dedupeKey: `payment-refunded:${event.id}` });
   }
 
   private fromAddress(): string {

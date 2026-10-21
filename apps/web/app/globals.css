@@ -117,6 +117,8 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .badge.COMPLETED { background: var(--ok-soft); color: var(--ok); }
 .badge.CANCELLED { background: var(--danger-soft); color: var(--danger); }
 .badge.NO_SHOW { background: var(--warn-soft); color: var(--warn); }
+.badge.PENDING_PAYMENT { background: var(--warn-soft); color: var(--warn); }
+.badge.PAID { background: var(--ok-soft); color: var(--ok); }
 
 .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; }
 .slot { padding: 6px; min-height: 36px; font-variant-numeric: tabular-nums; }

@@ -14,6 +14,8 @@ export async function createApp(
   RateLimiter.enabled = config.rateLimitEnabled ?? true;
   const app = await NestFactory.create<NestExpressApplication>(buildAppModule(config, transports), {
     logger: logger ? ['error', 'warn', 'log'] : false,
+    // El webhook de Stripe verifica la firma sobre el cuerpo original.
+    rawBody: true,
   });
   // Un único salto de proxy (Nginx o el proxy de Next) para obtener la IP del cliente.
   if (config.trustProxy) app.set('trust proxy', 1);

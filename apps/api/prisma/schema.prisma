@@ -1,4 +1,4 @@
-// Medora · Sprint 8
+// Medora · Sprint 9
 // Todas las entidades de negocio llevan clinicId y se consultan siempre
 // filtradas por la clínica obtenida de la sesión.
 
@@ -25,6 +25,8 @@ enum SessionKind {
 }
 
 enum AppointmentStatus {
+  // Reservada en línea en una clínica con pago obligatorio: aparta el horario hasta paymentDueAt.
+  PENDING_PAYMENT
   BOOKED
   CANCELLED
   COMPLETED
@@ -39,6 +41,26 @@ enum AppointmentSource {
 enum ActorKind {
   STAFF
   PATIENT
+  // Procesos automáticos (vencimiento de pagos).
+  SYSTEM
+}
+
+enum PaymentMode {
+  OFF
+  OPTIONAL
+  REQUIRED
+}
+
+enum PaymentStatus {
+  // Sesión de pago abierta.
+  OPEN
+  // Ficha OXXO o transferencia SPEI emitida, en espera del depósito.
+  PROCESSING
+  PAID
+  EXPIRED
+  FAILED
+  REFUND_PENDING
+  REFUNDED
 }
 
 enum AuthTokenKind {
@@ -54,6 +76,8 @@ enum AppointmentEventType {
   COMPLETED
   NO_SHOW
   CONFIRMED
+  PAID
+  REFUNDED
 }
 
 enum PatientAuditAction {
@@ -134,6 +158,14 @@ model Clinic {
   reviewsEnabled          Boolean  @default(true)
   // Aparecer en el directorio público de Medora (búsqueda entre clínicas).
   directoryEnabled        Boolean  @default(false)
+  // Pagos en línea (Stripe, cuenta de Medora).
+  paymentMode             PaymentMode @default(OFF)
+  // Anticipo: porcentaje del precio de la cita (100 = pago completo).
+  depositPercent          Int      @default(100)
+  // Cancelar con al menos esta anticipación reembolsa el pago; después (o si no asiste) no hay reembolso.
+  refundMinMinutes        Int      @default(1440)
+  // Aceptar OXXO y transferencia SPEI (sólo para citas con 3 días o más de anticipación).
+  asyncPaymentsEnabled    Boolean  @default(false)
   createdAt               DateTime @default(now()) @db.Timestamptz(3)
   updatedAt               DateTime @updatedAt @db.Timestamptz(3)
 
@@ -377,6 +409,8 @@ model Appointment {
   followUpOfId    String?           @db.Uuid
   // Canal por el que llegó una reserva en línea: web, widget, google o instagram.
   channel         String?           @db.VarChar(20)
+  // Pago obligatorio: si no se paga antes, la cita se cancela y el horario se libera.
+  paymentDueAt    DateTime?         @db.Timestamptz(3)
   // Sede y consultorio del bloque del horario en que cae la cita.
   locationId      String            @db.Uuid
   roomId          String?           @db.Uuid
@@ -393,6 +427,7 @@ model Appointment {
   location      Location           @relation(fields: [locationId], references: [id])
   room          Room?              @relation(fields: [roomId], references: [id])
   review        Review?
+  payments      Payment[]
 
   @@index([clinicId, startsAt])
   @@index([doctorId, startsAt])
@@ -826,4 +861,41 @@ model DoctorCondition {
 
   @@id([doctorId, conditionId])
   @@index([conditionId])
+}
+
+// Pago de una cita con Stripe Checkout. Puede haber varios intentos; a lo más uno pagado.
+model Payment {
+  id              String        @id @default(uuid()) @db.Uuid
+  clinicId        String        @db.Uuid
+  appointmentId   String        @db.Uuid
+  provider        String        @default("stripe") @db.VarChar(20)
+  checkoutId      String        @unique @db.VarChar(255)
+  checkoutUrl     String?       @db.VarChar(1000)
+  paymentIntentId String?       @unique @db.VarChar(255)
+  amountCents     Int
+  currency        String        @default("mxn") @db.VarChar(3)
+  status          PaymentStatus @default(OPEN)
+  // card, oxxo o customer_balance (SPEI).
+  method          String?       @db.VarChar(30)
+  expiresAt       DateTime      @db.Timestamptz(3)
+  paidAt          DateTime?     @db.Timestamptz(3)
+  refundedCents   Int           @default(0)
+  refundReason    String?       @db.VarChar(200)
+  refundedAt      DateTime?     @db.Timestamptz(3)
+  // Último error del proveedor (p. ej. un reembolso que requiere atención manual).
+  lastError       String?       @db.VarChar(500)
+  createdAt       DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime      @updatedAt @db.Timestamptz(3)
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id])
+
+  @@index([appointmentId])
+  @@index([clinicId, createdAt])
+}
+
+// Eventos de webhook ya procesados: un evento repetido no se vuelve a aplicar.
+model PaymentWebhookEvent {
+  id         String   @id @db.VarChar(255)
+  type       String   @db.VarChar(100)
+  receivedAt DateTime @default(now()) @db.Timestamptz(3)
 }

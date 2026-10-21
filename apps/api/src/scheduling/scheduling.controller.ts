@@ -419,7 +419,7 @@ export class SchedulingController {
       if (!doctor) throw new NotFoundException('Médico no encontrado');
       await lockDoctor(tx, id);
       const conflicts = await tx.appointment.count({
-        where: { doctorId: id, status: 'BOOKED', startsAt: { lt: endsAt }, endsAt: { gt: startsAt } },
+        where: { doctorId: id, status: { in: ['BOOKED', 'PENDING_PAYMENT'] }, startsAt: { lt: endsAt }, endsAt: { gt: startsAt } },
       });
       if (conflicts > 0) {
         throw new ConflictException(

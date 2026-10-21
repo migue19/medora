@@ -8,7 +8,7 @@ import { VerifyEmailNotice } from '@/components/VerifyEmailNotice';
 import { ReviewForm } from '@/components/ReviewForm';
 import { ApiError, errorMessage, patientSession } from '@/lib/api';
 import { useSession } from '@/lib/hooks';
-import { STATUS_LABEL, fmtDate, fmtTime, money, todayIn } from '@/lib/format';
+import { PAYMENT_LABEL, PAY_METHOD_LABEL, STATUS_LABEL, fmtDate, fmtTime, money, todayIn } from '@/lib/format';
 
 interface Appt {
   id: string; startsAt: string; endsAt: string; status: string; serviceName: string; durationMinutes: number;
@@ -17,6 +17,9 @@ interface Appt {
   doctor: { id: string; displayName: string; specialty: string };
   location?: { name: string; address: string | null; phone: string | null; mapUrl: string | null };
   reviewed?: boolean; canReview?: boolean;
+  payment?: { status: string; amountCents: number; refundedCents: number; method: string | null } | null;
+  paymentDueAt?: string | null; canPay?: boolean; depositCents?: number | null; refundOnCancel?: boolean | null;
+  canCancelPending?: boolean;
 }
 
 export function PatientPortal() {
@@ -36,8 +39,33 @@ export function PatientPortal() {
 
   useEffect(() => { if (session) void reload(); else setList(null); }, [session, reload]);
 
+  // Regreso de la página de pago de Stripe: el pago se confirma por webhook en unos segundos.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const result = q.get('pago');
+    if (!result) return;
+    window.history.replaceState(null, '', window.location.pathname);
+    if (result === 'listo') {
+      setNotice('¡Gracias! Estamos confirmando tu pago; en unos segundos verás tu cita confirmada y te llegará un correo. Si pagaste en OXXO o por transferencia, se confirma al acreditarse.');
+      const timers = [3000, 8000, 20000].map((ms) => setTimeout(() => { void reload(); }, ms));
+      return () => timers.forEach(clearTimeout);
+    }
+    setNotice('No se completó el pago. Puedes intentarlo de nuevo antes de que venza el apartado.');
+  }, [reload]);
+
+  async function pay(a: Appt) {
+    setError(null);
+    try {
+      const { url } = await patientSession.post<{ url: string }>(`/api/patient/appointments/${a.id}/checkout`, {});
+      window.location.assign(url);
+    } catch (e) { setError(errorMessage(e)); }
+  }
+
   async function cancel(a: Appt) {
-    if (!window.confirm(`¿Cancelar tu cita con ${a.doctor.displayName}?`)) return;
+    const refund = a.refundOnCancel === true && a.payment ? ` Se te reembolsarán ${money(a.payment.amountCents)}.`
+      : a.refundOnCancel === false ? ' Ya pasó el plazo de reembolso: lo que pagaste no se devuelve.' : '';
+    const question = a.status === 'PENDING_PAYMENT' ? '¿Soltar este horario apartado?' : `¿Cancelar tu cita con ${a.doctor.displayName}?${refund}`;
+    if (!window.confirm(question)) return;
     setError(null); setNotice(null);
     try {
       await patientSession.post(`/api/patient/appointments/${a.id}/cancel`, {});
@@ -75,7 +103,18 @@ export function PatientPortal() {
                   {list.upcoming.map((a) => (
                     <div key={a.id} className="card stack">
                       <ApptSummary a={a} />
-                      {a.canChangeOnline ? (
+                      {a.status === 'PENDING_PAYMENT' && (
+                        <div className="alert warn small">
+                          Tu horario está apartado. Paga {a.depositCents ? money(a.depositCents) : ''}{a.paymentDueAt ? ` antes de las ${fmtTime(a.paymentDueAt, a.clinic.timezone)}` : ''} para confirmarlo; si no, se libera.
+                        </div>
+                      )}
+                      {a.canPay && (
+                        <div className="row">
+                          <button className="primary" onClick={() => pay(a)}>{a.status === 'PENDING_PAYMENT' ? 'Pagar y confirmar' : 'Pagar en línea'}{a.depositCents ? ` ${money(a.depositCents)}` : ''}</button>
+                          {a.canCancelPending && <button className="ghost" onClick={() => cancel(a)}>Soltar apartado</button>}
+                        </div>
+                      )}
+                      {a.status === 'PENDING_PAYMENT' ? null : a.canChangeOnline ? (
                         <div className="row">
                           <button onClick={() => { setRescheduling(a); setNotice(null); setError(null); }}>Reprogramar</button>
                           <button className="danger" onClick={() => cancel(a)}>Cancelar</button>
@@ -125,6 +164,13 @@ function ApptSummary({ a }: { a: Appt }) {
         ? <span className="muted small">{[a.location.name, a.location.address ?? a.clinic.address].filter(Boolean).join(' · ')}{a.location.mapUrl && <> · <a href={a.location.mapUrl} target="_blank" rel="noreferrer">Mapa</a></>}</span>
         : a.clinic.address && <span className="muted small">{a.clinic.address}</span>}
       {a.cancelReason && <span className="muted small">Motivo de cancelación: {a.cancelReason}</span>}
+      {a.payment && (
+        <span className="small">
+          <span className={`badge ${a.payment.status === 'PAID' ? 'PAID' : ''}`}>{PAYMENT_LABEL[a.payment.status]}</span>{' '}
+          {money(a.payment.amountCents)}{a.payment.method ? ` con ${PAY_METHOD_LABEL[a.payment.method] ?? a.payment.method}` : ''}
+          {a.payment.status === 'PAID' && a.refundOnCancel === false && <span className="muted"> · ya no es reembolsable si cancelas</span>}
+        </span>
+      )}
     </div>
   );
 }

@@ -10,9 +10,11 @@ import { hashPassword } from '../../src/common/crypto';
 import { JobsService } from '../../src/jobs/jobs.service';
 import { MemoryTransport, OutgoingEmail } from '../../src/mail/mail.transport';
 import { MemoryWhatsApp } from '../../src/notifications/whatsapp.transport';
+import { MemoryGateway } from '../../src/payments/gateway';
 
 export const ORIGIN = 'http://localhost:6011';
 export const TZ = 'America/Mexico_City';
+export const WEBHOOK_SECRET = 'whsec_integracion';
 
 export function testDatabaseUrl(): string {
   const url = process.env.TEST_DATABASE_URL;
@@ -28,6 +30,7 @@ export interface Harness {
   prisma: PrismaClient;
   mail: MemoryTransport;
   whatsapp: MemoryWhatsApp;
+  payments: MemoryGateway;
   jobs: JobsService;
   /** Ejecuta la cola y devuelve los correos enviados en esta corrida. */
   deliver(): Promise<OutgoingEmail[]>;
@@ -40,6 +43,7 @@ export async function startHarness(): Promise<Harness> {
   const databaseUrl = testDatabaseUrl();
   const mail = new MemoryTransport();
   const whatsapp = new MemoryWhatsApp();
+  const payments = new MemoryGateway();
   const app = await createApp({
     databaseUrl,
     jwtSecret: new TextEncoder().encode('integration-secret-integration-secret-0123'),
@@ -56,15 +60,16 @@ export async function startHarness(): Promise<Harness> {
       language: 'es_MX', apiVersion: 'v21.0',
       defaultCountryCode: '52',
     },
+    payments: { secretKey: 'sk_test_integracion', webhookSecret: WEBHOOK_SECRET },
     jobsPollMs: 0,
-  }, false, { mail, whatsapp });
+  }, false, { mail, whatsapp, payments });
   await app.listen(0, '127.0.0.1');
   const { port } = app.getHttpServer().address() as AddressInfo;
   const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: databaseUrl }) });
   sharedPrisma = prisma;
   const jobs = app.get(JobsService);
   return {
-    app, base: `http://127.0.0.1:${port}`, prisma, mail, whatsapp, jobs,
+    app, base: `http://127.0.0.1:${port}`, prisma, mail, whatsapp, payments, jobs,
     async deliver() {
       const before = mail.sent.length;
       await jobs.runOnce();

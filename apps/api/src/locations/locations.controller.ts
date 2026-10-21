@@ -143,7 +143,7 @@ export class LocationsController {
       // Una sede con horarios o citas próximas no se puede desactivar.
       const [rules, upcoming] = await Promise.all([
         this.prisma.scheduleRule.count({ where: { locationId: id } }),
-        this.prisma.appointment.count({ where: { locationId: id, status: 'BOOKED', startsAt: { gt: new Date() } } }),
+        this.prisma.appointment.count({ where: { locationId: id, status: { in: ['BOOKED', 'PENDING_PAYMENT'] }, startsAt: { gt: new Date() } } }),
       ]);
       if (rules || upcoming) {
         throw new ConflictException('La sede tiene horarios de médicos o citas próximas. Muévelos antes de desactivarla.');

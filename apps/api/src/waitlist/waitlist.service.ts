@@ -152,9 +152,9 @@ export class WaitlistService implements OnModuleInit {
         }
         const [overlap, future] = await Promise.all([
           tx.appointment.count({
-            where: { clinicPatientId: entry.clinicPatientId, status: 'BOOKED', startsAt: { lt: endsAt }, endsAt: { gt: startsAt } },
+            where: { clinicPatientId: entry.clinicPatientId, status: { in: ['BOOKED', 'PENDING_PAYMENT'] }, startsAt: { lt: endsAt }, endsAt: { gt: startsAt } },
           }),
-          tx.appointment.count({ where: { clinicPatientId: entry.clinicPatientId, status: 'BOOKED', startsAt: { gt: now } } }),
+          tx.appointment.count({ where: { clinicPatientId: entry.clinicPatientId, status: { in: ['BOOKED', 'PENDING_PAYMENT'] }, startsAt: { gt: now } } }),
         ]);
         if (overlap > 0 || future >= MAX_FUTURE_ONLINE_APPOINTMENTS) continue;
 

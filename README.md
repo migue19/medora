@@ -98,7 +98,9 @@ Entregado. `/directorio` busca entre las clínicas que activan «Aparecer en el 
 - Catálogo normalizado de especialidades y padecimientos.
 - **Terminado cuando**: un paciente encuentra un médico por especialidad y zona y reserva en menos de un minuto.
 
-### Sprint 9 · Pagos en línea
+### Sprint 9 · Pagos en línea ✅
+
+Entregado con Stripe Checkout (cuenta de Medora). Con pago obligatorio, la reserva en línea aparta el horario 35 min y el pago la confirma; si no llega, se cancela sola y el horario se libera. Los webhooks verifican la firma, se registran por id y consultan el estado real en Stripe, así que un evento repetido o fuera de orden no duplica nada. Reembolsos automáticos según la política de la clínica y pestaña «Pagos» para conciliar. Detalle en [SPRINT9_RESULTS.md](SPRINT9_RESULTS.md).
 
 - Anticipo o pago completo al reservar con un proveedor para México (Stripe, Mercado Pago o Conekta), con tarjeta y OXXO o SPEI según el proveedor.
 - Políticas por clínica: pago obligatorio u opcional, ventana de cancelación con reembolso y cargo por inasistencia.
@@ -255,6 +257,36 @@ Opcional. Sin `WHATSAPP_TOKEN` el canal queda desactivado y los recordatorios sa
 4. Opcional, para invitar a opinar por WhatsApp: plantilla `invitacion_opinion` (Utilidad, `es_MX`), cuerpo `Hola {{1}}, ¿cómo te fue con {{2}} en {{3}}? Tu opinión ayuda a otros pacientes.` y botón URL dinámica `https://medora.nut.com.mx/opinion?t={{1}}`. Variable `WHATSAPP_REVIEW_TEMPLATE` si usas otro nombre.
 5. En el panel, «Clínica → Recordatorios», activar «También por WhatsApp». Sólo reciben WhatsApp los pacientes con consentimiento: los de cuenta en línea lo activan en su registro o en «Mis citas»; para fichas telefónicas lo registra recepción.
 
+## Pagos en línea (Stripe)
+
+Opcional. Sin `STRIPE_SECRET_KEY` los pagos quedan desactivados y las clínicas no pueden activarlos.
+
+1. Cuenta de Stripe México de Medora. En *Developers → API keys* copia la llave secreta (`sk_test_…` para pruebas, `sk_live_…` para cobrar de verdad; también sirve una llave restringida `rk_…` con permisos de Checkout Sessions, Customers y Refunds).
+2. Para OXXO y SPEI, actívalos en *Settings → Payment methods*.
+3. En *Developers → Webhooks* agrega el endpoint `https://medora.nut.com.mx/api/payments/stripe/webhook` con los eventos `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `checkout.session.expired` y `charge.refunded`. Copia su *signing secret* (`whsec_…`).
+4. En el `.env` del servidor (entre comillas simples) y reinicia la API:
+
+| Variable | Valor |
+|---|---|
+| `STRIPE_SECRET_KEY` | Llave secreta (secreto) |
+| `STRIPE_WEBHOOK_SECRET` | Signing secret del webhook (secreto) |
+
+5. En el panel, «Clínica → Pagos en línea»: obligatorio u opcional, anticipo (20 %, 30 %, 50 % o completo), horas mínimas para reembolso y OXXO/SPEI.
+
+Reglas:
+
+- **Pago obligatorio:**
+  - La reserva en línea queda «Pendiente de pago» y aparta el horario 35 min (hasta 2 h si el paciente reintenta).
+  - Con ficha OXXO o SPEI emitida, el apartado dura hasta 48 h y nunca pasa de 1 h antes de la cita.
+  - Al pagar se confirma la cita, se envían el correo con calendario y los recordatorios. Sin pago, se cancela y el horario se libera para otros pacientes y para la lista de espera.
+- **Reembolsos:**
+  - Si cancela la clínica, siempre se reembolsa completo.
+  - Si cancela el paciente con la anticipación configurada, se reembolsa completo. Después, o si no asiste, no hay reembolso.
+  - Un pago que llega para una cita ya cancelada, o un segundo cobro de la misma cita, se reembolsa solo.
+  - Stripe no reembolsa pagos en OXXO: esos aparecen en «Pagos → Requiere atención» para devolverlos por transferencia y marcarlos.
+- **Conciliación:** la pestaña «Pagos» muestra lo cobrado, lo reembolsado y el neto a transferir a cada clínica, con un botón «Conciliar» que vuelve a consultar Stripe. Al vencer un apartado también se consulta Stripe, por si se perdió un webhook.
+- **Sin pago en línea:** las reservas desde la lista de espera y las que captura recepción no piden pago en línea.
+
 ## Arranque con Docker Compose (local)
 
 Requisitos: Docker Desktop con Compose v2 y los puertos 6010/6011 libres. Estos puertos no chocan con Tavixo (6000/6001).
@@ -363,6 +395,9 @@ La API escucha en 127.0.0.1:6010 y Next en 127.0.0.1:6011. `WEB_ORIGIN` debe coi
 | GET | /api/public/directory | Público: especialidades y ciudades con médicos en el directorio |
 | GET | /api/public/directory/search | Público: `q`, `especialidad`, `padecimiento`, `ciudad`, `colonia`, `aseguradora`, `precioMax`, `videoconsulta`, `cuando`, `lat`/`lng`/`radioKm`, `orden`, `pagina` |
 | GET | /api/public/directory/suggest · catalog | Público: sugerencias y catálogo de especialidades y padecimientos |
+| POST | /api/patient/appointments/:id/checkout | Paciente: abre (o reutiliza) la página de pago de Stripe |
+| POST | /api/payments/stripe/webhook | Stripe (firma `Stripe-Signature`) |
+| GET · POST | /api/clinic/payments · :id/sync · :id/manual-refund | Propietario o administración: conciliación |
 | POST | /api/public/reviews/inspect · /api/public/reviews | Público con el token de la invitación; Origin |
 | GET | /api/public/reviews/clinics/:slug/doctors/:doctorSlug?page | Público: opiniones publicadas (10 por página) |
 | POST | /api/patient/appointments/:id/review | Paciente: opinar sobre su cita atendida |

@@ -106,6 +106,10 @@ export interface AppointmentEmailData {
   reason?: string | null;
   /** Portal del paciente (sólo si tiene cuenta en línea). */
   portalLink?: string | null;
+  /** Pago en línea recibido (confirmación tras pagar). */
+  paidCents?: number | null;
+  /** Al cancelar una cita pagada: monto que se reembolsa, o 0 si la política no lo permite. */
+  refundCents?: number | null;
 }
 
 export function formatWhen(date: Date, timezone: string): string {
@@ -136,6 +140,10 @@ export function appointmentEmail(p: AppointmentEmailData): RenderedEmail {
     { label: 'Médico', value: p.doctorName },
     { label: 'Servicio', value: p.serviceName },
     ...(p.kind !== 'CANCELLED' ? [{ label: 'Precio', value: formatPrice(p.priceCents) }] : []),
+    ...(p.paidCents ? [{ label: 'Pagado en línea', value: formatPrice(p.paidCents) }] : []),
+    ...(p.kind === 'CANCELLED' && p.refundCents != null
+      ? [{ label: 'Reembolso', value: p.refundCents > 0 ? `${formatPrice(p.refundCents)} a tu método de pago (5 a 10 días hábiles)` : 'No aplica: se canceló fuera del plazo de reembolso de la clínica' }]
+      : []),
     ...(p.clinic.address ? [{ label: 'Dirección', value: p.clinic.address }] : []),
     ...(p.clinic.phone ? [{ label: 'Teléfono', value: p.clinic.phone }] : []),
     ...(p.kind === 'CANCELLED' && p.reason ? [{ label: 'Motivo', value: p.reason }] : []),
@@ -296,5 +304,20 @@ export function onboardingSubmitted(p: { label: string; clinicName: string; cont
     paragraphs: [`${p.clinicName || p.label} terminó de llenar el alta de Medora y la envió para revisión.`],
     details: [{ label: 'Contacto', value: p.contact || 'sin dato' }, { label: 'Alta', value: p.id }],
     footer: ['Revísala e impórtala con el comando del alta (README, sección «Alta de clínicas»).'],
+  });
+}
+
+export function refundEmail(p: {
+  patientName: string; clinicName: string; amountCents: number; startsAt: Date; timezone: string; serviceName: string;
+}): RenderedEmail {
+  return layout({
+    subject: `Reembolso de ${formatPrice(p.amountCents)} · ${p.clinicName}`,
+    greeting: `Hola, ${p.patientName}:`,
+    paragraphs: [`Reembolsamos ${formatPrice(p.amountCents)} del pago de tu cita en ${p.clinicName}.`],
+    details: [
+      { label: 'Cita', value: `${p.serviceName} · ${formatWhen(p.startsAt, p.timezone)}` },
+      { label: 'Monto', value: formatPrice(p.amountCents) },
+    ],
+    footer: ['El reembolso aparece en tu estado de cuenta en 5 a 10 días hábiles, según tu banco.'],
   });
 }
