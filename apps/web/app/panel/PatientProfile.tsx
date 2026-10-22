@@ -51,7 +51,11 @@ export function PatientProfile({ session, id, doctors, onBack }: {
 
   return (
     <div className="stack">
-      <div className="row"><button className="ghost" onClick={onBack}>← Pacientes</button></div>
+      <div className="row">
+        <button className="ghost" onClick={onBack}>← Pacientes</button>
+        <span className="spacer" />
+        {session.membership.role !== 'RECEPTION' && <a className="btn" href={`/expediente?paciente=${id}`}>Expediente clínico</a>}
+      </div>
       <div className="card stack">
         <div className="row">
           <h2 style={{ margin: 0 }}>{pt.name}</h2>

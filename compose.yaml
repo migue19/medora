@@ -48,6 +48,7 @@ services:
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       DAILY_API_KEY: ${DAILY_API_KEY:-}
+      RECORDS_ENCRYPTION_KEY: ${RECORDS_ENCRYPTION_KEY:-}
     ports:
       - "127.0.0.1:6010:3000"
     networks: [backend, frontend]

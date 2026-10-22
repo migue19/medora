@@ -10,7 +10,7 @@ import { fmtDate, fmtTime } from '@/lib/format';
 import { takeLinkToken } from '@/lib/link-token';
 
 interface Info {
-  appointmentId: string; status: string; startsAt: string; endsAt: string; serviceName: string;
+  appointmentId: string; clinicPatientId: string; status: string; startsAt: string; endsAt: string; serviceName: string;
   clinic: { name: string; timezone: string; phone: string | null };
   doctor: { displayName: string; specialty: string }; patientName: string;
   opensAt: string; closesAt: string; open: boolean; consentGiven: boolean; consentText: string[]; available: boolean;
@@ -186,7 +186,10 @@ function Visit({ mode }: { mode: Mode }) {
             <p>Saliste de la videoconsulta.</p>
             <div className="row">
               {info.open && active && <button onClick={() => setPhase('lobby')}>Volver a entrar</button>}
-              {doctor ? <Link className="btn primary" href="/panel">Ir a la agenda para marcarla como atendida</Link>
+              {doctor ? <>
+                <Link className="btn primary" href={`/expediente?paciente=${info.clinicPatientId}&cita=${info.appointmentId}`}>Documentar en el expediente</Link>
+                <Link className="btn" href="/panel">Ir a la agenda para marcarla como atendida</Link>
+              </>
                 : <Link className="btn" href="/paciente">Ir a Mis citas</Link>}
             </div>
           </div>

@@ -18,6 +18,8 @@ import { ClinicPaymentsController, PatientPaymentsController, PaymentWebhookCont
 import { PAYMENT_GATEWAY, PaymentGateway, createGateway } from './payments/gateway';
 import { VIDEO_PROVIDER, VideoProvider, createVideo } from './video/video.provider';
 import { VideoService } from './video/video.service';
+import { RecordsService } from './records/records.service';
+import { PrescriptionVerifyController, RecordsController } from './records/records.controller';
 import { PatientVideoController, StaffVideoController, VideoLinkController } from './video/video.controller';
 import { HealthController } from './health.controller';
 import { AuthTokensService } from './auth/auth-tokens.service';
@@ -53,7 +55,7 @@ export function buildAppModule(config: AppConfig = loadConfig(), transports: Tra
       AppointmentActionsController, PatientsController, PatientLinksController, StaffWaitlistController,
       PatientWaitlistController, LocationsController, DoctorPhotoController, SitemapController, DirectoryController,
       PatientPaymentsController, PaymentWebhookController, ClinicPaymentsController,
-      VideoLinkController, PatientVideoController, StaffVideoController,
+      VideoLinkController, PatientVideoController, StaffVideoController, RecordsController, PrescriptionVerifyController,
       PublicReviewsController, PatientReviewsController, StaffReviewsController, OnboardingController,
     ],
     providers: [
@@ -63,7 +65,7 @@ export function buildAppModule(config: AppConfig = loadConfig(), transports: Tra
       { provide: PAYMENT_GATEWAY, useValue: transports.payments ?? createGateway(config.payments) },
       { provide: VIDEO_PROVIDER, useValue: transports.video ?? createVideo(config.video) },
       PrismaService, TokensService, StaffGuard, PatientGuard, AppointmentsService,
-      AuthTokensService, JobsService, MailService, RemindersService, PatientsService, WaitlistService, ReviewsService, OnboardingService, DirectoryService, PaymentsService, VideoService,
+      AuthTokensService, JobsService, MailService, RemindersService, PatientsService, WaitlistService, ReviewsService, OnboardingService, DirectoryService, PaymentsService, VideoService, RecordsService,
     ],
   })
   class AppModule {}

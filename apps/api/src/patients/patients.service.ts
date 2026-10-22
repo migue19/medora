@@ -196,6 +196,14 @@ export class PatientsService {
 
     const moved = await tx.appointment.updateMany({ where: { clinicPatientId: sourceId }, data: { clinicPatientId: targetId } });
     await tx.patientNote.updateMany({ where: { clinicPatientId: sourceId }, data: { clinicPatientId: targetId } });
+    // Expediente clínico: se mueve completo (la bitácora también). Dos historias clínicas no se fusionan solas.
+    const profiles = await tx.clinicalProfile.count({ where: { clinicPatientId: { in: [sourceId, targetId] } } });
+    if (profiles === 2) throw new ConflictException('Las dos fichas tienen historia clínica: el médico debe unificarlas antes de fusionar');
+    for (const model of ['allergy', 'clinicalNote', 'prescription', 'clinicalFile', 'clinicalAccessLog', 'clinicalProfile'] as const) {
+      await (tx[model] as unknown as { updateMany: (a: object) => Promise<unknown> })
+        .updateMany({ where: { clinicPatientId: sourceId }, data: { clinicPatientId: targetId } });
+    }
+    await tx.clinicalHistoryVersion.updateMany({ where: { clinicPatientId: sourceId }, data: { clinicPatientId: targetId } });
     // Si ambos esperaban con el mismo médico y servicio, se conserva la entrada más antigua.
     const sourceWaiting = await tx.waitlistEntry.findMany({ where: { clinicPatientId: sourceId, status: 'WAITING' } });
     for (const e of sourceWaiting) {

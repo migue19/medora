@@ -157,6 +157,9 @@ export function Agenda({ session }: { session: StaffSessionData }) {
                       )}
                     </div>
                   )}
+                  {role !== 'RECEPTION' && a.status !== 'CANCELLED' && a.status !== 'PENDING_PAYMENT' && (
+                    <div className="row"><Link className="btn small" href={`/expediente?paciente=${a.patient.id}&cita=${a.id}`}>Expediente clínico</Link></div>
+                  )}
                   {a.modality === 'VIDEO' && a.status === 'BOOKED' && canVideo(a) && (
                     <div className="row"><Link className="btn primary" href={`/consulta?cita=${a.id}&rol=medico`}>{a.doctorJoinedAt ? 'Volver a la videoconsulta' : 'Iniciar videoconsulta'}</Link></div>
                   )}

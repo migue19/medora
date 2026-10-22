@@ -14,6 +14,8 @@ export interface AppConfig {
   payments: PaymentsConfig | null;
   /** Daily (videoconsultas). Sin llave, la telemedicina queda desactivada. */
   video: { apiKey: string } | null;
+  /** Llave AES-256 (32 bytes) para cifrar los adjuntos del expediente. Sin ella no se aceptan adjuntos. */
+  recordsKey: Buffer | null;
   /** Intervalo del trabajador de la cola; 0 lo desactiva (pruebas). */
   jobsPollMs: number;
 }
@@ -65,6 +67,7 @@ export function loadConfig(): AppConfig {
     whatsapp: loadWhatsAppConfig(),
     payments: loadPaymentsConfig(production),
     video: process.env.DAILY_API_KEY?.trim() ? { apiKey: process.env.DAILY_API_KEY.trim() } : null,
+    recordsKey: loadRecordsKey(),
     jobsPollMs: Number(process.env.JOBS_POLL_MS ?? 2000),
     databaseUrl: required('DATABASE_URL'),
     jwtSecret: new TextEncoder().encode(jwtSecret),
@@ -75,6 +78,14 @@ export function loadConfig(): AppConfig {
     production,
     trustProxy: (process.env.TRUST_PROXY ?? 'true') === 'true',
   };
+}
+
+function loadRecordsKey(): Buffer | null {
+  const raw = process.env.RECORDS_ENCRYPTION_KEY?.trim();
+  if (!raw) return null;
+  const key = Buffer.from(raw, 'base64');
+  if (key.length !== 32) throw new Error('RECORDS_ENCRYPTION_KEY debe ser 32 bytes en base64 (openssl rand -base64 32)');
+  return key;
 }
 
 function loadPaymentsConfig(production: boolean): PaymentsConfig | null {

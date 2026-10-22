@@ -1,9 +1,9 @@
 'use client';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { StaffSessionData, errorMessage, staffSession } from '@/lib/api';
-import { ROLE_LABEL, fmtDate } from '@/lib/format';
+import { ROLE_LABEL, addDays, fmtDate, fmtTime, todayIn } from '@/lib/format';
 
-interface Member { id: string; role: string; active: boolean; user: { name: string; email: string }; doctor: { displayName: string } | null }
+interface Member { id: string; role: string; active: boolean; clinicalAccess?: boolean; user: { name: string; email: string }; doctor: { displayName: string } | null }
 interface Invitation { id: string; name: string; email: string; role: string; expiresAt: string; expired: boolean }
 
 export function Team({ session }: { session: StaffSessionData }) {
@@ -13,6 +13,7 @@ export function Team({ session }: { session: StaffSessionData }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const roles = session.membership.role === 'OWNER' ? ['ADMIN', 'RECEPTION', 'DOCTOR'] : ['RECEPTION', 'DOCTOR'];
+  const isOwner = session.membership.role === 'OWNER';
   const load = useCallback(() => Promise.all([
     staffSession.get<Member[]>('/api/clinic/members').then(setMembers),
     staffSession.get<Invitation[]>('/api/clinic/invitations').then(setInvitations),
@@ -87,7 +88,7 @@ export function Team({ session }: { session: StaffSessionData }) {
       )}
       <div className="table-wrap card">
         <table>
-          <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th></tr></thead>
+          <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th>{isOwner && <th>Expedientes clínicos</th>}</tr></thead>
           <tbody>
             {members.map((m) => {
               const editable = m.id !== session.membership.id && roles.includes(m.role);
@@ -103,12 +104,73 @@ export function Team({ session }: { session: StaffSessionData }) {
                   <td>{editable ? (
                     <button className={m.active ? 'danger' : ''} onClick={() => update(m, { active: !m.active })}>{m.active ? 'Desactivar' : 'Reactivar'}</button>
                   ) : m.active ? 'Activo' : 'Inactivo'}</td>
+                  {isOwner && (
+                    <td className="small">
+                      {m.role === 'RECEPTION' ? <span className="muted">Sin acceso</span> : (
+                        <label className="check" title="Acceso a los expedientes de todos los pacientes (p. ej. dirección médica)">
+                          <input type="checkbox" checked={Boolean(m.clinicalAccess)} onChange={async (e) => {
+                            setError(null);
+                            try { await staffSession.patch(`/api/clinic/members/${m.id}/clinical-access`, { clinicalAccess: e.target.checked }); await load(); } catch (err) { setError(errorMessage(err)); }
+                          }} />
+                          {m.clinicalAccess ? 'Todos los pacientes' : m.doctor ? 'Sólo sus pacientes' : 'Sin acceso'}
+                        </label>
+                      )}
+                    </td>
+                  )}
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
+      {isOwner && <p className="small muted">Los médicos ven el expediente de los pacientes que atienden. Marca «Todos los pacientes» sólo para quien lo necesite (p. ej. la dirección médica). Recepción nunca ve información clínica.</p>}
+      {isOwner && <ClinicalAudit tz={session.clinic.timezone} />}
+    </div>
+  );
+}
+
+const AUDIT_ACTION: Record<string, string> = {
+  VIEW_RECORD: 'Consultó el expediente', UPDATE_HISTORY: 'Actualizó la historia clínica', ADD_ALLERGY: 'Registró una alergia',
+  UPDATE_ALLERGY: 'Cambió una alergia', CREATE_NOTE: 'Creó una nota', UPDATE_NOTE: 'Editó una nota', SIGN_NOTE: 'Firmó una nota',
+  PRESCRIBE: 'Emitió una receta', PRINT_PRESCRIPTION: 'Imprimió una receta', VOID_PRESCRIPTION: 'Anuló una receta',
+  UPLOAD_FILE: 'Subió un archivo', DOWNLOAD_FILE: 'Abrió un archivo', VIEW_LOG: 'Consultó la bitácora', DENIED: 'Intento sin permiso',
+};
+
+/** Bitácora de acceso a expedientes de toda la clínica (sólo el propietario). */
+function ClinicalAudit({ tz }: { tz: string }) {
+  const today = todayIn(tz);
+  const [from, setFrom] = useState(addDays(today, -7));
+  const [rows, setRows] = useState<{ userName: string; role: string; action: string; createdAt: string; patient: { name: string } }[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    staffSession.get(`/api/clinic/clinical-audit?from=${from}&to=${today}`).then(setRows).catch((e) => setError(errorMessage(e)));
+  }, [from, today]);
+  return (
+    <div className="card stack">
+      <div className="row">
+        <h3 style={{ margin: 0 }}>Bitácora de expedientes</h3>
+        <span className="spacer" />
+        <label className="row small" style={{ fontWeight: 400 }}>Desde<input type="date" value={from} max={today} onChange={(e) => setFrom(e.target.value)} style={{ width: 'auto' }} /></label>
+      </div>
+      {error && <div className="alert error">{error}</div>}
+      {rows && rows.length === 0 && <p className="small muted">Sin accesos en el periodo.</p>}
+      {rows && rows.length > 0 && (
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>Fecha</th><th>Persona</th><th>Paciente</th><th>Acción</th></tr></thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={i}>
+                  <td className="small">{fmtDate(r.createdAt, tz, { day: 'numeric', month: 'short' })} {fmtTime(r.createdAt, tz)}</td>
+                  <td className="small">{r.userName} <span className="muted">· {ROLE_LABEL[r.role] ?? r.role}</span></td>
+                  <td className="small">{r.patient.name}</td>
+                  <td className="small" style={r.action === 'DENIED' ? { color: 'var(--danger)' } : undefined}>{AUDIT_ACTION[r.action] ?? r.action}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

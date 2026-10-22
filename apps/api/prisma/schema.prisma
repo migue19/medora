@@ -1,4 +1,4 @@
-// Medora · Sprint 10
+// Medora · Sprint 11
 // Todas las entidades de negocio llevan clinicId y se consultan siempre
 // filtradas por la clínica obtenida de la sesión.
 
@@ -203,6 +203,8 @@ model Membership {
   clinicId  String    @db.Uuid
   role      StaffRole
   active    Boolean   @default(true)
+  // Acceso al expediente clínico de todos los pacientes (dirección médica). Los médicos ven a sus pacientes sin esto.
+  clinicalAccess Boolean @default(false)
   createdAt DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt DateTime  @updatedAt @db.Timestamptz(3)
 
@@ -278,6 +280,11 @@ model ClinicPatient {
   notes          PatientNote[]
   audit          PatientAudit[]
   waitlist       WaitlistEntry[]
+  clinicalProfile ClinicalProfile?
+  allergies       Allergy[]
+  clinicalNotes   ClinicalNote[]
+  prescriptions   Prescription[]
+  clinicalFiles   ClinicalFile[]
 
   @@unique([clinicId, patientAccountId])
   @@unique([id, clinicId])
@@ -911,4 +918,153 @@ model PaymentWebhookEvent {
   id         String   @id @db.VarChar(255)
   type       String   @db.VarChar(100)
   receivedAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+// ---------------------------------------------------------------- Expediente clínico (NOM-004-SSA3-2012)
+// Nada clínico se borra (disparadores en la base): se conserva más allá de los 5 años que pide la norma.
+
+// Ficha clínica e historia clínica del paciente (secciones de la NOM-004 en `history`).
+model ClinicalProfile {
+  clinicPatientId String    @id @db.Uuid
+  clinicId        String    @db.Uuid
+  birthDate       DateTime? @db.Date
+  // F, M o X
+  sex             String?   @db.VarChar(1)
+  curp            String?   @db.VarChar(18)
+  bloodType       String?   @db.VarChar(3)
+  history         Json      @default("{}")
+  updatedById     String?   @db.Uuid
+  updatedByName   String?   @db.VarChar(120)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
+
+  clinicPatient ClinicPatient @relation(fields: [clinicPatientId], references: [id])
+  versions      ClinicalHistoryVersion[]
+}
+
+// Cada cambio de la historia clínica queda como versión (quién y cuándo).
+model ClinicalHistoryVersion {
+  id              String   @id @default(uuid()) @db.Uuid
+  clinicPatientId String   @db.Uuid
+  snapshot        Json
+  authorId        String   @db.Uuid
+  authorName      String   @db.VarChar(120)
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+
+  profile ClinicalProfile @relation(fields: [clinicPatientId], references: [clinicPatientId])
+
+  @@index([clinicPatientId, createdAt])
+}
+
+model Allergy {
+  id              String   @id @default(uuid()) @db.Uuid
+  clinicId        String   @db.Uuid
+  clinicPatientId String   @db.Uuid
+  substance       String   @db.VarChar(120)
+  reaction        String?  @db.VarChar(200)
+  // LEVE, MODERADA o GRAVE
+  severity        String   @db.VarChar(10)
+  active          Boolean  @default(true)
+  recordedById    String   @db.Uuid
+  recordedByName  String   @db.VarChar(120)
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
+
+  clinicPatient ClinicPatient @relation(fields: [clinicPatientId], references: [id])
+
+  @@index([clinicPatientId])
+}
+
+// Nota de evolución (SOAP) con signos vitales y diagnósticos CIE-10. Firmada, ya no cambia: se corrige con una adenda.
+model ClinicalNote {
+  id              String    @id @default(uuid()) @db.Uuid
+  clinicId        String    @db.Uuid
+  clinicPatientId String    @db.Uuid
+  appointmentId   String?   @db.Uuid
+  doctorId        String    @db.Uuid
+  authorId        String    @db.Uuid
+  authorName      String    @db.VarChar(120)
+  subjective      String    @default("")
+  objective       String    @default("")
+  assessment      String    @default("")
+  plan            String    @default("")
+  vitals          Json      @default("{}")
+  diagnoses       Json      @default("[]")
+  // Adenda: corrige o complementa una nota firmada.
+  amendsId        String?   @db.Uuid
+  signedAt        DateTime? @db.Timestamptz(3)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
+
+  clinicPatient ClinicPatient  @relation(fields: [clinicPatientId], references: [id])
+  prescriptions Prescription[]
+
+  @@index([clinicPatientId, createdAt])
+  @@index([appointmentId])
+}
+
+// Receta: inmutable una vez emitida (sólo se puede anular). El código permite verificarla en línea.
+model Prescription {
+  id              String    @id @default(uuid()) @db.Uuid
+  clinicId        String    @db.Uuid
+  clinicPatientId String    @db.Uuid
+  noteId          String?   @db.Uuid
+  doctorId        String    @db.Uuid
+  authorId        String    @db.Uuid
+  code            String    @unique @db.VarChar(12)
+  items           Json
+  instructions    String?   @db.VarChar(2000)
+  diagnosis       String?   @db.VarChar(500)
+  issuedAt        DateTime  @default(now()) @db.Timestamptz(3)
+  voidedAt        DateTime? @db.Timestamptz(3)
+  voidReason      String?   @db.VarChar(200)
+
+  clinicPatient ClinicPatient @relation(fields: [clinicPatientId], references: [id])
+  note          ClinicalNote? @relation(fields: [noteId], references: [id])
+
+  @@index([clinicPatientId, issuedAt])
+}
+
+// Archivo adjunto cifrado (AES-256-GCM) con la llave del servidor.
+model ClinicalFile {
+  id              String   @id @default(uuid()) @db.Uuid
+  clinicId        String   @db.Uuid
+  clinicPatientId String   @db.Uuid
+  noteId          String?  @db.Uuid
+  filename        String   @db.VarChar(200)
+  mimeType        String   @db.VarChar(100)
+  size            Int
+  iv              Bytes
+  tag             Bytes
+  data            Bytes
+  uploadedById    String   @db.Uuid
+  uploadedByName  String   @db.VarChar(120)
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+
+  clinicPatient ClinicPatient @relation(fields: [clinicPatientId], references: [id])
+
+  @@index([clinicPatientId, createdAt])
+}
+
+// Bitácora de acceso al expediente: cada consulta, cambio, impresión e intento denegado.
+model ClinicalAccessLog {
+  id              String   @id @default(uuid()) @db.Uuid
+  clinicId        String   @db.Uuid
+  clinicPatientId String   @db.Uuid
+  userId          String   @db.Uuid
+  userName        String   @db.VarChar(120)
+  role            String   @db.VarChar(20)
+  action          String   @db.VarChar(40)
+  resourceId      String?  @db.Uuid
+  ip              String?  @db.VarChar(64)
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([clinicPatientId, createdAt])
+  @@index([clinicId, createdAt])
+}
+
+// Catálogo CIE-10 (códigos de uso frecuente; se admiten otros códigos con formato válido).
+model Icd10 {
+  code        String @id @db.VarChar(10)
+  description String @db.VarChar(255)
 }

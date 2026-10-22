@@ -65,6 +65,7 @@ export async function startHarness(): Promise<Harness> {
     },
     payments: { secretKey: 'sk_test_integracion', webhookSecret: WEBHOOK_SECRET },
     video: { apiKey: 'daily-prueba' },
+    recordsKey: Buffer.alloc(32, 7),
     jobsPollMs: 0,
   }, false, { mail, whatsapp, payments, video });
   await app.listen(0, '127.0.0.1');

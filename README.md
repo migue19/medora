@@ -116,7 +116,9 @@ Entregado con Daily. En servicios marcados «También por videoconsulta», el pa
 - Consentimiento informado para teleconsulta.
 - **Terminado cuando**: médico y paciente completan una videoconsulta desde el navegador, sin instalar nada, y la cita queda como atendida.
 
-### Sprint 11 · Expediente clínico y recetas
+### Sprint 11 · Expediente clínico y recetas ✅
+
+Entregado. Expediente por paciente con historia clínica por secciones de la NOM-004 (con versiones), alergias, notas SOAP con signos vitales y diagnósticos CIE-10, recetas en PDF con QR de verificación y adjuntos cifrados. Lo ve el médico tratante y quien autorice el propietario; recepción nunca. Toda consulta, cambio, impresión e intento negado queda en una bitácora que, como el resto del expediente, la base de datos no deja borrar ni alterar. Revisión de la NOM-024 en [docs/NOM-024-revision.md](docs/NOM-024-revision.md). Detalle en [SPRINT11_RESULTS.md](SPRINT11_RESULTS.md).
 
 - Expediente por paciente conforme a la NOM-004-SSA3-2012: historia clínica, notas de evolución (SOAP), signos vitales, alergias, diagnósticos (CIE-10) y archivos adjuntos.
 - Recetas en PDF con los datos del médico y su cédula, más un código de verificación.
@@ -305,6 +307,17 @@ Cómo funciona:
 - **Antes de entrar:** prueba de cámara y micrófono, y la primera vez el consentimiento para la consulta a distancia (se guarda la fecha y la versión del texto).
 - **Médico:** la agenda se actualiza sola, marca «Paciente en sala de espera» y muestra el número de pacientes esperando en el título de la pestaña. Al terminar, el médico la marca como atendida como cualquier cita.
 
+## Expediente clínico
+
+- **Quién lo ve:**
+  - El médico de los pacientes que atiende (con citas o notas suyas) y las personas a las que el propietario marque «Todos los pacientes» en «Equipo».
+  - Recepción nunca. El propietario o la administración también pueden tener perfil de médico (consultorios pequeños).
+- **Quién escribe:** sólo quien tiene perfil de médico. La nota se firma y desde ese momento no cambia; las correcciones van en una adenda. La receta emitida sólo se puede anular.
+- **Bitácora:** cada consulta, cambio, impresión, descarga e intento sin permiso. Se ve en el expediente, y la de toda la clínica en «Equipo» (sólo el propietario).
+- **Conservación:** la base de datos rechaza borrar cualquier registro clínico o de la bitácora (la NOM-004 pide al menos 5 años).
+- **Recetas:** PDF con los datos de la clínica, el médico y su cédula, el paciente (edad, sexo y alergias), medicamentos e indicaciones, más un QR que lleva a `/receta/{código}`. Ahí la farmacia confirma que es auténtica y no fue anulada, viendo sólo las iniciales del paciente.
+- **Adjuntos:** PDF, JPG o PNG de hasta 10 MB, cifrados con AES-256-GCM. La llave `RECORDS_ENCRYPTION_KEY` está en el `.env` del servidor y **debe respaldarse aparte**: los respaldos de la base no la incluyen, y sin ella los adjuntos no se pueden leer.
+
 ## Arranque con Docker Compose (local)
 
 Requisitos: Docker Desktop con Compose v2 y los puertos 6010/6011 libres. Estos puertos no chocan con Tavixo (6000/6001).
@@ -419,6 +432,10 @@ La API escucha en 127.0.0.1:6010 y Next en 127.0.0.1:6011. `WEB_ORIGIN` debe coi
 | POST | /api/video/link/info · join · heartbeat | Enlace firmado del correo + Origin |
 | GET · POST | /api/patient/appointments/:id/video · video/join · video/heartbeat | Paciente |
 | GET · POST | /api/clinic/appointments/:id/video · video/join | Médico de la cita, propietario o administración |
+| GET · PATCH · POST | /api/clinic/patients/:id/record (profile, allergies, notes, notes/:id/sign, prescriptions, prescriptions/:id/pdf · void, files, log) | Médico tratante o personal autorizado; escribe sólo un médico |
+| GET | /api/clinic/icd10?q= · /api/clinic/clinical-audit | Personal clínico · propietario |
+| PATCH | /api/clinic/members/:id/clinical-access | Propietario |
+| GET | /api/public/prescriptions/:code | Público (verificación de recetas) |
 | POST | /api/public/reviews/inspect · /api/public/reviews | Público con el token de la invitación; Origin |
 | GET | /api/public/reviews/clinics/:slug/doctors/:doctorSlug?page | Público: opiniones publicadas (10 por página) |
 | POST | /api/patient/appointments/:id/review | Paciente: opinar sobre su cita atendida |

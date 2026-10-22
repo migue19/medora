@@ -296,7 +296,8 @@ export class SchedulingController {
         where: { id: membershipId, clinicId }, include: { doctor: { select: { id: true } } },
       });
       if (!m) throw new NotFoundException('Integrante no encontrado');
-      if (m.role !== 'DOCTOR') throw new BadRequestException('Sólo se puede vincular un integrante con rol DOCTOR');
+      // El propietario o la administración también pueden ser médicos (consultorios pequeños); recepción no.
+      if (m.role === 'RECEPTION') throw new BadRequestException('Recepción no puede tener un perfil de médico');
       if (m.doctor && m.doctor.id !== doctorId) throw new ConflictException('Ese integrante ya tiene un perfil de médico');
     }
     const unique = [...new Set(serviceIds)];

@@ -63,7 +63,7 @@ export class VideoService {
   info(a: NonNullable<VideoAppointment>, now = new Date()) {
     const { opensAt, closesAt } = this.window(a);
     return {
-      appointmentId: a.id, status: a.status, modality: a.modality, startsAt: a.startsAt, endsAt: a.endsAt,
+      appointmentId: a.id, clinicPatientId: a.clinicPatientId, status: a.status, modality: a.modality, startsAt: a.startsAt, endsAt: a.endsAt,
       serviceName: a.serviceName, clinic: { name: a.clinic.name, timezone: a.clinic.timezone, phone: a.clinic.phone },
       doctor: { displayName: a.doctor.displayName, specialty: a.doctor.specialty }, patientName: a.clinicPatient.name,
       opensAt, closesAt, open: now >= opensAt && now <= closesAt,

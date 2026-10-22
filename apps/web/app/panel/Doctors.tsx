@@ -138,7 +138,7 @@ function DoctorForm({ doctor, services, members, onDone, canPhoto }: { doctor: D
   const [serviceIds, setServiceIds] = useState<string[]>(doctor?.serviceIds ?? []);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const doctorMembers = members.filter((m) => m.role === 'DOCTOR' && m.active && (!m.doctor || m.doctor.id === doctor?.id));
+  const doctorMembers = members.filter((m) => m.role !== 'RECEPTION' && m.active && (!m.doctor || m.doctor.id === doctor?.id));
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -172,7 +172,7 @@ function DoctorForm({ doctor, services, members, onDone, canPhoto }: { doctor: D
             <input name="slug" required minLength={2} maxLength={80} pattern="[a-z0-9]+(-[a-z0-9]+)*" defaultValue={doctor.slug} autoCapitalize="none" />
           </label>
         )}
-        <label>Usuario vinculado (rol Médico)
+        <label>Usuario vinculado (quien atiende con este perfil)
           <select name="membershipId" defaultValue={doctor?.membership?.id ?? ''}>
             <option value="">Sin usuario</option>
             {doctorMembers.map((m) => <option key={m.id} value={m.id}>{m.user.name} · {m.user.email}</option>)}

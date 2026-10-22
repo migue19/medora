@@ -93,6 +93,20 @@ export class Session<T = unknown> {
   patch = <R = any>(p: string, b: unknown) => this.request<R>('PATCH', p, b);
   put = <R = any>(p: string, b: unknown) => this.request<R>('PUT', p, b);
   del = <R = any>(p: string) => this.request<R>('DELETE', p);
+
+  /** Petición autenticada sin JSON (archivos): descarga un blob o sube un formulario multipart. */
+  async raw(method: 'GET' | 'POST', path: string, body?: FormData, retry = true): Promise<Response> {
+    const res = await fetch(path, {
+      method, body, credentials: 'same-origin', cache: 'no-store',
+      headers: this.token ? { authorization: `Bearer ${this.token}` } : {},
+    }).catch(() => { throw new ApiError(0, 'Sin conexión. Revisa tu red e inténtalo de nuevo.'); });
+    if (res.status === 401 && retry && await this.refresh()) return this.raw(method, path, body, false);
+    if (!res.ok) {
+      const json = safeJson(await res.text());
+      throw new ApiError(res.status, json && typeof json.message === 'string' ? json.message : `Error ${res.status}`);
+    }
+    return res;
+  }
 }
 
 function safeJson(t: string) {

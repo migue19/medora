@@ -108,7 +108,7 @@ export class ClinicController {
       orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
     });
     return rows.map((m) => ({
-      id: m.id, role: m.role, active: m.active, createdAt: m.createdAt,
+      id: m.id, role: m.role, active: m.active, createdAt: m.createdAt, clinicalAccess: m.clinicalAccess,
       user: { id: m.user.id, name: m.user.name, email: m.user.email },
       doctor: m.doctor,
     }));
@@ -219,7 +219,7 @@ export class ClinicController {
       if (!target) throw new NotFoundException('Integrante no encontrado');
       if (!allowed.includes(target.role)) throw new ForbiddenException('No puedes modificar a este integrante');
       if (dto.role && !allowed.includes(dto.role)) throw new ForbiddenException('No puedes asignar ese rol');
-      if (dto.role && dto.role !== 'DOCTOR' && target.doctor) {
+      if (dto.role === 'RECEPTION' && target.doctor) {
         throw new ConflictException('Desvincula primero el perfil de médico');
       }
       const updated = await tx.membership.update({
