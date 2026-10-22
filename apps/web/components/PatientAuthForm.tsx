@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
 import { ApiError, errorMessage, patientSession } from '@/lib/api';
+import { PasswordInput } from './PasswordInput';
 
 export function PatientAuthForm({ onDone }: { onDone?: () => void }) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -44,7 +45,7 @@ export function PatientAuthForm({ onDone }: { onDone?: () => void }) {
       )}
       <label>Correo electrónico<input name="email" type="email" required autoComplete="email" /></label>
       <label>Contraseña
-        <input name="password" type="password" required minLength={mode === 'register' ? 10 : 1}
+        <PasswordInput name="password" required minLength={mode === 'register' ? 10 : 1}
           autoComplete={mode === 'register' ? 'new-password' : 'current-password'} />
       </label>
       {mode === 'register' && (

@@ -2,6 +2,7 @@
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { errorMessage, staffSession } from '@/lib/api';
+import { PasswordInput } from '@/components/PasswordInput';
 
 export function Account() {
   const router = useRouter();
@@ -20,9 +21,9 @@ export function Account() {
   return (
     <form className="card stack narrow" onSubmit={submit}>
       <h3>Cambiar contraseña</h3>
-      <label>Contraseña actual<input name="currentPassword" type="password" required autoComplete="current-password" /></label>
-      <label>Nueva contraseña<input name="newPassword" type="password" required minLength={12} autoComplete="new-password" /></label>
-      <label>Confirmar<input name="confirm" type="password" required minLength={12} autoComplete="new-password" /></label>
+      <label>Contraseña actual<PasswordInput name="currentPassword" required autoComplete="current-password" /></label>
+      <label>Nueva contraseña<PasswordInput name="newPassword" required minLength={12} autoComplete="new-password" /></label>
+      <label>Confirmar<PasswordInput name="confirm" required minLength={12} autoComplete="new-password" /></label>
       <p className="muted small">Al cambiarla se cierran todas tus sesiones.</p>
       {msg && <div className="alert error">{msg}</div>}
       <div><button className="primary">Cambiar</button></div>

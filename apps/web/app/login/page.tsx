@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Header } from '@/components/Header';
 import { ApiError, errorMessage, staffSession } from '@/lib/api';
+import { PasswordInput } from '@/components/PasswordInput';
 
 export default function StaffLogin() {
   const router = useRouter();
@@ -38,7 +39,7 @@ export default function StaffLogin() {
           <label>Clínica (identificador)<input name="clinicSlug" required pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="mi-clinica" autoCapitalize="none"
             value={slug} onChange={(e) => setSlug(e.target.value)} /></label>
           <label>Correo<input name="email" type="email" required autoComplete="username" /></label>
-          <label>Contraseña<input name="password" type="password" required autoComplete="current-password" /></label>
+          <label>Contraseña<PasswordInput name="password" required autoComplete="current-password" /></label>
           {error && <div className="alert error" role="alert">{error}</div>}
           <button className="primary" disabled={busy}>{busy ? 'Entrando…' : 'Entrar'}</button>
           <p className="small"><Link href="/recuperar?tipo=personal">¿Olvidaste tu contraseña?</Link></p>

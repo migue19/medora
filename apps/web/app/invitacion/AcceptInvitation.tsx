@@ -5,6 +5,7 @@ import { Header } from '@/components/Header';
 import { Session, errorMessage } from '@/lib/api';
 import { ROLE_LABEL } from '@/lib/format';
 import { takeLinkToken } from '@/lib/link-token';
+import { PasswordInput } from '@/components/PasswordInput';
 
 const anon = new Session('patient');
 
@@ -66,8 +67,8 @@ export function AcceptInvitation() {
                   <p className="muted small">Ya tienes una cuenta de Medora con este correo: entrarás con tu contraseña actual.</p>
                 ) : (
                   <>
-                    <label>Crea tu contraseña<input name="password" type="password" required minLength={12} maxLength={200} autoComplete="new-password" /></label>
-                    <label>Confirmar<input name="confirm" type="password" required minLength={12} maxLength={200} autoComplete="new-password" /></label>
+                    <label>Crea tu contraseña<PasswordInput name="password" required minLength={12} maxLength={200} autoComplete="new-password" /></label>
+                    <label>Confirmar<PasswordInput name="confirm" required minLength={12} maxLength={200} autoComplete="new-password" /></label>
                     <p className="muted small">Mínimo 12 caracteres. Nadie más la conocerá, ni siquiera la clínica.</p>
                   </>
                 )}

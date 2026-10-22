@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Header } from '@/components/Header';
 import { Session, errorMessage, patientSession, staffSession } from '@/lib/api';
 import { Audience, audienceFromQuery, takeLinkToken } from '@/lib/link-token';
+import { PasswordInput } from '@/components/PasswordInput';
 
 const anon = new Session('patient');
 
@@ -57,8 +58,8 @@ export function ResetPassword() {
             </>
           ) : (
             <form className="stack" onSubmit={submit}>
-              <label>Nueva contraseña<input name="password" type="password" required minLength={minLength} maxLength={200} autoComplete="new-password" /></label>
-              <label>Confirmar<input name="confirm" type="password" required minLength={minLength} maxLength={200} autoComplete="new-password" /></label>
+              <label>Nueva contraseña<PasswordInput name="password" required minLength={minLength} maxLength={200} autoComplete="new-password" /></label>
+              <label>Confirmar<PasswordInput name="confirm" required minLength={minLength} maxLength={200} autoComplete="new-password" /></label>
               <p className="muted small">Mínimo {minLength} caracteres. Al cambiarla se cerrarán todas tus sesiones.</p>
               {error && (
                 <div className="alert error" role="alert">
