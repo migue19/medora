@@ -87,8 +87,9 @@ function Payments({ clinic, onSaved }: { clinic: Clinic; onSaved: (c: Clinic) =>
     const f = new FormData(e.currentTarget);
     setMsg(null);
     try {
-      const updated = await staffSession.patch<Clinic>('/api/clinic', {
-        paymentMode: f.get('paymentMode'), depositPercent: Number(f.get('depositPercent')),
+      // Con «No cobrar en línea» los demás campos no se muestran: se conserva lo configurado.
+      const updated = await staffSession.patch<Clinic>('/api/clinic', mode === 'OFF' ? { paymentMode: 'OFF' } : {
+        paymentMode: mode, depositPercent: Number(f.get('depositPercent')),
         refundMinMinutes: Math.round(Number(f.get('refundHours')) * 60), asyncPaymentsEnabled: f.get('async') === 'on',
       });
       onSaved(updated);
