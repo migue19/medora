@@ -107,7 +107,9 @@ Entregado con Stripe Checkout (cuenta de Medora). Con pago obligatorio, la reser
 - Webhooks idempotentes y conciliación de pagos con citas.
 - **Terminado cuando**: un pago aprobado confirma la cita, un webhook repetido no duplica nada y los reembolsos siguen la política de la clínica.
 
-### Sprint 10 · Telemedicina
+### Sprint 10 · Telemedicina ✅
+
+Entregado con Daily. En servicios marcados «También por videoconsulta», el paciente elige al reservar (o recepción al agendar) si la cita es por video. Cada cita tiene una sala privada que sólo abre de 15 min antes a 30 min después, con pases por persona; se entra desde el navegador con prueba de cámara y micrófono, con consentimiento informado registrado y aviso al médico en la agenda cuando el paciente está esperando. Detalle en [SPRINT10_RESULTS.md](SPRINT10_RESULTS.md).
 
 - Servicios marcados como videoconsulta, con una sala por cita a través de un proveedor (Daily, Twilio o Jitsi autohospedado) y enlaces que caducan.
 - Sala de espera virtual, prueba de cámara y micrófono y aviso al médico cuando el paciente entra.
@@ -287,6 +289,22 @@ Reglas:
 - **Conciliación:** la pestaña «Pagos» muestra lo cobrado, lo reembolsado y el neto a transferir a cada clínica, con un botón «Conciliar» que vuelve a consultar Stripe. Al vencer un apartado también se consulta Stripe, por si se perdió un webhook.
 - **Sin pago en línea:** las reservas desde la lista de espera y las que captura recepción no piden pago en línea.
 
+## Videoconsultas (Daily)
+
+Opcional. Sin `DAILY_API_KEY` las videoconsultas quedan desactivadas (los servicios no ofrecen la opción).
+
+1. Crea una cuenta en [daily.co](https://dashboard.daily.co) (10,000 minutos al mes gratis; después ~$0.004 USD por minuto por participante) y copia la llave en *Developers → API keys*.
+2. Guárdala en el servidor y reinicia la API: `ssh -t root@82.180.139.70 /opt/medora/scripts/set-daily-key.sh`.
+3. En el panel, «Servicios»: marca «También por videoconsulta» en los servicios que se pueden dar por video.
+
+Cómo funciona:
+
+- **Reserva:** el paciente elige «En la clínica» o «Por videoconsulta»; recepción también puede agendarla por video.
+- **Enlaces:** la confirmación y los recordatorios traen «Entrar a la videoconsulta». Es un enlace firmado que sólo abre la sala de esa cita, y sólo dentro de su ventana; también se entra desde «Mis citas».
+- **Sala:** privada por cita, de 15 min antes a 30 min después, sin grabación. Cada persona entra con su propio pase y el médico como anfitrión.
+- **Antes de entrar:** prueba de cámara y micrófono, y la primera vez el consentimiento para la consulta a distancia (se guarda la fecha y la versión del texto).
+- **Médico:** la agenda se actualiza sola, marca «Paciente en sala de espera» y muestra el número de pacientes esperando en el título de la pestaña. Al terminar, el médico la marca como atendida como cualquier cita.
+
 ## Arranque con Docker Compose (local)
 
 Requisitos: Docker Desktop con Compose v2 y los puertos 6010/6011 libres. Estos puertos no chocan con Tavixo (6000/6001).
@@ -398,6 +416,9 @@ La API escucha en 127.0.0.1:6010 y Next en 127.0.0.1:6011. `WEB_ORIGIN` debe coi
 | POST | /api/patient/appointments/:id/checkout | Paciente: abre (o reutiliza) la página de pago de Stripe |
 | POST | /api/payments/stripe/webhook | Stripe (firma `Stripe-Signature`) |
 | GET · POST | /api/clinic/payments · :id/sync · :id/manual-refund | Propietario o administración: conciliación |
+| POST | /api/video/link/info · join · heartbeat | Enlace firmado del correo + Origin |
+| GET · POST | /api/patient/appointments/:id/video · video/join · video/heartbeat | Paciente |
+| GET · POST | /api/clinic/appointments/:id/video · video/join | Médico de la cita, propietario o administración |
 | POST | /api/public/reviews/inspect · /api/public/reviews | Público con el token de la invitación; Origin |
 | GET | /api/public/reviews/clinics/:slug/doctors/:doctorSlug?page | Público: opiniones publicadas (10 por página) |
 | POST | /api/patient/appointments/:id/review | Paciente: opinar sobre su cita atendida |

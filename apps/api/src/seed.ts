@@ -16,7 +16,7 @@ function env(name: string, fallback?: string): string {
 }
 
 async function main() {
-  const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: env('DATABASE_URL') }) });
+  const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: env('DATABASE_URL'), options: '-c TimeZone=UTC' }) });
   try {
     const slug = env('SEED_CLINIC_SLUG');
     const clinicName = env('SEED_CLINIC_NAME');

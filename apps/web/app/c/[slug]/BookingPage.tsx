@@ -13,6 +13,8 @@ import { fmtDate, fmtTime, money, todayIn, uuid, weeklyLabel } from '@/lib/forma
 interface Service {
   id: string; name: string; durationMinutes: number; priceCents: number; visitType: 'ANY' | 'FIRST' | 'FOLLOW_UP';
   priceByLocation: Record<string, number>;
+  /** También se ofrece por videoconsulta. */
+  telemedicine?: boolean;
 }
 interface Doctor {
   id: string; displayName: string; slug: string; specialty: string; licenseNumber: string | null; bio: string | null;
@@ -82,6 +84,7 @@ export function BookingPage({ slug, initialProfile, doctorSlug, embedded = false
   const [locationId, setLocationId] = useState<string | null>(null);
   const [slot, setSlot] = useState<{ startsAt: string; time: string } | null>(null);
   const [notes, setNotes] = useState('');
+  const [modality, setModality] = useState<'IN_PERSON' | 'VIDEO'>('IN_PERSON');
   const [requestId, setRequestId] = useState(uuid);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -135,7 +138,7 @@ export function BookingPage({ slug, initialProfile, doctorSlug, embedded = false
   );
 
   function chooseDoctor(d: Doctor, s: Service) {
-    setDoctor(d); setService(s); setSlot(null); setError(null); setBooked(null); setRequestId(uuid());
+    setDoctor(d); setService(s); setSlot(null); setError(null); setBooked(null); setRequestId(uuid()); setModality('IN_PERSON');
     // Si atiende en una sola sede, queda elegida; si atiende en varias, el paciente la elige.
     setLocationId(d.locationIds.length === 1 ? d.locationIds[0] : null);
   }
@@ -149,6 +152,7 @@ export function BookingPage({ slug, initialProfile, doctorSlug, embedded = false
     try {
       const res = await patientSession.post(`/api/public/clinics/${encodeURIComponent(slug)}/appointments`, {
         requestId, doctorId: doctor.id, serviceId: service.id, startsAt: slot.startsAt, notes: notes.trim() || null, channel,
+        modality: service.telemedicine ? modality : undefined,
       });
       setBooked({ id: res.appointment.id, startsAt: res.appointment.startsAt, status: res.appointment.status });
       // Pago obligatorio: la cita queda apartada y se paga en Stripe para confirmarla.
@@ -225,7 +229,7 @@ export function BookingPage({ slug, initialProfile, doctorSlug, embedded = false
             <h2>{doctor?.displayName}</h2>
             <p>{service?.name} · {priceLabel(service!, locationId)}</p>
             {place(locationId) && <p className="small">{place(locationId)!.name}{place(locationId)!.address ? ` · ${place(locationId)!.address}` : ''}</p>}
-            <p><strong>{fmtDate(booked.startsAt, tz)}</strong> a las <strong>{fmtTime(booked.startsAt, tz)}</strong> (hora de la clínica)</p>
+            <p><strong>{fmtDate(booked.startsAt, tz)}</strong> a las <strong>{fmtTime(booked.startsAt, tz)}</strong> (hora de la clínica){modality === 'VIDEO' && service?.telemedicine ? ' · Videoconsulta' : ''}</p>
             {booked.status === 'PENDING_PAYMENT' ? (
               <>
                 {error && <div className="alert error" role="alert">{error}</div>}
@@ -323,6 +327,14 @@ export function BookingPage({ slug, initialProfile, doctorSlug, embedded = false
                     {place(locationId)!.mapUrl && <> · <a href={place(locationId)!.mapUrl!} target="_blank" rel="noreferrer">Mapa</a></>}</p>
                 )}
                 <p>{fmtDate(slot.startsAt, tz)} · {slot.time} h</p>
+                {service.telemedicine && (
+                  <fieldset className="row" style={{ border: 0, padding: 0, margin: 0 }}>
+                    <legend className="small" style={{ fontWeight: 600 }}>¿Cómo quieres tu consulta?</legend>
+                    <label className="check"><input type="radio" name="modalidad" checked={modality === 'IN_PERSON'} onChange={() => { setModality('IN_PERSON'); setRequestId(uuid()); }} />En la clínica</label>
+                    <label className="check"><input type="radio" name="modalidad" checked={modality === 'VIDEO'} onChange={() => { setModality('VIDEO'); setRequestId(uuid()); }} />Por videoconsulta</label>
+                  </fieldset>
+                )}
+                {modality === 'VIDEO' && <p className="small muted">Entras desde tu celular o computadora, sin instalar nada. Te mandamos el enlace por correo y también lo verás en «Mis citas».</p>}
                 {!patient ? (
                   <div className="stack">
                     <p className="muted">Inicia sesión o crea tu cuenta para confirmar.</p>

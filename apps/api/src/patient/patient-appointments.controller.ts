@@ -59,7 +59,7 @@ export class PatientAppointmentsController {
       id: a.id, startsAt: a.startsAt, endsAt: a.endsAt, status: a.status, serviceId: a.serviceId,
       serviceName: a.serviceName, durationMinutes: a.durationMinutes, priceCents: a.priceCents,
       patientNotes: a.patientNotes, cancelReason: a.cancelReason, clinic, doctor: a.doctor, location: a.location,
-      payment, paymentDueAt: a.paymentDueAt,
+      payment, paymentDueAt: a.paymentDueAt, modality: a.modality,
       // Pagar en línea: obligatorio mientras está apartada; opcional si la clínica lo ofrece y aún no se pagó.
       canPay: this.payments.available && deposit !== null && a.startsAt > now && (a.status === 'PENDING_PAYMENT'
         || (a.status === 'BOOKED' && paymentMode !== 'OFF' && (!payment || payment.status === 'OPEN' || payment.status === 'PROCESSING'))),

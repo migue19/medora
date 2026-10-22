@@ -9,6 +9,7 @@ import {
   AppointmentEmailKind, RenderedEmail, appointmentEmail, patientLinkRequest, resetPassword, staffInvitation, verifyEmail,
   onboardingSubmitted, ownerActivation, refundEmail, reviewInvitation, reviewModerated, waitlistOffer,
 } from './templates';
+import { videoLinkToken } from '../video/link';
 
 /**
  * Arma los correos y los encola en la transacción del cambio que los origina.
@@ -117,6 +118,7 @@ export class MailService {
       portalLink: a.clinicPatient.patientAccountId ? this.link('/paciente') : null,
       paidCents: kind !== 'CANCELLED' && paid?.status === 'PAID' ? paid.amountCents : null,
       refundCents: kind === 'CANCELLED' && paid ? (paid.status === 'PAID' ? 0 : paid.amountCents) : null,
+      videoLink: a.modality === 'VIDEO' ? this.link('/consulta', videoLinkToken(this.config.jwtSecret, a.id)) : null,
     });
     // La secuencia del evento de calendario crece con cada cambio de la cita.
     const sequence = await tx.appointmentEvent.count({

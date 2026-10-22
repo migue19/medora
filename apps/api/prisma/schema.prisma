@@ -1,4 +1,4 @@
-// Medora · Sprint 9
+// Medora · Sprint 10
 // Todas las entidades de negocio llevan clinicId y se consultan siempre
 // filtradas por la clínica obtenida de la sesión.
 
@@ -43,6 +43,12 @@ enum ActorKind {
   PATIENT
   // Procesos automáticos (vencimiento de pagos).
   SYSTEM
+}
+
+enum AppointmentModality {
+  IN_PERSON
+  // Videoconsulta: sala de Daily por cita.
+  VIDEO
 }
 
 enum PaymentMode {
@@ -411,6 +417,13 @@ model Appointment {
   channel         String?           @db.VarChar(20)
   // Pago obligatorio: si no se paga antes, la cita se cancela y el horario se libera.
   paymentDueAt    DateTime?         @db.Timestamptz(3)
+  modality        AppointmentModality @default(IN_PERSON)
+  // Videoconsulta: consentimiento informado del paciente (versión del texto aceptado) y presencia en la sala.
+  videoConsentAt      DateTime?     @db.Timestamptz(3)
+  videoConsentVersion String?       @db.VarChar(20)
+  patientJoinedAt     DateTime?     @db.Timestamptz(3)
+  patientSeenAt       DateTime?     @db.Timestamptz(3)
+  doctorJoinedAt      DateTime?     @db.Timestamptz(3)
   // Sede y consultorio del bloque del horario en que cae la cita.
   locationId      String            @db.Uuid
   roomId          String?           @db.Uuid

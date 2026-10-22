@@ -110,6 +110,8 @@ export interface AppointmentEmailData {
   paidCents?: number | null;
   /** Al cancelar una cita pagada: monto que se reembolsa, o 0 si la política no lo permite. */
   refundCents?: number | null;
+  /** Videoconsulta: enlace a la sala (en lugar de la dirección). */
+  videoLink?: string | null;
 }
 
 export function formatWhen(date: Date, timezone: string): string {
@@ -144,7 +146,8 @@ export function appointmentEmail(p: AppointmentEmailData): RenderedEmail {
     ...(p.kind === 'CANCELLED' && p.refundCents != null
       ? [{ label: 'Reembolso', value: p.refundCents > 0 ? `${formatPrice(p.refundCents)} a tu método de pago (5 a 10 días hábiles)` : 'No aplica: se canceló fuera del plazo de reembolso de la clínica' }]
       : []),
-    ...(p.clinic.address ? [{ label: 'Dirección', value: p.clinic.address }] : []),
+    ...(p.videoLink ? [{ label: 'Modalidad', value: 'Videoconsulta (desde tu celular o computadora, sin instalar nada)' }]
+      : p.clinic.address ? [{ label: 'Dirección', value: p.clinic.address }] : []),
     ...(p.clinic.phone ? [{ label: 'Teléfono', value: p.clinic.phone }] : []),
     ...(p.kind === 'CANCELLED' && p.reason ? [{ label: 'Motivo', value: p.reason }] : []),
   ];
@@ -159,8 +162,11 @@ export function appointmentEmail(p: AppointmentEmailData): RenderedEmail {
     greeting: `Hola, ${p.patientName}:`,
     paragraphs: [intro],
     details,
-    action: p.portalLink ? { label: 'Ver mis citas', url: p.portalLink } : undefined,
-    footer,
+    action: p.videoLink && p.kind !== 'CANCELLED' ? { label: 'Entrar a la videoconsulta', url: p.videoLink }
+      : p.portalLink ? { label: 'Ver mis citas', url: p.portalLink } : undefined,
+    footer: p.videoLink && p.kind !== 'CANCELLED'
+      ? [`La sala abre 15 minutos antes de la cita. Ten a la mano un lugar privado, buena conexión y cámara y micrófono.`, ...footer]
+      : footer,
   });
 }
 
@@ -173,17 +179,22 @@ export function reminderEmail(p: {
   link: string;
   /** Fecha límite para cancelar en línea; null si ya pasó. */
   cancelUntil: Date | null;
+  /** Videoconsulta: enlace a la sala. */
+  videoLink?: string | null;
 }): RenderedEmail {
   const when = formatWhen(p.startsAt, p.clinic.timezone);
   return layout({
     subject: `Recordatorio de tu cita: ${when}`,
     greeting: `Hola, ${p.patientName}:`,
-    paragraphs: [`Te recordamos tu cita en ${p.clinic.name}. Confírmanos si vas a asistir.`],
+    paragraphs: [
+      `Te recordamos tu cita en ${p.clinic.name}. Confírmanos si vas a asistir.`,
+      ...(p.videoLink ? [`Es una videoconsulta. Entra aquí 15 minutos antes: ${p.videoLink}`] : []),
+    ],
     details: [
       { label: 'Fecha', value: when },
       { label: 'Médico', value: p.doctorName },
       { label: 'Servicio', value: p.serviceName },
-      ...(p.clinic.address ? [{ label: 'Dirección', value: p.clinic.address }] : []),
+      ...(p.videoLink ? [{ label: 'Modalidad', value: 'Videoconsulta' }] : p.clinic.address ? [{ label: 'Dirección', value: p.clinic.address }] : []),
       ...(p.clinic.phone ? [{ label: 'Teléfono', value: p.clinic.phone }] : []),
     ],
     action: { label: 'Confirmar o cancelar', url: p.link },

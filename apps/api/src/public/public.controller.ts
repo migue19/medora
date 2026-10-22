@@ -12,6 +12,7 @@ import { AppointmentsService } from '../appointments/appointments.service';
 import { RateLimiter } from '../common/rate-limit';
 import { clientIp } from '../common/http';
 import { PaymentsService } from '../payments/payments.service';
+import { VideoService } from '../video/video.service';
 import { MIN_CHARGE_CENTS } from '../payments/policy';
 
 const emptyToNull = ({ value }: { value: unknown }) =>
@@ -35,6 +36,7 @@ class BookDto {
   @IsISO8601({ strict: true }) startsAt: string;
   @IsOptional() @Transform(emptyToNull) @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(500)
   notes?: string | null;
+  @IsOptional() @IsIn(['IN_PERSON', 'VIDEO']) modality?: 'IN_PERSON' | 'VIDEO';
 }
 
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -47,6 +49,7 @@ export class PublicController {
     private readonly appointments: AppointmentsService,
     private readonly reviews: ReviewsService,
     private readonly payments: PaymentsService,
+    private readonly video: VideoService,
   ) {}
 
   private async clinic(slug: string) {
@@ -83,6 +86,8 @@ export class PublicController {
       const locationIds = [...new Set(d.scheduleRules.map((r) => r.locationId))];
       const services = await Promise.all(d.services.map(async ({ service: s }) => ({
         id: s.id, name: s.name, durationMinutes: s.durationMinutes, priceCents: s.priceCents, visitType: s.visitType,
+        // Videoconsulta sólo si el servicio la ofrece y Medora tiene salas configuradas.
+        telemedicine: s.telemedicine && this.video.available,
         priceByLocation: await pricesFor(this.prisma, s, d.id, locationIds),
       })));
       return { d, locationIds, services };
@@ -152,7 +157,7 @@ export class PublicController {
     const { appointment, replayed } = await this.appointments.book({
       clinicId: clinic.id, doctorId: dto.doctorId, serviceId: dto.serviceId, clinicPatientId: clinicPatient.id,
       startsAt: new Date(dto.startsAt), notes: dto.notes ?? null, source: 'ONLINE', requestId: dto.requestId,
-      actor: { kind: 'PATIENT', id: patient.id, name: patient.name }, channel: dto.channel ?? 'web',
+      actor: { kind: 'PATIENT', id: patient.id, name: patient.name }, channel: dto.channel ?? 'web', modality: dto.modality,
     });
     return { appointment, replayed };
   }

@@ -8,6 +8,7 @@ import { formatWhen, reminderEmail } from '../mail/templates';
 import { placeOf } from '../mail/mail.service';
 import { randomToken, sha256 } from '../common/crypto';
 import { WHATSAPP_TRANSPORT, WhatsAppTransport, toWhatsAppNumber } from './whatsapp.transport';
+import { videoLinkToken } from '../video/link';
 
 export const REMINDER_JOB = 'reminder.send';
 /** No se programa un recordatorio que debería salir en menos de este margen. */
@@ -127,6 +128,7 @@ export class RemindersService implements OnModuleInit {
           startsAt: a.startsAt,
           link: `${this.config.webOrigin}/cita#${token}`,
           cancelUntil: cancelUntil > now ? cancelUntil : null,
+          videoLink: a.modality === 'VIDEO' ? `${this.config.webOrigin}/consulta#${videoLinkToken(this.config.jwtSecret, a.id)}` : null,
         });
         await this.mail.send({
           to: recipient, ...rendered, messageId: `<reminder-${a.id}-${p.offsetMinutes}-${a.startsAt.getTime()}@medora>`,

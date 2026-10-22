@@ -16,6 +16,9 @@ import { DirectoryService } from './directory/directory.service';
 import { PaymentsService } from './payments/payments.service';
 import { ClinicPaymentsController, PatientPaymentsController, PaymentWebhookController } from './payments/payments.controller';
 import { PAYMENT_GATEWAY, PaymentGateway, createGateway } from './payments/gateway';
+import { VIDEO_PROVIDER, VideoProvider, createVideo } from './video/video.provider';
+import { VideoService } from './video/video.service';
+import { PatientVideoController, StaffVideoController, VideoLinkController } from './video/video.controller';
 import { HealthController } from './health.controller';
 import { AuthTokensService } from './auth/auth-tokens.service';
 import { InvitationsController } from './auth/invitations.controller';
@@ -39,6 +42,7 @@ export interface Transports {
   mail?: MailTransport;
   whatsapp?: WhatsAppTransport;
   payments?: PaymentGateway;
+  video?: VideoProvider;
 }
 
 export function buildAppModule(config: AppConfig = loadConfig(), transports: Transports = {}) {
@@ -49,6 +53,7 @@ export function buildAppModule(config: AppConfig = loadConfig(), transports: Tra
       AppointmentActionsController, PatientsController, PatientLinksController, StaffWaitlistController,
       PatientWaitlistController, LocationsController, DoctorPhotoController, SitemapController, DirectoryController,
       PatientPaymentsController, PaymentWebhookController, ClinicPaymentsController,
+      VideoLinkController, PatientVideoController, StaffVideoController,
       PublicReviewsController, PatientReviewsController, StaffReviewsController, OnboardingController,
     ],
     providers: [
@@ -56,8 +61,9 @@ export function buildAppModule(config: AppConfig = loadConfig(), transports: Tra
       { provide: MAIL_TRANSPORT, useValue: transports.mail ?? createTransport(config.mail) },
       { provide: WHATSAPP_TRANSPORT, useValue: transports.whatsapp ?? createWhatsApp(config.whatsapp) },
       { provide: PAYMENT_GATEWAY, useValue: transports.payments ?? createGateway(config.payments) },
+      { provide: VIDEO_PROVIDER, useValue: transports.video ?? createVideo(config.video) },
       PrismaService, TokensService, StaffGuard, PatientGuard, AppointmentsService,
-      AuthTokensService, JobsService, MailService, RemindersService, PatientsService, WaitlistService, ReviewsService, OnboardingService, DirectoryService, PaymentsService,
+      AuthTokensService, JobsService, MailService, RemindersService, PatientsService, WaitlistService, ReviewsService, OnboardingService, DirectoryService, PaymentsService, VideoService,
     ],
   })
   class AppModule {}

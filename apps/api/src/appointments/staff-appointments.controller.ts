@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma.service';
 import { Roles, Staff, StaffContext, StaffGuard } from '../auth/guards';
 import { Actor, AppointmentsService } from './appointments.service';
 import { PaymentSummary, PaymentsService } from '../payments/payments.service';
+import { VideoService } from '../video/video.service';
 import { parseLocalDate } from '../scheduling/availability';
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
@@ -39,6 +40,7 @@ class StaffBookDto {
   notes?: string | null;
   /** Cita atendida de la que esta es subsecuente. */
   @IsOptional() @IsUUID() followUpOfId?: string;
+  @IsOptional() @IsIn(['IN_PERSON', 'VIDEO']) modality?: 'IN_PERSON' | 'VIDEO';
 }
 
 class CancelDto {
@@ -144,7 +146,7 @@ export class StaffAppointmentsController {
     const { appointment } = await this.appointments.book({
       clinicId: staff.clinicId, doctorId: dto.doctorId, serviceId: dto.serviceId, clinicPatientId: patient.id,
       startsAt: new Date(dto.startsAt), notes: dto.notes ?? null, source: 'STAFF', requestId: dto.requestId,
-      actor: actorOf(staff), followUpOfId: dto.followUpOfId ?? null,
+      actor: actorOf(staff), followUpOfId: dto.followUpOfId ?? null, modality: dto.modality,
     });
     return appointment;
   }
@@ -195,6 +197,7 @@ type Row = {
   id: string; startsAt: Date; endsAt: Date; status: string; source: string; serviceName: string;
   durationMinutes: number; priceCents: number; patientNotes: string | null; cancelReason: string | null;
   createdAt: Date; serviceId: string; confirmedAt: Date | null; followUpOfId: string | null; paymentDueAt: Date | null;
+  modality: string; patientSeenAt: Date | null; doctorJoinedAt: Date | null;
   location: { id: string; name: string }; room: { id: string; name: string } | null; channel: string | null;
   notifications: { channel: string; offsetMinutes: number | null; status: string; error: string | null; createdAt: Date; startsAt: Date }[];
   doctor: { id: string; displayName: string };
@@ -204,6 +207,7 @@ type Row = {
 function serialize(a: Row, payment?: PaymentSummary) {
   return {
     payment: payment ?? null, paymentDueAt: a.paymentDueAt,
+    modality: a.modality, patientWaiting: VideoService.waiting(a), doctorJoinedAt: a.doctorJoinedAt,
     id: a.id, startsAt: a.startsAt, endsAt: a.endsAt, status: a.status, source: a.source,
     serviceId: a.serviceId, serviceName: a.serviceName, durationMinutes: a.durationMinutes, priceCents: a.priceCents,
     patientNotes: a.patientNotes, cancelReason: a.cancelReason, createdAt: a.createdAt, confirmedAt: a.confirmedAt,

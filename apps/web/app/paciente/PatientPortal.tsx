@@ -20,6 +20,7 @@ interface Appt {
   payment?: { status: string; amountCents: number; refundedCents: number; method: string | null } | null;
   paymentDueAt?: string | null; canPay?: boolean; depositCents?: number | null; refundOnCancel?: boolean | null;
   canCancelPending?: boolean;
+  modality?: 'IN_PERSON' | 'VIDEO';
 }
 
 export function PatientPortal() {
@@ -108,6 +109,12 @@ export function PatientPortal() {
                           Tu horario está apartado. Paga {a.depositCents ? money(a.depositCents) : ''}{a.paymentDueAt ? ` antes de las ${fmtTime(a.paymentDueAt, a.clinic.timezone)}` : ''} para confirmarlo; si no, se libera.
                         </div>
                       )}
+                      {a.modality === 'VIDEO' && a.status === 'BOOKED' && (
+                        <div className="row">
+                          <Link className="btn primary" href={`/consulta?cita=${a.id}`}>Entrar a la videoconsulta</Link>
+                          <span className="small muted">La sala abre 15 minutos antes.</span>
+                        </div>
+                      )}
                       {a.canPay && (
                         <div className="row">
                           <button className="primary" onClick={() => pay(a)}>{a.status === 'PENDING_PAYMENT' ? 'Pagar y confirmar' : 'Pagar en línea'}{a.depositCents ? ` ${money(a.depositCents)}` : ''}</button>
@@ -158,7 +165,7 @@ function ApptSummary({ a }: { a: Appt }) {
       <div className="row"><span className={`badge ${a.status}`}>{STATUS_LABEL[a.status]}</span>
         <Link href={`/c/${a.clinic.slug}`} className="small">{a.clinic.name}</Link></div>
       <strong>{fmtDate(a.startsAt, tz)} · {fmtTime(a.startsAt, tz)} h</strong>
-      <span>{a.doctor.displayName} · {a.doctor.specialty}</span>
+      <span>{a.doctor.displayName} · {a.doctor.specialty}{a.modality === 'VIDEO' ? ' · Videoconsulta' : ''}</span>
       <span className="muted small">{a.serviceName} · {a.durationMinutes} min · {money(a.priceCents)}</span>
       {a.location
         ? <span className="muted small">{[a.location.name, a.location.address ?? a.clinic.address].filter(Boolean).join(' · ')}{a.location.mapUrl && <> · <a href={a.location.mapUrl} target="_blank" rel="noreferrer">Mapa</a></>}</span>

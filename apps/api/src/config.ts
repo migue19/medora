@@ -12,6 +12,8 @@ export interface AppConfig {
   whatsapp: WhatsAppConfig | null;
   /** Stripe (cuenta de Medora). Sin llaves, los pagos en línea quedan desactivados. */
   payments: PaymentsConfig | null;
+  /** Daily (videoconsultas). Sin llave, la telemedicina queda desactivada. */
+  video: { apiKey: string } | null;
   /** Intervalo del trabajador de la cola; 0 lo desactiva (pruebas). */
   jobsPollMs: number;
 }
@@ -62,6 +64,7 @@ export function loadConfig(): AppConfig {
     mail: loadMailConfig(production),
     whatsapp: loadWhatsAppConfig(),
     payments: loadPaymentsConfig(production),
+    video: process.env.DAILY_API_KEY?.trim() ? { apiKey: process.env.DAILY_API_KEY.trim() } : null,
     jobsPollMs: Number(process.env.JOBS_POLL_MS ?? 2000),
     databaseUrl: required('DATABASE_URL'),
     jwtSecret: new TextEncoder().encode(jwtSecret),

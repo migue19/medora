@@ -29,5 +29,6 @@ export interface Appointment {
   confirmedAt: string | null; reminders: ReminderLog[]; followUpOfId: string | null;
   location?: { id: string; name: string }; room?: { id: string; name: string } | null; channel?: string | null;
   payment?: PaymentSummary | null; paymentDueAt?: string | null;
+  modality?: 'IN_PERSON' | 'VIDEO'; patientWaiting?: boolean; doctorJoinedAt?: string | null;
 }
 export interface PaymentSummary { status: string; amountCents: number; refundedCents: number; method: string | null }

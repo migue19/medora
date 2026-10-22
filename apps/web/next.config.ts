@@ -28,6 +28,17 @@ const nextConfig: NextConfig = {
       { source: '/:path*', headers: securityHeaders },
       { source: '/:path((?!embed/).*)', headers: noFraming },
       { source: '/embed/:path*', headers: embedFraming },
+      // Excepciones al Permissions-Policy (la última regla que coincide gana): «Cerca de mí» del directorio
+      // y la cámara y el micrófono de la videoconsulta, delegados sólo a la sala de Daily.
+      { source: '/directorio/:path*', headers: [{ key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(self)' }] },
+      { source: '/directorio', headers: [{ key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(self)' }] },
+      {
+        source: '/consulta',
+        headers: [{
+          key: 'Permissions-Policy',
+          value: 'camera=(self "https://*.daily.co"), microphone=(self "https://*.daily.co"), display-capture=(self "https://*.daily.co"), autoplay=(self "https://*.daily.co"), geolocation=()',
+        }],
+      },
       { source: '/widget.js', headers: [{ key: 'Cache-Control', value: 'public, max-age=3600' }] },
       { source: '/sw.js', headers: [{ key: 'Cache-Control', value: 'no-cache' }, { key: 'Service-Worker-Allowed', value: '/' }] },
     ];

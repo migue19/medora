@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { ApiError, StaffSessionData, errorMessage, staffSession } from '@/lib/api';
 import { PAYMENT_LABEL, PAY_METHOD_LABEL, STATUS_LABEL, addDays, fmtDay, fmtTime, money, todayIn } from '@/lib/format';
@@ -21,6 +22,12 @@ export function Agenda({ session }: { session: StaffSessionData }) {
   const [creating, setCreating] = useState<false | { patient?: Appointment['patient']; followUp?: { id: string; doctorId: string; serviceId: string } }>(false);
   const [active, setActive] = useState<{ id: string; mode: 'cancel' | 'reschedule' } | null>(null);
   const canBook = role !== 'DOCTOR';
+  /** Abre la sala el médico de la cita (o dirección), de 15 min antes a 30 min después. */
+  const canVideo = (a: Appointment) => {
+    const allowed = role === 'OWNER' || role === 'ADMIN' || (role === 'DOCTOR' && session.membership.doctorId === a.doctor.id);
+    const now = Date.now();
+    return allowed && now >= new Date(a.startsAt).getTime() - 15 * 60_000 && now <= new Date(a.endsAt).getTime() + 30 * 60_000;
+  };
 
   useEffect(() => {
     staffSession.get<Doctor[]>('/api/clinic/doctors').then(setDoctors).catch(() => undefined);
@@ -37,6 +44,19 @@ export function Agenda({ session }: { session: StaffSessionData }) {
       setAppointments(res.appointments);
     } catch (e) { setError(errorMessage(e)); }
   }, [date, days, doctorId, locationId]);
+
+  // Con videoconsultas hoy, la agenda se actualiza sola para avisar cuando el paciente entra a la sala.
+  const hasVideoToday = date === todayIn(tz) && (appointments ?? []).some((a) => a.modality === 'VIDEO' && a.status === 'BOOKED');
+  useEffect(() => {
+    if (!hasVideoToday) return;
+    const t = setInterval(() => { if (!active && !creating) void reload(); }, 20_000);
+    return () => clearInterval(t);
+  }, [hasVideoToday, reload, active, creating]);
+  const waiting = (appointments ?? []).filter((a) => a.patientWaiting && a.status === 'BOOKED' && canVideo(a)).length;
+  useEffect(() => {
+    const base = document.title.replace(/^\(\d+\) /, '');
+    document.title = waiting ? `(${waiting}) ${base}` : base;
+  }, [waiting]);
 
   useEffect(() => { void reload(); }, [reload]);
 
@@ -111,6 +131,8 @@ export function Agenda({ session }: { session: StaffSessionData }) {
                     {a.source === 'ONLINE' && <span className="badge">En línea</span>}
                     {a.followUpOfId && <span className="badge">Subsecuente</span>}
                     {a.channel && a.channel !== 'web' && <span className="badge">{CHANNEL_LABEL[a.channel] ?? a.channel}</span>}
+                    {a.modality === 'VIDEO' && <span className="badge">Videoconsulta</span>}
+                    {a.patientWaiting && a.status === 'BOOKED' && <span className="badge COMPLETED">Paciente en sala de espera</span>}
                     {a.payment && <span className={`badge ${a.payment.status === 'PAID' ? 'PAID' : ''}`}>{PAYMENT_LABEL[a.payment.status]} {money(a.payment.amountCents)}{a.payment.method ? ` · ${PAY_METHOD_LABEL[a.payment.method] ?? a.payment.method}` : ''}</span>}
                   </div>
                   {a.status === 'PENDING_PAYMENT' && a.paymentDueAt && <span className="small">Apartada: si no se paga antes de las {fmtTime(a.paymentDueAt, tz)} se libera sola.</span>}
@@ -134,6 +156,9 @@ export function Agenda({ session }: { session: StaffSessionData }) {
                         </>
                       )}
                     </div>
+                  )}
+                  {a.modality === 'VIDEO' && a.status === 'BOOKED' && canVideo(a) && (
+                    <div className="row"><Link className="btn primary" href={`/consulta?cita=${a.id}&rol=medico`}>{a.doctorJoinedAt ? 'Volver a la videoconsulta' : 'Iniciar videoconsulta'}</Link></div>
                   )}
                   {a.status === 'PENDING_PAYMENT' && !started && (
                     <div className="row"><button className="danger" onClick={() => setActive({ id: a.id, mode: 'cancel' })}>Liberar apartado</button></div>

@@ -24,6 +24,7 @@ export function NewAppointment({ session, doctors, patient: initialPatient, onCl
   const [manualDate, setManualDate] = useState(todayIn(tz));
   const [manualTime, setManualTime] = useState('');
   const [notes, setNotes] = useState('');
+  const [video, setVideo] = useState(false);
   const [requestId, setRequestId] = useState(uuid);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -50,6 +51,7 @@ export function NewAppointment({ session, doctors, patient: initialPatient, onCl
       await staffSession.post('/api/clinic/appointments', {
         requestId, doctorId, serviceId, clinicPatientId: patient.id, startsAt, notes: notes.trim() || null,
         ...(followUp ? { followUpOfId: followUp.id } : {}),
+        ...(video && service?.telemedicine ? { modality: 'VIDEO' } : {}),
       });
       onClose(`Cita agendada para ${patient.name}: ${fmtDate(startsAt, tz)} ${fmtTime(startsAt, tz)} h.`);
     } catch (e) {
@@ -93,6 +95,9 @@ export function NewAppointment({ session, doctors, patient: initialPatient, onCl
                   <input type="time" step={300} value={manualTime} onChange={(e) => { setManualTime(e.target.value); setSlot(null); setRequestId(uuid()); }} style={{ width: 'auto' }} />
                 </div>
               </details>
+              {service?.telemedicine && (
+                <label className="check"><input type="checkbox" checked={video} onChange={(e) => { setVideo(e.target.checked); setRequestId(uuid()); }} />Por videoconsulta (el paciente recibe el enlace por correo)</label>
+              )}
               <label>Notas (opcional)<textarea value={notes} maxLength={500} onChange={(e) => setNotes(e.target.value)} /></label>
               {startsAt && <p className="small">{fmtDate(startsAt, tz)} · {fmtTime(startsAt, tz)} h · {service?.name}</p>}
               {error && <div className="alert error" role="alert">{error}</div>}

@@ -58,6 +58,8 @@ export interface BookingInput {
   followUpOfId?: string | null;
   /** Canal de una reserva en línea (web, widget, google, instagram). No forma parte del reintento idempotente. */
   channel?: string | null;
+  /** Videoconsulta (sólo en servicios que la ofrecen). */
+  modality?: 'IN_PERSON' | 'VIDEO';
 }
 
 const HELD = 'Ese horario está apartado para una persona de la lista de espera.';
@@ -184,6 +186,7 @@ export class AppointmentsService {
       clinicId: input.clinicId, doctorId: input.doctorId, serviceId: input.serviceId,
       clinicPatientId: input.clinicPatientId, startsAt: input.startsAt.toISOString(), notes: input.notes,
       waitlistOfferId: input.waitlistOfferId, followUpOfId: input.followUpOfId ?? undefined,
+      modality: input.modality === 'VIDEO' ? 'VIDEO' : undefined,
     });
     const replay = async () => {
       const existing = await this.prisma.appointment.findUnique({ where: { requestKey } });
@@ -209,6 +212,9 @@ export class AppointmentsService {
         const startsAt = input.startsAt;
         const endsAt = new Date(startsAt.getTime() + service.durationMinutes * 60_000);
         const offer = input.waitlistOfferId ? await this.lockOffer(tx, input, endsAt, now) : null;
+        if (input.modality === 'VIDEO' && !service.telemedicine) {
+          throw new BadRequestException('Este servicio no se ofrece por videoconsulta');
+        }
 
         if (input.source === 'ONLINE') {
           if (!clinic.bookingEnabled) throw new ForbiddenException('La clínica no acepta reservas en línea por ahora');
@@ -246,7 +252,7 @@ export class AppointmentsService {
             clinicId: input.clinicId, doctorId: doctor.id, serviceId: service.id,
             clinicPatientId: input.clinicPatientId, startsAt, endsAt, source: input.source,
             serviceName: service.name, durationMinutes: service.durationMinutes,
-            priceCents, status: pending ? 'PENDING_PAYMENT' : 'BOOKED', paymentDueAt,
+            priceCents, status: pending ? 'PENDING_PAYMENT' : 'BOOKED', paymentDueAt, modality: input.modality ?? 'IN_PERSON',
             patientNotes: input.notes, requestKey, requestHash, followUpOfId: input.followUpOfId ?? null,
             locationId: rule.locationId, roomId: rule.roomId, channel: input.channel ?? null,
           },
