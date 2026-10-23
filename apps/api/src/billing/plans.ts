@@ -1,7 +1,7 @@
 import { ForbiddenException } from '@nestjs/common';
 import type { Clinic, Plan } from '@prisma/client';
 
-export type Feature = 'whatsapp' | 'telemedicine' | 'payments' | 'attachments';
+export type Feature = 'whatsapp' | 'telemedicine' | 'payments' | 'attachments' | 'exports';
 
 export interface PlanInfo {
   name: string;
@@ -15,18 +15,18 @@ export interface PlanInfo {
 export const PLANS: Record<Plan, PlanInfo> = {
   CONSULTORIO: {
     name: 'Consultorio', priceCents: 49_900, maxDoctors: 1,
-    features: { whatsapp: false, telemedicine: false, payments: false, attachments: false },
+    features: { whatsapp: false, telemedicine: false, payments: false, attachments: false, exports: false },
     summary: ['1 médico', 'Agenda y reservas en línea', 'Recordatorios por correo', 'Expediente clínico y recetas', 'Directorio y opiniones'],
   },
   CLINICA: {
     name: 'Clínica', priceCents: 129_900, maxDoctors: 5,
-    features: { whatsapp: true, telemedicine: true, payments: true, attachments: false },
+    features: { whatsapp: true, telemedicine: true, payments: true, attachments: false, exports: false },
     summary: ['Hasta 5 médicos', 'Todo lo de Consultorio', 'Recordatorios por WhatsApp', 'Videoconsultas', 'Cobro en línea'],
   },
   PLUS: {
     name: 'Plus', priceCents: 249_900, maxDoctors: 15,
-    features: { whatsapp: true, telemedicine: true, payments: true, attachments: true },
-    summary: ['Hasta 15 médicos', 'Todo lo de Clínica', 'Estudios y archivos en el expediente', 'Reportes avanzados'],
+    features: { whatsapp: true, telemedicine: true, payments: true, attachments: true, exports: true },
+    summary: ['Hasta 15 médicos', 'Todo lo de Clínica', 'Estudios y archivos en el expediente', 'Exportación de reportes a Excel'],
   },
 };
 
@@ -36,6 +36,7 @@ export const GRACE_DAYS = 7;
 
 const FEATURE_NAME: Record<Feature, string> = {
   whatsapp: 'los recordatorios por WhatsApp', telemedicine: 'las videoconsultas', payments: 'el cobro en línea', attachments: 'los archivos en el expediente',
+  exports: 'la exportación de reportes',
 };
 
 type BillingFields = Pick<Clinic, 'plan' | 'subscriptionStatus' | 'trialEndsAt' | 'currentPeriodEnd' | 'billingExempt'>;

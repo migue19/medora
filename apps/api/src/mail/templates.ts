@@ -402,3 +402,19 @@ export function accountExists(p: { name: string; loginLink: string; recoverLink:
     footer: ['Si no fuiste tú, ignora este correo.'],
   });
 }
+
+export interface WeeklyMetric { label: string; value: string; previous: string | null }
+
+export function weeklyReportEmail(p: { clinicName: string; weekLabel: string; metrics: WeeklyMetric[]; topDoctor: string | null; link: string }): RenderedEmail {
+  return layout({
+    subject: `Tu semana en ${p.clinicName}: ${p.metrics[0]?.value ?? ''} citas`,
+    greeting: 'Hola:',
+    paragraphs: [`Este es el resumen de ${p.clinicName} del ${p.weekLabel}, comparado con la semana anterior.`],
+    details: p.metrics.map((m) => ({ label: m.label, value: m.previous !== null ? `${m.value} (antes ${m.previous})` : m.value })),
+    action: { label: 'Ver reportes', url: p.link },
+    footer: [
+      ...(p.topDoctor ? [`Mayor ocupación: ${p.topDoctor}.`] : []),
+      'Puedes dejar de recibir este resumen en «Clínica» del panel.',
+    ],
+  });
+}

@@ -16,6 +16,7 @@ import { Team } from './Team';
 import { ClinicSettings } from './ClinicSettings';
 import { Account } from './Account';
 import { Subscription, SubscriptionBanner } from './Subscription';
+import { Reports } from './Reports';
 
 type Role = StaffSessionData['membership']['role'];
 const TABS: { id: string; label: string; roles: Role[] }[] = [
@@ -25,6 +26,7 @@ const TABS: { id: string; label: string; roles: Role[] }[] = [
   { id: 'doctors', label: 'Médicos y horarios', roles: ['OWNER', 'ADMIN', 'RECEPTION', 'DOCTOR'] },
   { id: 'reviews', label: 'Opiniones', roles: ['OWNER', 'ADMIN', 'RECEPTION', 'DOCTOR'] },
   { id: 'services', label: 'Servicios', roles: ['OWNER', 'ADMIN'] },
+  { id: 'reportes', label: 'Reportes', roles: ['OWNER', 'ADMIN'] },
   { id: 'payments', label: 'Pagos', roles: ['OWNER', 'ADMIN'] },
   { id: 'team', label: 'Equipo', roles: ['OWNER', 'ADMIN'] },
   { id: 'clinic', label: 'Clínica', roles: ['OWNER', 'ADMIN'] },
@@ -74,6 +76,7 @@ export default function Panel() {
         {tab === 'reviews' && <Reviews session={session} />}
         {tab === 'doctors' && <Doctors session={session} />}
         {tab === 'services' && <Services />}
+        {tab === 'reportes' && <Reports session={session} />}
         {tab === 'payments' && <Payments />}
         {tab === 'team' && <Team session={session} />}
         {tab === 'clinic' && <ClinicSettings />}

@@ -7,7 +7,7 @@ interface Clinic {
   name: string; slug: string; phone: string | null; address: string | null; timezone: string; bookingEnabled: boolean;
   minNoticeMinutes: number; horizonDays: number; patientCancelMinMinutes: number;
   remindersEnabled: boolean; reminderOffsets: number[]; whatsappEnabled: boolean; whatsappAvailable: boolean;
-  reviewsEnabled: boolean; directoryEnabled: boolean;
+  reviewsEnabled: boolean; directoryEnabled: boolean; weeklyReport: boolean;
   paymentMode: 'OFF' | 'OPTIONAL' | 'REQUIRED'; depositPercent: number; refundMinMinutes: number; asyncPaymentsEnabled: boolean;
   paymentsAvailable: boolean;
 }
@@ -39,6 +39,7 @@ export function ClinicSettings() {
         patientCancelMinMinutes: Math.round(Number(f.get('cancelHours')) * 60),
         reviewsEnabled: f.get('reviewsEnabled') === 'on',
         directoryEnabled: f.get('directoryEnabled') === 'on',
+        weeklyReport: f.get('weeklyReport') === 'on',
       });
       setClinic(updated);
       setMsg({ ok: true, text: 'Configuración guardada.' });
@@ -69,6 +70,7 @@ export function ClinicSettings() {
         <label className="check"><input type="checkbox" name="bookingEnabled" defaultChecked={clinic.bookingEnabled} />Aceptar reservas en línea</label>
         <label className="check"><input type="checkbox" name="reviewsEnabled" defaultChecked={clinic.reviewsEnabled} />Invitar a opinar tras cada cita atendida y mostrar las opiniones verificadas</label>
         <label className="check"><input type="checkbox" name="directoryEnabled" defaultChecked={clinic.directoryEnabled} />Aparecer en el <a href="/directorio" target="_blank" rel="noreferrer">directorio de Medora</a> (búsqueda por especialidad, padecimiento y zona)</label>
+        <label className="check"><input type="checkbox" name="weeklyReport" defaultChecked={clinic.weeklyReport} />Enviarme cada lunes el resumen de la semana (citas, inasistencias, ocupación, ingresos)</label>
         <p className="muted small">Zona horaria: {clinic.timezone}</p>
         {msg && <div className={`alert ${msg.ok ? 'ok' : 'error'}`}>{msg.text}</div>}
         <div><button className="primary">Guardar</button></div>

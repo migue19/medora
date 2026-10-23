@@ -39,6 +39,8 @@ class UpdateClinicDto {
   @IsOptional() @IsBoolean() reviewsEnabled?: boolean;
   /** Aparecer en el directorio público de Medora. */
   @IsOptional() @IsBoolean() directoryEnabled?: boolean;
+  /** Resumen semanal de indicadores por correo. */
+  @IsOptional() @IsBoolean() weeklyReport?: boolean;
   @IsOptional() @IsEnum(PaymentMode) paymentMode?: PaymentMode;
   @IsOptional() @IsInt() @Min(10) @Max(100) depositPercent?: number;
   @IsOptional() @IsInt() @Min(0) @Max(10080) refundMinMinutes?: number;

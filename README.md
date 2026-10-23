@@ -135,7 +135,9 @@ Entregado: planes Consultorio, Clínica y Plus con 14 días de prueba, cobro rec
 - Alta autoservicio de clínicas, con verificación de la cédula del médico.
 - **Terminado cuando**: una clínica nueva se registra, paga, recibe su factura y sus límites se aplican según el plan.
 
-### Sprint 13 · Reportes y analítica
+### Sprint 13 · Reportes y analítica ✅
+
+Entregado: pestaña «Reportes» con citas, inasistencia, cancelaciones (quién y con cuánta anticipación), ocupación por médico, origen de las citas, ingresos, cobros en línea y pacientes nuevos o recurrentes, filtrables por periodo, médico y sede. Exportación a CSV y Excel (plan Plus) y resumen semanal por correo los lunes a las 8:00. Las cifras se comprueban contra la agenda en las pruebas. Detalle en [SPRINT13_RESULTS.md](SPRINT13_RESULTS.md).
 
 - Ocupación de la agenda por médico, tasa de inasistencia, cancelaciones con anticipación, origen de las citas (en línea, teléfono, directorio o widget), ingresos y pacientes nuevos o recurrentes.
 - Exportación a CSV y Excel y un resumen semanal por correo al propietario.
@@ -463,6 +465,7 @@ La API escucha en 127.0.0.1:6010 y Next en 127.0.0.1:6011. `WEB_ORIGIN` debe coi
 | GET · POST | /api/public/plans · /api/public/signup | Público (alta autoservicio; Origin y límite por IP) |
 | GET · POST · PUT | /api/clinic/subscription (checkout, plan, cancel, portal, billing, invoices/:id/cfdi, invoices/:id/pdf\|xml) | Propietario (cambios) y administración |
 | GET · PATCH | /api/admin/clinics | Administración de Medora (`SUPERADMIN_EMAILS`) |
+| GET · POST | /api/clinic/reports/summary · export/csv\|xlsx · weekly-preview | Propietario o administración (exportar: plan Plus) |
 | POST | /api/public/reviews/inspect · /api/public/reviews | Público con el token de la invitación; Origin |
 | GET | /api/public/reviews/clinics/:slug/doctors/:doctorSlug?page | Público: opiniones publicadas (10 por página) |
 | POST | /api/patient/appointments/:id/review | Paciente: opinar sobre su cita atendida |

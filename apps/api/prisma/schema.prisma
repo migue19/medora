@@ -1,4 +1,4 @@
-// Medora · Sprint 12
+// Medora · Sprint 13
 // Todas las entidades de negocio llevan clinicId y se consultan siempre
 // filtradas por la clínica obtenida de la sesión.
 
@@ -200,6 +200,8 @@ model Clinic {
   refundMinMinutes        Int      @default(1440)
   // Aceptar OXXO y transferencia SPEI (sólo para citas con 3 días o más de anticipación).
   asyncPaymentsEnabled    Boolean  @default(false)
+  // Resumen semanal de indicadores por correo a los propietarios (lunes por la mañana).
+  weeklyReport            Boolean  @default(true)
   // Suscripción a Medora.
   plan                    Plan               @default(CLINICA)
   subscriptionStatus      SubscriptionStatus @default(TRIALING)
@@ -513,6 +515,8 @@ model AppointmentEvent {
   appointment Appointment @relation(fields: [appointmentId], references: [id])
 
   @@index([appointmentId])
+
+  @@index([type, appointmentId], map: "AppointmentEvent_type_appointment")
 }
 
 // Token de un solo uso enviado por correo (verificación y recuperación de contraseña).
