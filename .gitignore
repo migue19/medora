@@ -13,3 +13,8 @@ next-env.d.ts
 apps/api/prisma.wasm.config.ts
 hostinger.txt
 dist-test/
+
+# Material de marketing: credenciales de la demo local y videos generados
+marketing/.demo-credentials.json
+marketing/out/
+marketing/node_modules/

@@ -1,0 +1,12 @@
+{
+  "name": "medora-marketing",
+  "private": true,
+  "type": "module",
+  "description": "Grabación de reels y capturas de Medora con la clínica demo local",
+  "scripts": {
+    "reel": "node reels/record.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.64.0"
+  }
+}
