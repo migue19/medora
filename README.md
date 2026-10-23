@@ -410,6 +410,10 @@ scripts/restore-check.sh
 docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner' < /var/backups/medora/medora-AAAAMMDD-HHMMSS.dump
 ```
 
+### Certificado TLS
+
+Sólo se usa el puerto 443 (el 80 está cerrado en el firewall de Hostinger), así que Let's Encrypt valida por DNS. Al renovar, certbot llama a `scripts/acme-dns-hook.sh`, que publica el TXT `_acme-challenge` con la API DNS de Hostinger, espera a que se propague y luego lo borra. El token se carga una vez con `scripts/set-hostinger-dns-token.sh`, que también ajusta la renovación y la prueba en seco.
+
 ### Copia externa (Google Drive)
 
 `scripts/offsite-backup.sh` sube cada día a las 03:30 (Ciudad de México) los respaldos recientes y el `.env` a Google Drive, cifrados con `rclone crypt` (contenido y nombres), conserva 30 días (`OFFSITE_KEEP_DAYS`) y comprueba que el último respaldo llegó íntegro. La configuración se hace una vez con `scripts/set-gdrive-backup.sh`. El permiso de Drive es `drive.file`, así que rclone sólo ve la carpeta `medora-respaldos` que él mismo crea.

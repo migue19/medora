@@ -108,6 +108,7 @@ git archive HEAD | ssh root@82.180.139.70 'tar -x -C /opt/medora && cd /opt/medo
 
 ## Pendientes conocidos
 
-- El certificado de `medora.nut.com.mx` vence el 13-ene-2027 y su validación DNS es manual (`/root/medora-acme/auth-hook.sh`). Falta automatizarla.
-- Los respaldos sólo viven en el VPS. Falta la copia cifrada fuera del servidor.
+- Sólo se usa el puerto 443; el 80 está cerrado en el firewall de Hostinger.
+- El certificado se renueva solo por DNS. `scripts/acme-dns-hook.sh` publica el TXT con la API de Hostinger, y el token está en `/root/.hostinger-dns-token`.
+- Respaldos: copia diaria cifrada en Google Drive con `scripts/offsite-backup.sh`. La contraseña de cifrado está en `/root/medora-offsite-password`.
 - Facturama, Stripe en modo real, Microsoft Entra y las plantillas de WhatsApp están pendientes de las cuentas del usuario.
