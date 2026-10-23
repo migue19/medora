@@ -3,6 +3,9 @@ import { Header } from '@/components/Header';
 import { apiBase } from '@/lib/server-api';
 import { money } from '@/lib/format';
 
+// Se arma al pedirla (los planes vienen de la API, en caché 1 h): no depende de que la API exista al compilar.
+export const dynamic = 'force-dynamic';
+
 interface Plan { key: string; name: string; priceCents: number; summary: string[] }
 
 async function plans(): Promise<{ trialDays: number; plans: Plan[] } | null> {
