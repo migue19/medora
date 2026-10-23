@@ -89,6 +89,23 @@ git archive HEAD | ssh root@82.180.139.70 'tar -x -C /opt/medora && cd /opt/medo
 - El VPS es compartido: no leer `.env` ni datos de otros proyectos.
 - `hostinger.txt` contiene el token de la API de Hostinger: está en `.gitignore` y nunca se imprime.
 
+## Notas en Obsidian
+
+- Las notas del proyecto viven en la bóveda Development: `~/Documents/Development/Medora/`.
+- El índice es `Medora.md`, que enlaza a estas notas:
+  - `Estado y pendientes`
+  - `Sprints`
+  - `Arquitectura`
+  - `Despliegue y operación`
+  - `Proveedores y cuentas`
+  - `Decisiones`
+  - `Bitácora`
+- Al terminar un trabajo relevante:
+  - agregar una entrada con la fecha en `Bitácora.md`;
+  - marcar o agregar casillas en `Estado y pendientes.md`;
+  - anotar cada decisión nueva en `Decisiones.md`.
+- En esas notas nunca van llaves, contraseñas ni datos de pacientes.
+
 ## Pendientes conocidos
 
 - El certificado de `medora.nut.com.mx` vence el 13-ene-2027 y su validación DNS es manual (`/root/medora-acme/auth-hook.sh`). Falta automatizarla.
