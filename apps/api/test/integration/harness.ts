@@ -14,6 +14,9 @@ import { MemoryGateway } from '../../src/payments/gateway';
 import { MemoryVideo } from '../../src/video/video.provider';
 import { MemoryBilling } from '../../src/billing/billing.gateway';
 import { MemoryCfdi } from '../../src/billing/cfdi';
+import { MemoryWebhooks } from '../../src/integrations/webhook.transport';
+import { MemoryCalendar } from '../../src/integrations/calendar.providers';
+import { MemoryPush } from '../../src/integrations/push.service';
 
 export const ORIGIN = 'http://localhost:6011';
 export const TZ = 'America/Mexico_City';
@@ -37,6 +40,9 @@ export interface Harness {
   video: MemoryVideo;
   billing: MemoryBilling;
   cfdi: MemoryCfdi;
+  webhooks: MemoryWebhooks;
+  calendar: MemoryCalendar;
+  push: MemoryPush;
   jobs: JobsService;
   /** Ejecuta la cola y devuelve los correos enviados en esta corrida. */
   deliver(): Promise<OutgoingEmail[]>;
@@ -53,6 +59,9 @@ export async function startHarness(): Promise<Harness> {
   const video = new MemoryVideo();
   const billing = new MemoryBilling();
   const cfdi = new MemoryCfdi();
+  const webhooks = new MemoryWebhooks();
+  const calendar = new MemoryCalendar();
+  const push = new MemoryPush();
   const app = await createApp({
     databaseUrl,
     jwtSecret: new TextEncoder().encode('integration-secret-integration-secret-0123'),
@@ -74,15 +83,17 @@ export async function startHarness(): Promise<Harness> {
     recordsKey: Buffer.alloc(32, 7),
     invoicing: { user: 'prueba', password: 'prueba', sandbox: true, expeditionPlace: '03100', series: 'MED', resicoRetention: false },
     superadmins: ['admin@medora.test'],
+    calendars: { google: { clientId: 'google-prueba', clientSecret: 'secreto' }, microsoft: null },
+    push: { publicKey: 'BPrueba', privateKey: 'privada', subject: 'mailto:prueba@medora.test' },
     jobsPollMs: 0,
-  }, false, { mail, whatsapp, payments, video, billing, cfdi });
+  }, false, { mail, whatsapp, payments, video, billing, cfdi, webhooks, calendars: { GOOGLE: calendar }, push });
   await app.listen(0, '127.0.0.1');
   const { port } = app.getHttpServer().address() as AddressInfo;
   const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: databaseUrl, options: '-c TimeZone=UTC' }) });
   sharedPrisma = prisma;
   const jobs = app.get(JobsService);
   return {
-    app, base: `http://127.0.0.1:${port}`, prisma, mail, whatsapp, payments, video, billing, cfdi, jobs,
+    app, base: `http://127.0.0.1:${port}`, prisma, mail, whatsapp, payments, video, billing, cfdi, webhooks, calendar, push, jobs,
     async deliver() {
       const before = mail.sent.length;
       await jobs.runOnce();

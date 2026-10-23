@@ -76,6 +76,12 @@ export class AppointmentsService {
     private readonly reviews: ReviewsService,
   ) {}
 
+  /** Eventos personales del calendario del médico (Google u Outlook) que se traslapan con el rango. */
+  private async externalBusy(tx: Tx | PrismaService, doctorId: string, start: Date, end: Date): Promise<Interval[]> {
+    const rows = await tx.externalBusy.findMany({ where: { doctorId, startsAt: { lt: end }, endsAt: { gt: start } }, select: { startsAt: true, endsAt: true } });
+    return rows.map((r) => ({ start: r.startsAt, end: r.endsAt }));
+  }
+
   /** Horarios apartados vigentes de la lista de espera que se traslapan con el rango. */
   async holds(tx: Tx | PrismaService, doctorId: string, start: Date, end: Date, excludeOfferId: string | null = null) {
     const rows = await tx.waitlistOffer.findMany({
@@ -153,6 +159,7 @@ export class AppointmentsService {
       ...appointments.map((a) => ({ start: a.startsAt, end: a.endsAt })),
       ...timeOffs.map((t) => ({ start: t.startsAt, end: t.endsAt })),
       ...(await this.holds(this.prisma, doctor.id, rangeStart, rangeEnd)),
+      ...(await this.externalBusy(this.prisma, doctor.id, rangeStart, rangeEnd)),
     ];
     const days_ = computeSlots({
       timezone: clinic.timezone,
@@ -530,6 +537,7 @@ export class AppointmentsService {
       busy: [
         ...[...appointments, ...timeOffs].map((b) => ({ start: b.startsAt, end: b.endsAt })),
         ...(await this.holds(tx, doctorId, dayStart, dayEnd, excludeOfferId)),
+        ...(await this.externalBusy(tx, doctorId, dayStart, dayEnd)),
       ],
       roomBusy: await this.roomBusy(tx, rules, doctorId, dayStart, dayEnd, excludeId),
       fromDate: day.toISODate()!, days: 1,

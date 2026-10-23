@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma.service';
 import { VIDEO_PROVIDER, VideoProvider } from './video.provider';
 import { readVideoLinkToken, videoLinkToken } from './link';
 import { entitlements } from '../billing/plans';
+import { PushService } from '../integrations/push.service';
 
 /** La sala abre 15 min antes y cierra 30 min después del fin de la cita. */
 export const OPENS_BEFORE_MINUTES = 15;
@@ -27,6 +28,7 @@ export class VideoService {
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     @Inject(VIDEO_PROVIDER) private readonly provider: VideoProvider,
     private readonly prisma: PrismaService,
+    private readonly push: PushService,
   ) {}
 
   get available() {
@@ -95,6 +97,13 @@ export class VideoService {
     }
     const room = await this.room(a);
     const token = await this.provider.token(room.name, { userName: a.clinicPatient.name, owner: false, expires: this.window(a).closesAt });
+    // Primera vez que entra: aviso inmediato al médico (aunque no tenga la agenda abierta).
+    if (!a.patientJoinedAt && a.doctor.membershipId) {
+      await this.push.notify([a.doctor.membershipId], {
+        title: 'Paciente en la sala de espera', body: `${a.clinicPatient.name} entró a la videoconsulta`,
+        url: `/consulta?cita=${a.id}&rol=medico`, tag: `video-${a.id}`,
+      }, `video:${a.id}`);
+    }
     await this.prisma.appointment.update({
       where: { id: a.id },
       data: {

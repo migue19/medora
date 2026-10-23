@@ -21,6 +21,14 @@ import { VideoService } from './video/video.service';
 import { RecordsService } from './records/records.service';
 import { BillingService } from './billing/billing.service';
 import { ReportsService } from './reports/reports.service';
+import { IntegrationsService } from './integrations/integrations.service';
+import { CalendarService } from './integrations/calendar.service';
+import { PUSH_TRANSPORT, PushService, PushTransport, WebPushTransport } from './integrations/push.service';
+import { PushController } from './integrations/push.controller';
+import { CalendarController, CalendarHooksController } from './integrations/calendar.controller';
+import { CALENDAR_PROVIDERS, CalendarProviders, GoogleCalendar, MicrosoftCalendar } from './integrations/calendar.providers';
+import { ApiKeyGuard, ApiV1Controller, IntegrationsController } from './integrations/api-v1.controller';
+import { HttpWebhookTransport, WEBHOOK_TRANSPORT, WebhookTransport } from './integrations/webhook.transport';
 import { WeeklyReportService } from './reports/weekly.service';
 import { ReportsController } from './reports/reports.controller';
 import { SignupService } from './billing/signup.service';
@@ -55,6 +63,9 @@ export interface Transports {
   video?: VideoProvider;
   billing?: BillingGateway;
   cfdi?: CfdiProvider;
+  webhooks?: WebhookTransport;
+  calendars?: CalendarProviders;
+  push?: PushTransport;
 }
 
 export function buildAppModule(config: AppConfig = loadConfig(), transports: Transports = {}) {
@@ -67,6 +78,7 @@ export function buildAppModule(config: AppConfig = loadConfig(), transports: Tra
       PatientPaymentsController, PaymentWebhookController, ClinicPaymentsController,
       VideoLinkController, PatientVideoController, StaffVideoController, RecordsController, PrescriptionVerifyController,
       SignupController, SubscriptionController, AdminController, ReportsController,
+      ApiV1Controller, IntegrationsController, CalendarController, CalendarHooksController, PushController,
       PublicReviewsController, PatientReviewsController, StaffReviewsController, OnboardingController,
     ],
     providers: [
@@ -77,8 +89,17 @@ export function buildAppModule(config: AppConfig = loadConfig(), transports: Tra
       { provide: VIDEO_PROVIDER, useValue: transports.video ?? createVideo(config.video) },
       { provide: BILLING_GATEWAY, useValue: transports.billing ?? createBilling(config.payments) },
       { provide: CFDI_PROVIDER, useValue: transports.cfdi ?? createCfdi(config.invoicing) },
+      { provide: PUSH_TRANSPORT, useValue: transports.push ?? (config.push ? new WebPushTransport(config.push) : null) },
+      { provide: WEBHOOK_TRANSPORT, useValue: transports.webhooks ?? new HttpWebhookTransport() },
+      {
+        provide: CALENDAR_PROVIDERS,
+        useValue: transports.calendars ?? {
+          ...(config.calendars.google ? { GOOGLE: new GoogleCalendar(config.calendars.google) } : {}),
+          ...(config.calendars.microsoft ? { MICROSOFT: new MicrosoftCalendar(config.calendars.microsoft) } : {}),
+        },
+      },
       PrismaService, TokensService, StaffGuard, PatientGuard, AppointmentsService,
-      AuthTokensService, JobsService, MailService, RemindersService, PatientsService, WaitlistService, ReviewsService, OnboardingService, DirectoryService, PaymentsService, VideoService, RecordsService, BillingService, SignupService, ReportsService, WeeklyReportService,
+      AuthTokensService, JobsService, MailService, RemindersService, PatientsService, WaitlistService, ReviewsService, OnboardingService, DirectoryService, PaymentsService, VideoService, RecordsService, BillingService, SignupService, ReportsService, WeeklyReportService, IntegrationsService, ApiKeyGuard, CalendarService, PushService,
     ],
   })
   class AppModule {}

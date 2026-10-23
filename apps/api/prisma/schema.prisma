@@ -1,4 +1,4 @@
-// Medora · Sprint 13
+// Medora · Sprint 14
 // Todas las entidades de negocio llevan clinicId y se consultan siempre
 // filtradas por la clínica obtenida de la sesión.
 
@@ -69,6 +69,18 @@ enum ClinicVerification {
   PENDING
   VERIFIED
   REJECTED
+}
+
+enum CalendarProvider {
+  GOOGLE
+  MICROSOFT
+}
+
+enum ConnectionStatus {
+  ACTIVE
+  // El proveedor rechazó el token (revocado o vencido): hay que volver a conectar.
+  ERROR
+  DISCONNECTED
 }
 
 enum CfdiStatus {
@@ -1155,4 +1167,130 @@ model SubscriptionInvoice {
   clinic Clinic @relation(fields: [clinicId], references: [id])
 
   @@index([clinicId, paidAt])
+}
+
+// ---------------------------------------------------------------- Integraciones
+
+// Llave de la API pública de una clínica. Sólo se guarda el hash; se muestra una vez al crearla.
+model ApiKey {
+  id          String    @id @default(uuid()) @db.Uuid
+  clinicId    String    @db.Uuid
+  name        String    @db.VarChar(80)
+  prefix      String    @db.VarChar(16)
+  keyHash     String    @unique @db.Char(64)
+  // read: consultar; write: agendar y cancelar.
+  scopes      String[]
+  createdById String    @db.Uuid
+  lastUsedAt  DateTime? @db.Timestamptz(3)
+  revokedAt   DateTime? @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([clinicId])
+}
+
+// Destino de webhooks de citas (HTTPS). Cada envío va firmado con su secreto.
+model WebhookEndpoint {
+  id           String    @id @default(uuid()) @db.Uuid
+  clinicId     String    @db.Uuid
+  url          String    @db.VarChar(500)
+  secret       String    @db.VarChar(80)
+  events       String[]
+  active       Boolean   @default(true)
+  failureCount Int       @default(0)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime  @updatedAt @db.Timestamptz(3)
+
+  deliveries WebhookDelivery[]
+
+  @@index([clinicId])
+}
+
+model WebhookDelivery {
+  id           String    @id @default(uuid()) @db.Uuid
+  endpointId   String    @db.Uuid
+  eventId      String    @db.Uuid
+  type         String    @db.VarChar(40)
+  payload      Json
+  status       String    @default("PENDING") @db.VarChar(10)
+  attempts     Int       @default(0)
+  responseCode Int?
+  lastError    String?   @db.VarChar(300)
+  deliveredAt  DateTime? @db.Timestamptz(3)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+
+  endpoint WebhookEndpoint @relation(fields: [endpointId], references: [id])
+
+  @@unique([endpointId, eventId])
+  @@index([endpointId, createdAt])
+}
+
+// Calendario personal (Google u Outlook) de un médico: sus eventos bloquean la agenda y sus citas se escriben ahí.
+model CalendarConnection {
+  id                String           @id @default(uuid()) @db.Uuid
+  clinicId          String           @db.Uuid
+  doctorId          String           @db.Uuid
+  membershipId      String           @db.Uuid
+  provider          CalendarProvider
+  accountEmail      String           @db.VarChar(254)
+  // Tokens cifrados (AES-256-GCM) con la llave del servidor.
+  accessToken       String
+  refreshToken      String
+  tokenExpiresAt    DateTime         @db.Timestamptz(3)
+  // Canal de notificaciones (Google: channel; Microsoft: subscription).
+  channelId         String?          @db.VarChar(255)
+  channelResourceId String?          @db.VarChar(255)
+  channelToken      String?          @db.VarChar(80)
+  channelExpiresAt  DateTime?        @db.Timestamptz(3)
+  pushAppointments  Boolean          @default(true)
+  status            ConnectionStatus @default(ACTIVE)
+  lastSyncAt        DateTime?        @db.Timestamptz(3)
+  lastError         String?          @db.VarChar(300)
+  createdAt         DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime         @updatedAt @db.Timestamptz(3)
+
+  busy   ExternalBusy[]
+  events AppointmentCalendarEvent[]
+
+  @@unique([doctorId, provider])
+  @@index([channelId])
+}
+
+// Bloque ocupado de un calendario externo (sin título ni detalles: sólo el horario).
+model ExternalBusy {
+  id           String   @id @default(uuid()) @db.Uuid
+  connectionId String   @db.Uuid
+  doctorId     String   @db.Uuid
+  externalId   String   @db.VarChar(1024)
+  startsAt     DateTime @db.Timestamptz(3)
+  endsAt       DateTime @db.Timestamptz(3)
+
+  connection CalendarConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, externalId])
+  @@index([doctorId, startsAt])
+}
+
+// Evento que Medora creó en el calendario del médico por una cita.
+model AppointmentCalendarEvent {
+  appointmentId   String @db.Uuid
+  connectionId    String @db.Uuid
+  externalEventId String @db.VarChar(1024)
+
+  connection CalendarConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@id([appointmentId, connectionId])
+  @@index([connectionId, externalEventId])
+}
+
+// Suscripción a notificaciones push del navegador (personal de la clínica).
+model PushSubscription {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @db.Uuid
+  membershipId String   @db.Uuid
+  endpoint     String   @unique @db.VarChar(1000)
+  p256dh       String   @db.VarChar(200)
+  auth         String   @db.VarChar(100)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([membershipId])
 }

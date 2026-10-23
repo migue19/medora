@@ -17,6 +17,7 @@ import { ClinicSettings } from './ClinicSettings';
 import { Account } from './Account';
 import { Subscription, SubscriptionBanner } from './Subscription';
 import { Reports } from './Reports';
+import { Integrations } from './Integrations';
 
 type Role = StaffSessionData['membership']['role'];
 const TABS: { id: string; label: string; roles: Role[] }[] = [
@@ -30,6 +31,7 @@ const TABS: { id: string; label: string; roles: Role[] }[] = [
   { id: 'payments', label: 'Pagos', roles: ['OWNER', 'ADMIN'] },
   { id: 'team', label: 'Equipo', roles: ['OWNER', 'ADMIN'] },
   { id: 'clinic', label: 'Clínica', roles: ['OWNER', 'ADMIN'] },
+  { id: 'integraciones', label: 'Integraciones', roles: ['OWNER', 'ADMIN'] },
   { id: 'suscripcion', label: 'Suscripción', roles: ['OWNER', 'ADMIN'] },
   { id: 'account', label: 'Mi cuenta', roles: ['OWNER', 'ADMIN', 'RECEPTION', 'DOCTOR'] },
 ];
@@ -80,6 +82,7 @@ export default function Panel() {
         {tab === 'payments' && <Payments />}
         {tab === 'team' && <Team session={session} />}
         {tab === 'clinic' && <ClinicSettings />}
+        {tab === 'integraciones' && <Integrations tz={session.clinic.timezone} />}
         {tab === 'suscripcion' && <Subscription session={session} />}
         {tab === 'account' && <Account />}
       </main>

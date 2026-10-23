@@ -7,6 +7,8 @@ import { SlotPicker } from '@/components/SlotPicker';
 import { NewAppointment } from './NewAppointment';
 import type { Appointment, Doctor } from './shared';
 
+interface Busy { doctorId: string; startsAt: string; endsAt: string; provider: 'GOOGLE' | 'MICROSOFT' }
+
 export function Agenda({ session }: { session: StaffSessionData }) {
   const tz = session.clinic.timezone;
   const role = session.membership.role;
@@ -21,6 +23,7 @@ export function Agenda({ session }: { session: StaffSessionData }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [creating, setCreating] = useState<false | { patient?: Appointment['patient']; followUp?: { id: string; doctorId: string; serviceId: string } }>(false);
   const [active, setActive] = useState<{ id: string; mode: 'cancel' | 'reschedule' } | null>(null);
+  const [busy, setBusy] = useState<Busy[]>([]);
   const canBook = role !== 'DOCTOR';
   /** Abre la sala el médico de la cita (o dirección), de 15 min antes a 30 min después. */
   const canVideo = (a: Appointment) => {
@@ -42,6 +45,9 @@ export function Agenda({ session }: { session: StaffSessionData }) {
       if (locationId) q.set('locationId', locationId);
       const res = await staffSession.get<{ appointments: Appointment[] }>(`/api/clinic/appointments?${q}`);
       setAppointments(res.appointments);
+      const bq = new URLSearchParams({ from: date, days: String(days) });
+      if (doctorId) bq.set('doctorId', doctorId);
+      setBusy(await staffSession.get<Busy[]>(`/api/clinic/calendar/busy?${bq}`).catch(() => []));
     } catch (e) { setError(errorMessage(e)); }
   }, [date, days, doctorId, locationId]);
 
@@ -115,6 +121,13 @@ export function Agenda({ session }: { session: StaffSessionData }) {
       {error && <div className="alert error" role="alert">{error}</div>}
       {appointments && <p className="muted small">{booked} cita(s) agendada(s) · {appointments.length} en total</p>}
       {appointments && appointments.length === 0 && <p className="muted">Sin citas en este periodo.</p>}
+      {busy.length > 0 && (
+        <div className="small muted stack" style={{ gap: 2 }}>
+          {busy.map((b, i) => (
+            <span key={i}>Ocupado en su calendario ({b.provider === 'GOOGLE' ? 'Google' : 'Outlook'}): {doctors.find((d) => d.id === b.doctorId)?.displayName ?? 'Médico'} · {days > 1 ? `${fmtDay(new Date(b.startsAt).toLocaleDateString('en-CA', { timeZone: tz }))} ` : ''}{fmtTime(b.startsAt, tz)}–{fmtTime(b.endsAt, tz)}</span>
+          ))}
+        </div>
+      )}
       {[...grouped.entries()].map(([day, list]) => (
         <section key={day} className="stack">
           {days > 1 && <h3>{fmtDay(day, { weekday: 'long', day: 'numeric', month: 'long' })}</h3>}

@@ -143,7 +143,9 @@ Entregado: pestaña «Reportes» con citas, inasistencia, cancelaciones (quién 
 - Exportación a CSV y Excel y un resumen semanal por correo al propietario.
 - **Terminado cuando**: el propietario ve los indicadores del mes y las cifras cuadran con la agenda.
 
-### Sprint 14 · Integraciones
+### Sprint 14 · Integraciones ✅
+
+Entregado: sincronización con Google Calendar y Outlook (los eventos personales bloquean la agenda en segundos y las citas se escriben en el calendario del médico), API pública v1 con llaves por clínica, webhooks firmados de citas, avisos push de la PWA al personal y la evaluación de una app nativa ([docs/app-movil.md](docs/app-movil.md)). Detalle en [SPRINT14_RESULTS.md](SPRINT14_RESULTS.md).
 
 - Sincronización bidireccional con Google Calendar y Outlook, para que los eventos personales del médico bloqueen su agenda.
 - API pública con llaves por clínica y webhooks de citas.
@@ -344,6 +346,15 @@ Cómo funciona:
   3. Cada cobro se factura solo (clave 81112106, unidad E48, PUE, forma de pago 04 crédito o 28 débito según la tarjeta) y se envía al correo fiscal de la clínica con el PDF y el XML. Sin datos fiscales queda «sin factura» y la clínica puede pedirla dentro de 30 días.
   4. `INVOICE_RESICO_RETENTION=true` agrega la retención de ISR del 1.25 % a personas morales: **confírmalo con tu contador**.
 
+## Integraciones
+
+- **API pública v1 y webhooks:** en el panel, «Integraciones». Ahí se crean las llaves (sólo consultar, o consultar y agendar), los webhooks firmados (`Medora-Signature: t=…,v1=HMAC-SHA256(secreto, t.cuerpo)`) y está la documentación de los endpoints. Los webhooks sólo aceptan URLs HTTPS públicas, se reintentan con espera creciente y se pausan tras 50 fallos seguidos.
+- **Calendarios:** cada médico conecta su Google Calendar u Outlook en «Mi cuenta». Requiere `RECORDS_ENCRYPTION_KEY` (los tokens se guardan cifrados) y una app OAuth:
+  - **Google Cloud:** activa la Google Calendar API. Pantalla de consentimiento con los alcances `openid`, `email` y `…/auth/calendar.events`. Cliente OAuth «Aplicación web» con la URI de redirección `https://medora.nut.com.mx/api/integrations/google/callback`. Variables `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET`. Mientras la app esté «en prueba», agrega a los médicos como usuarios de prueba (hasta 100). Para abrirla a todos, Google revisa los alcances sensibles.
+  - **Microsoft Entra:** registro de app multiinquilino y cuentas personales. Redirección web `https://medora.nut.com.mx/api/integrations/microsoft/callback`, permisos delegados `Calendars.ReadWrite`, `User.Read` y `offline_access`, y un secreto de cliente. Variables `MICROSOFT_CLIENT_ID` y `MICROSOFT_CLIENT_SECRET`.
+  - Guárdalas con `ssh -t root@82.180.139.70 /opt/medora/scripts/set-calendar-keys.sh`.
+- **Avisos push:** `VAPID_PUBLIC_KEY` y `VAPID_PRIVATE_KEY`, generadas en el servidor. El personal los activa en «Mi cuenta → Avisos en este dispositivo».
+
 ## Arranque con Docker Compose (local)
 
 Requisitos: Docker Desktop con Compose v2 y los puertos 6010/6011 libres. Estos puertos no chocan con Tavixo (6000/6001).
@@ -465,6 +476,10 @@ La API escucha en 127.0.0.1:6010 y Next en 127.0.0.1:6011. `WEB_ORIGIN` debe coi
 | GET · POST | /api/public/plans · /api/public/signup | Público (alta autoservicio; Origin y límite por IP) |
 | GET · POST · PUT | /api/clinic/subscription (checkout, plan, cancel, portal, billing, invoices/:id/cfdi, invoices/:id/pdf\|xml) | Propietario (cambios) y administración |
 | GET · PATCH | /api/admin/clinics | Administración de Medora (`SUPERADMIN_EMAILS`) |
+| GET · POST | /api/v1/doctors · services · locations · availability · appointments (`POST`, `:id`, `:id/cancel`) | Llave de API (`Bearer mdr_…`) |
+| GET · POST · PATCH · DELETE | /api/clinic/integrations (keys, webhooks, webhooks/:id/ping) | Propietario o administración |
+| GET · POST · PATCH · DELETE | /api/clinic/calendar (`:provider/start`, `busy`) · /api/integrations/:provider/callback · notify | Médico · Google y Microsoft |
+| GET · POST · DELETE | /api/clinic/push (key, subscribe, test) | Personal |
 | GET · POST | /api/clinic/reports/summary · export/csv\|xlsx · weekly-preview | Propietario o administración (exportar: plan Plus) |
 | POST | /api/public/reviews/inspect · /api/public/reviews | Público con el token de la invitación; Origin |
 | GET | /api/public/reviews/clinics/:slug/doctors/:doctorSlug?page | Público: opiniones publicadas (10 por página) |

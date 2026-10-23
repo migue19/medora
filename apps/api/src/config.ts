@@ -21,6 +21,10 @@ export interface AppConfig {
   invoicing: InvoicingConfig | null;
   /** Correos de quienes administran Medora (verifican clínicas). */
   superadmins: string[];
+  /** Apps OAuth para conectar calendarios (Google Cloud y Microsoft Entra). */
+  /** Llaves VAPID de las notificaciones push (web-push generate-vapid-keys). */
+  push: { publicKey: string; privateKey: string; subject: string } | null;
+  calendars: { google: { clientId: string; clientSecret: string } | null; microsoft: { clientId: string; clientSecret: string } | null };
   /** Intervalo del trabajador de la cola; 0 lo desactiva (pruebas). */
   jobsPollMs: number;
 }
@@ -74,6 +78,13 @@ export function loadConfig(): AppConfig {
     video: process.env.DAILY_API_KEY?.trim() ? { apiKey: process.env.DAILY_API_KEY.trim() } : null,
     recordsKey: loadRecordsKey(),
     invoicing: loadInvoicingConfig(),
+    push: process.env.VAPID_PUBLIC_KEY?.trim()
+      ? { publicKey: process.env.VAPID_PUBLIC_KEY.trim(), privateKey: required('VAPID_PRIVATE_KEY'), subject: process.env.VAPID_SUBJECT?.trim() || 'mailto:contacto@nut.com.mx' }
+      : null,
+    calendars: {
+      google: process.env.GOOGLE_CLIENT_ID?.trim() ? { clientId: process.env.GOOGLE_CLIENT_ID.trim(), clientSecret: required('GOOGLE_CLIENT_SECRET') } : null,
+      microsoft: process.env.MICROSOFT_CLIENT_ID?.trim() ? { clientId: process.env.MICROSOFT_CLIENT_ID.trim(), clientSecret: required('MICROSOFT_CLIENT_SECRET') } : null,
+    },
     superadmins: (process.env.SUPERADMIN_EMAILS ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
     jobsPollMs: Number(process.env.JOBS_POLL_MS ?? 2000),
     databaseUrl: required('DATABASE_URL'),
