@@ -67,6 +67,7 @@ export default async function Home() {
           <div className="card"><h3>Agenda para recepción</h3><p className="muted">Captura citas por teléfono, reprograma, cancela con motivo y registra asistencia.</p></div>
           <div className="card"><h3>Horarios y bloqueos</h3><p className="muted">Horario semanal por médico, vacaciones y bloqueos que se reflejan al instante.</p></div>
         </section>
+        <p className="small muted section">¿Dudas sobre cómo funciona? Visita el <Link href="/ayuda">centro de ayuda</Link> · <Link href="/privacidad">Aviso de privacidad</Link></p>
       </main>
     </>
   );

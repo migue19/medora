@@ -157,3 +157,22 @@ dialog::backdrop { background: rgb(0 0 0 / 40%); }
 .pw-field input { padding-right: 44px; }
 .pw-toggle { position: absolute; top: 0; right: 0; height: 100%; min-height: 0; width: 44px; padding: 0; border: 0; background: transparent; color: var(--muted); display: grid; place-items: center; }
 .pw-toggle:hover:not(:disabled) { background: transparent; color: var(--text); }
+
+/* Centro de ayuda */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.help-hero { max-width: 720px; }
+.help-search input { font-size: 1.05rem; padding: 14px 16px; }
+.help-result { display: flex; flex-direction: column; gap: 2px; padding: 8px 4px; border-bottom: 1px solid var(--border); text-decoration: none; color: var(--text); }
+.help-result:last-child { border-bottom: 0; }
+.help-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+.help-links { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.help-article { max-width: 760px; }
+.help-body h2 { margin-top: 12px; }
+.help-body p, .help-body li { line-height: 1.6; }
+.help-body ul, .help-steps { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 6px; }
+.help-steps li::marker { color: var(--primary); font-weight: 800; }
+.help-tip { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-left: 4px solid var(--primary); background: var(--primary-soft); border-radius: 8px; line-height: 1.5; }
+.help-tip > strong { color: var(--primary); font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
+.help-shot { margin: 4px 0; display: flex; flex-direction: column; gap: 6px; }
+.help-shot img { width: 100%; height: auto; border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); background: var(--surface); }
+.help-shot.mobile img { max-width: 300px; border-radius: 20px; }

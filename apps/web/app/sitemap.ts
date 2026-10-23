@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next';
 import { getDirectoryOverview, getSitemapData, siteUrl } from '@/lib/server-api';
+import { ARTICLES } from './ayuda/articulos';
 
 // Se genera al pedirlo (con caché de 10 min en la consulta a la API), no al compilar.
 export const dynamic = 'force-dynamic';
@@ -10,6 +11,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     { url: `${site}/`, changeFrequency: 'monthly', priority: 0.5 },
     { url: `${site}/directorio`, changeFrequency: 'daily', priority: 0.8 },
+    { url: `${site}/ayuda`, changeFrequency: 'monthly', priority: 0.6 },
+    ...ARTICLES.map((a) => ({ url: `${site}/ayuda/${a.slug}`, changeFrequency: 'monthly' as const, priority: 0.5 })),
     ...directory.specialties.map((s) => ({ url: `${site}/directorio/${s.slug}`, changeFrequency: 'daily' as const, priority: 0.8 })),
     ...directory.combos.map((c) => ({
       url: `${site}/directorio/${c.specialty}/${c.city}`, lastModified: new Date(c.updatedAt), changeFrequency: 'daily' as const, priority: 0.7,

@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Header } from '@/components/Header';
 import { StaffSessionData, staffSession } from '@/lib/api';
 import { useSession } from '@/lib/hooks';
@@ -63,6 +64,7 @@ export default function Panel() {
     <>
       <Header>
         <span className="small"><strong>{session.clinic.name}</strong> · {session.user.name} <span className="badge">{ROLE_LABEL[role]}</span></span>
+        <Link className="btn ghost" href="/ayuda" target="_blank">Ayuda</Link>
         <button className="ghost" onClick={logout}>Salir</button>
       </Header>
       <main className="container section">
