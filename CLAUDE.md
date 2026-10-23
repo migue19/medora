@@ -80,7 +80,7 @@ Antes de dar por terminado un cambio en la API, correr typecheck y las pruebas d
 ssh root@82.180.139.70 /opt/medora/scripts/backup-db.sh
 git archive HEAD | ssh root@82.180.139.70 'tar -x -C /opt/medora && cd /opt/medora \
   && docker compose build -q && docker compose --profile tools build -q tools \
-  && docker compose --profile tools run --rm tools npm run db:migrate \
+  && docker compose --profile tools run --rm -T tools npm run db:migrate </dev/null \
   && docker compose up -d api web'
 ```
 
