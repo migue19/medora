@@ -1,0 +1,96 @@
+# Medora · guía para Claude
+
+Agenda, reservas en línea, expediente y cobros para clínicas en México. Producción: https://medora.nut.com.mx (VPS 82.180.139.70, `/opt/medora`).
+
+## Idioma
+
+- Responder **siempre en español**: texto, resúmenes y botones.
+- El código, los comentarios, los mensajes de error para el usuario y los commits también van en español (estilo: `Sprint N: tema`).
+
+## Estructura
+
+- Monorepo npm, Node ≥ 22.12.
+- `apps/api` contiene la API:
+  - NestJS 11 con Prisma 6.19 (`engineType = "client"` + `@prisma/adapter-pg`) sobre PostgreSQL 17.
+  - Cada módulo vive en `src/<dominio>/`: appointments, payments, video, records, billing, reports, integrations, etc.
+  - El esquema y las migraciones están en `prisma/`.
+  - Pruebas en `test/unit` y `test/integration`.
+- `apps/web` contiene la web: Next.js 16 (App Router) y React 19, como PWA. `/api/*` es un proxy de mismo origen hacia la API.
+- `compose.yaml` define los servicios `db`, `api`, `web` y `tools` (perfil `tools`). Puertos: API 6010, web 6011.
+- `scripts/` tiene los scripts de verificación local, respaldo y prueba de restauración.
+
+## Comandos
+
+```sh
+npm run typecheck
+npm test                    # unitarias de la API
+npm run verify:local        # PostgreSQL temporal en Docker + migraciones + typecheck + pruebas + build
+TEST_DATABASE_URL=postgresql://…/medora_test npm run test:integration   # la base debe terminar en _test
+npm run db:generate         # tras cambiar schema.prisma
+```
+
+Antes de dar por terminado un cambio en la API, correr typecheck y las pruebas de integración.
+
+## Convenciones importantes
+
+### Migraciones
+
+- Siempre una migración SQL nueva en `apps/api/prisma/migrations/AAAAMMDDHHMMSS_nombre`. Nunca editar migraciones ya aplicadas.
+- Muchas reglas viven en la base y no deben quitarse:
+  - exclusión anti-traslape (`btree_gist`) y CHECKs;
+  - triggers de inmutabilidad y retención del expediente;
+  - trigger `appointment_outbound`;
+  - índices únicos parciales de pagos.
+
+### Cola de trabajos
+
+- La tabla `Job` usa `dedupeKey`. Se encola dentro de la misma transacción del negocio.
+- Los handlers reciben `now` (el reloj de la cola). No uses `Date.now()` en ellos.
+
+### Fechas
+
+- Se guardan en UTC; la conexión fija `TimeZone=UTC`.
+- Se muestran en la zona horaria de la clínica (`clinic.timezone`), con luxon en la API y `lib/format` en la web.
+
+### Planes
+
+- Las funciones de pago se protegen con `assertFeature` y `entitlements()` (`src/billing/plans.ts`).
+
+### Proveedores externos
+
+- Cada proveedor está detrás de una interfaz inyectable, con un doble falso en las pruebas: Stripe, Daily, Facturama, correo, WhatsApp, webhooks, Google/Microsoft Calendar y web push.
+- Stripe:
+  - Los webhooks se verifican con el cuerpo crudo.
+  - En cada evento se vuelve a leer el estado desde Stripe; nunca se confía en el contenido del evento.
+
+### Datos sensibles
+
+- Los adjuntos clínicos se cifran con AES-256-GCM (`RECORDS_ENCRYPTION_KEY`), y los tokens de calendario con una llave derivada.
+- Nunca registrar en logs datos de pacientes ni secretos.
+
+### Encabezados de la web
+
+- `Permissions-Policy` se define por ruta en `apps/web/next.config.ts`:
+  - `/consulta` permite cámara y micrófono;
+  - `/directorio` permite geolocalización.
+
+## Despliegue (sólo cuando el usuario lo pida)
+
+```sh
+ssh root@82.180.139.70 /opt/medora/scripts/backup-db.sh
+git archive HEAD | ssh root@82.180.139.70 'tar -x -C /opt/medora && cd /opt/medora \
+  && docker compose build -q && docker compose --profile tools build -q tools \
+  && docker compose --profile tools run --rm tools npm run db:migrate \
+  && docker compose up -d api web'
+```
+
+- Se despliega lo que está en el commit (`git archive HEAD`). Primero se hace commit y después el despliegue.
+- Las llaves se cargan **por el usuario** con los scripts de `/opt/medora/scripts` (`set-stripe-keys.sh`, `set-daily-key.sh`, `set-facturama.sh`, `set-calendar-keys.sh`). Nunca se piden ni se escriben secretos en el chat.
+- El VPS es compartido: no leer `.env` ni datos de otros proyectos.
+- `hostinger.txt` contiene el token de la API de Hostinger: está en `.gitignore` y nunca se imprime.
+
+## Pendientes conocidos
+
+- El certificado de `medora.nut.com.mx` vence el 13-ene-2027 y su validación DNS es manual (`/root/medora-acme/auth-hook.sh`). Falta automatizarla.
+- Los respaldos sólo viven en el VPS. Falta la copia cifrada fuera del servidor.
+- Facturama, Stripe en modo real, Microsoft Entra y las plantillas de WhatsApp están pendientes de las cuentas del usuario.
