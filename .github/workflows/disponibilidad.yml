@@ -1,0 +1,27 @@
+# Chequeo externo de disponibilidad: avisa (correo de GitHub por ejecución fallida) si el VPS entero se cae,
+# caso que el monitoreo interno (scripts/monitor.sh) no puede reportar.
+name: Disponibilidad
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  revisar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: API y web de medora.nut.com.mx
+        run: |
+          for i in 1 2 3; do
+            api=$(curl -s -m 20 -o /dev/null -w '%{http_code}' https://medora.nut.com.mx/api/health || true)
+            web=$(curl -s -m 20 -o /dev/null -w '%{http_code}' https://medora.nut.com.mx/ || true)
+            echo "intento $i: api=$api web=$web"
+            [ "$api" = 200 ] && [ "$web" = 200 ] && exit 0
+            sleep 30
+          done
+          echo "::error::Medora no responde (api=$api, web=$web)"
+          exit 1

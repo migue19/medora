@@ -110,5 +110,8 @@ git archive HEAD | ssh root@82.180.139.70 'tar -x -C /opt/medora && cd /opt/medo
 
 - Sólo se usa el puerto 443; el 80 está cerrado en el firewall de Hostinger.
 - El certificado se renueva solo por DNS. `scripts/acme-dns-hook.sh` publica el TXT con la API de Hostinger, y el token está en `/root/.hostinger-dns-token`.
+- Monitoreo:
+  - `scripts/monitor.sh` corre cada 5 min por cron (`/etc/cron.d/medora-monitor`) y avisa por correo a `MONITOR_EMAIL` o `ONBOARDING_NOTIFY_EMAIL`.
+  - `.github/workflows/disponibilidad.yml` revisa desde fuera cada 15 min.
 - Respaldos: copia diaria cifrada en Google Drive con `scripts/offsite-backup.sh`. La contraseña de cifrado está en `/root/medora-offsite-password`.
 - Facturama, Stripe en modo real, Microsoft Entra y las plantillas de WhatsApp están pendientes de las cuentas del usuario.

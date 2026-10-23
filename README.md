@@ -410,6 +410,21 @@ scripts/restore-check.sh
 docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner' < /var/backups/medora/medora-AAAAMMDD-HHMMSS.dump
 ```
 
+### Monitoreo
+
+`scripts/monitor.sh` corre cada 5 minutos en el VPS (`/etc/cron.d/medora-monitor`; bitácora en `/var/log/medora-monitor.log`) y revisa:
+
+- la API y la web a través de nginx;
+- los contenedores;
+- los trabajos fallidos o atrasados de la cola;
+- que exista un respaldo de menos de 26 h y su copia en Drive;
+- que al certificado le queden 21 días o más;
+- que el disco esté por debajo del 85 %.
+
+Avisa por correo, con el SMTP del `.env`, a `MONITOR_EMAIL` (o, si no existe, a `ONBOARDING_NOTIFY_EMAIL`). El correo sale cuando aparece un problema, cada 24 h mientras siga y cuando se resuelve. `scripts/monitor.sh --prueba` envía un correo de prueba.
+
+Para cuando se cae el VPS completo, el workflow `.github/workflows/disponibilidad.yml` revisa el sitio desde GitHub cada 15 minutos. Si falla, GitHub manda su correo de ejecución fallida.
+
 ### Certificado TLS
 
 Sólo se usa el puerto 443 (el 80 está cerrado en el firewall de Hostinger), así que Let's Encrypt valida por DNS. Al renovar, certbot llama a `scripts/acme-dns-hook.sh`, que publica el TXT `_acme-challenge` con la API DNS de Hostinger, espera a que se propague y luego lo borra. El token se carga una vez con `scripts/set-hostinger-dns-token.sh`, que también ajusta la renovación y la prueba en seco.
