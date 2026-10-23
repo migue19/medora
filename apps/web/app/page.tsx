@@ -1,7 +1,19 @@
 import Link from 'next/link';
 import { Header } from '@/components/Header';
+import { apiBase } from '@/lib/server-api';
+import { money } from '@/lib/format';
 
-export default function Home() {
+interface Plan { key: string; name: string; priceCents: number; summary: string[] }
+
+async function plans(): Promise<{ trialDays: number; plans: Plan[] } | null> {
+  try {
+    const res = await fetch(`${apiBase()}/api/public/plans`, { next: { revalidate: 3600 } });
+    return res.ok ? res.json() : null;
+  } catch { return null; }
+}
+
+export default async function Home() {
+  const pricing = await plans();
   return (
     <>
       <Header>
@@ -17,7 +29,8 @@ export default function Home() {
             mientras recepción y médicos ven su agenda en tiempo real, sin dobles reservas.
           </p>
           <div className="row">
-            <Link className="btn primary" href="/login">Entrar al panel</Link>
+            <Link className="btn primary" href="/registro">Prueba 14 días gratis</Link>
+            <Link className="btn" href="/login">Entrar al panel</Link>
             <Link className="btn" href="/paciente">Soy paciente</Link>
           </div>
         </section>
@@ -29,6 +42,22 @@ export default function Home() {
             <button type="submit" className="primary">Buscar</button>
           </form>
         </section>
+        {pricing && (
+          <section className="stack section" aria-labelledby="planes">
+            <h2 id="planes">Planes para tu clínica</h2>
+            <p className="muted">{pricing.trialDays} días gratis, sin tarjeta. Precios mensuales con IVA incluido; cambia o cancela cuando quieras.</p>
+            <div className="grid">
+              {pricing.plans.map((p) => (
+                <div key={p.key} className="card stack" style={{ gap: 6 }}>
+                  <h3 style={{ margin: 0 }}>{p.name}</h3>
+                  <span><strong style={{ fontSize: '1.5rem' }}>{money(p.priceCents)}</strong> <span className="small muted">al mes</span></span>
+                  <ul className="small" style={{ margin: 0, paddingLeft: 18 }}>{p.summary.map((x) => <li key={x}>{x}</li>)}</ul>
+                  <Link className="btn primary" href={`/registro?plan=${p.key.toLowerCase()}`}>Probar {p.name}</Link>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
         <section className="grid section">
           <div className="card"><h3>Reservas 24/7</h3><p className="muted">Cada clínica tiene su página pública con médicos, servicios y horarios disponibles.</p></div>
           <div className="card"><h3>Sin doble agendado</h3><p className="muted">La base de datos impide que dos citas del mismo médico se traslapen, incluso con reservas simultáneas.</p></div>

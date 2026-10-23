@@ -332,3 +332,73 @@ export function refundEmail(p: {
     footer: ['El reembolso aparece en tu estado de cuenta en 5 a 10 días hábiles, según tu banco.'],
   });
 }
+
+export function subscriptionInvoiceEmail(p: {
+  clinicName: string; planName: string; amountCents: number; periodStart: Date; periodEnd: Date; uuid: string | null; panelLink: string;
+}): RenderedEmail {
+  const fmt = (d: Date) => DateTime.fromJSDate(d, { zone: 'America/Mexico_City' }).setLocale('es').toFormat("d 'de' LLLL 'de' yyyy");
+  return layout({
+    subject: `Tu factura de Medora · ${formatPrice(p.amountCents)}`,
+    greeting: `Hola, equipo de ${p.clinicName}:`,
+    paragraphs: ['Gracias por tu pago. Adjuntamos la factura (CFDI 4.0) en PDF y XML.'],
+    details: [
+      { label: 'Plan', value: p.planName },
+      { label: 'Periodo', value: `${fmt(p.periodStart)} al ${fmt(p.periodEnd)}` },
+      { label: 'Total', value: `${formatPrice(p.amountCents)} (IVA incluido)` },
+      ...(p.uuid ? [{ label: 'Folio fiscal', value: p.uuid }] : []),
+    ],
+    action: { label: 'Ver mi suscripción', url: p.panelLink },
+    footer: ['También puedes descargar tus facturas en el panel, en «Suscripción».'],
+  });
+}
+
+export function signupNotice(p: { clinicName: string; ownerName: string; email: string; doctorName: string; licenseNumber: string; adminLink: string }): RenderedEmail {
+  return layout({
+    subject: `Nueva clínica por verificar: ${p.clinicName}`,
+    greeting: 'Hola:',
+    paragraphs: ['Se registró una clínica nueva. Revisa la cédula en el Registro Nacional de Profesionistas y apruébala o recházala.'],
+    details: [
+      { label: 'Clínica', value: p.clinicName }, { label: 'Responsable', value: `${p.ownerName} <${p.email}>` },
+      { label: 'Médico', value: p.doctorName }, { label: 'Cédula', value: p.licenseNumber },
+    ],
+    action: { label: 'Revisar en Medora', url: p.adminLink },
+  });
+}
+
+export function verificationResult(p: { clinicName: string; approved: boolean; note: string | null; panelLink: string }): RenderedEmail {
+  return layout({
+    subject: p.approved ? `${p.clinicName} quedó verificada en Medora` : `Revisión de cédula de ${p.clinicName}`,
+    greeting: 'Hola:',
+    paragraphs: [p.approved
+      ? 'Verificamos la cédula profesional. Ya puedes aparecer en el directorio de Medora y cobrar en línea.'
+      : `No pudimos verificar la cédula profesional${p.note ? `: ${p.note}` : '.'} Corrígela en «Médicos» o responde a este correo.`],
+    action: { label: 'Ir al panel', url: p.panelLink },
+  });
+}
+
+export function signupActivation(p: { name: string; clinicName: string; slug: string; link: string; trialDays: number; planName: string }): RenderedEmail {
+  return layout({
+    subject: `Activa tu cuenta de Medora · ${p.clinicName}`,
+    greeting: `Hola, ${p.name}:`,
+    paragraphs: [
+      `Registramos ${p.clinicName} con el plan ${p.planName} y ${p.trialDays} días de prueba sin costo. Elige tu contraseña para entrar al panel.`,
+      `Para iniciar sesión usa el identificador de clínica «${p.slug}».`,
+      'Mientras verificamos la cédula profesional (normalmente en un día hábil) ya puedes configurar tu agenda y recibir citas.',
+    ],
+    action: { label: 'Elegir mi contraseña', url: p.link },
+    footer: ['El enlace vence en 7 días y sirve una sola vez. Si no fuiste tú, ignora este correo.'],
+  });
+}
+
+export function accountExists(p: { name: string; loginLink: string; recoverLink: string }): RenderedEmail {
+  return layout({
+    subject: 'Ya tienes una cuenta en Medora',
+    greeting: `Hola, ${p.name}:`,
+    paragraphs: [
+      'Alguien intentó registrar una clínica nueva con tu correo, que ya tiene cuenta en Medora. No creamos nada.',
+      `Si fuiste tú, entra al panel con tu contraseña. Si la olvidaste, recupérala aquí: ${p.recoverLink}. Para abrir otra clínica con el mismo correo, responde a este mensaje.`,
+    ],
+    action: { label: 'Entrar al panel', url: p.loginLink },
+    footer: ['Si no fuiste tú, ignora este correo.'],
+  });
+}

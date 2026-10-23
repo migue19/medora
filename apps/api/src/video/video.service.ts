@@ -3,6 +3,7 @@ import { APP_CONFIG, AppConfig } from '../config';
 import { PrismaService } from '../prisma.service';
 import { VIDEO_PROVIDER, VideoProvider } from './video.provider';
 import { readVideoLinkToken, videoLinkToken } from './link';
+import { entitlements } from '../billing/plans';
 
 /** La sala abre 15 min antes y cierra 30 min después del fin de la cita. */
 export const OPENS_BEFORE_MINUTES = 15;
@@ -45,7 +46,7 @@ export class VideoService {
     return this.prisma.appointment.findUnique({
       where: { id: appointmentId },
       include: {
-        clinic: { select: { name: true, timezone: true, phone: true } },
+        clinic: { select: { name: true, timezone: true, phone: true, plan: true, subscriptionStatus: true, trialEndsAt: true, currentPeriodEnd: true, billingExempt: true } },
         doctor: { select: { id: true, displayName: true, specialty: true, membershipId: true } },
         clinicPatient: { select: { name: true, patientAccountId: true } },
       },
@@ -68,12 +69,12 @@ export class VideoService {
       doctor: { displayName: a.doctor.displayName, specialty: a.doctor.specialty }, patientName: a.clinicPatient.name,
       opensAt, closesAt, open: now >= opensAt && now <= closesAt,
       consentGiven: a.videoConsentAt !== null, consentText: CONSENT_TEXT, consentVersion: CONSENT_VERSION,
-      available: this.available,
+      available: this.available && entitlements(a.clinic).plan.features.telemedicine,
     };
   }
 
   private assertJoinable(a: NonNullable<VideoAppointment>, now: Date) {
-    if (!this.available) throw new ConflictException('Las videoconsultas no están disponibles por ahora');
+    if (!this.available || !entitlements(a.clinic).plan.features.telemedicine) throw new ConflictException('Las videoconsultas no están disponibles por ahora');
     if (a.modality !== 'VIDEO') throw new ConflictException('Esta cita es presencial');
     if (a.status !== 'BOOKED') throw new ConflictException('La cita ya no está vigente');
     const { opensAt, closesAt } = this.window(a);

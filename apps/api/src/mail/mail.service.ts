@@ -161,6 +161,11 @@ export class MailService {
     }), { dedupeKey: `payment-refunded:${event.id}` });
   }
 
+  /** Encola un correo ya armado (avisos de suscripción y verificación). */
+  async queue(tx: Tx | PrismaService, to: string, rendered: RenderedEmail, dedupeKey?: string): Promise<void> {
+    await this.enqueue(tx, to, rendered, { dedupeKey });
+  }
+
   private fromAddress(): string {
     const from = this.config.mail.from;
     return from.match(/<([^>]+)>/)?.[1] ?? from;

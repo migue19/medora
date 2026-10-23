@@ -15,6 +15,7 @@ import { normalizeEmail } from '../common/http';
 import { MailService } from '../mail/mail.service';
 import { Roles, Staff, StaffContext, StaffGuard } from '../auth/guards';
 import { PHONE_PATTERN } from '../patient/patient-auth.controller';
+import { assertFeature } from '../billing/plans';
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 const emptyToNull = ({ value }: { value: unknown }) =>
@@ -90,6 +91,15 @@ export class ClinicController {
   @Roles('OWNER', 'ADMIN')
   async update(@Staff() staff: StaffContext, @Body() dto: UpdateClinicDto) {
     if (Object.keys(dto).length === 0) throw new BadRequestException('Sin cambios');
+    const current = await this.prisma.clinic.findUniqueOrThrow({ where: { id: staff.clinicId } });
+    if (dto.whatsappEnabled) assertFeature(current, 'whatsapp');
+    if (dto.paymentMode && dto.paymentMode !== 'OFF') {
+      assertFeature(current, 'payments');
+      if (current.verification !== 'VERIFIED') throw new ConflictException('Podrás cobrar en línea en cuanto verifiquemos la cédula del médico responsable');
+    }
+    if (dto.directoryEnabled && current.verification !== 'VERIFIED') {
+      throw new ConflictException('Podrás aparecer en el directorio en cuanto verifiquemos la cédula del médico responsable');
+    }
     if (dto.paymentMode && dto.paymentMode !== 'OFF' && !this.config.payments) {
       throw new ConflictException('Los pagos en línea aún no están configurados en Medora');
     }

@@ -1,4 +1,4 @@
-// Medora · Sprint 11
+// Medora · Sprint 12
 // Todas las entidades de negocio llevan clinicId y se consultan siempre
 // filtradas por la clínica obtenida de la sesión.
 
@@ -49,6 +49,34 @@ enum AppointmentModality {
   IN_PERSON
   // Videoconsulta: sala de Daily por cita.
   VIDEO
+}
+
+enum Plan {
+  CONSULTORIO
+  CLINICA
+  PLUS
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  // Falló el cobro: sigue operando unos días mientras se actualiza la tarjeta.
+  PAST_DUE
+  CANCELED
+}
+
+enum ClinicVerification {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum CfdiStatus {
+  PENDING
+  ISSUED
+  // Sin datos fiscales de la clínica: no se timbra (puede pedirse después dentro del mes).
+  SKIPPED
+  FAILED
 }
 
 enum PaymentMode {
@@ -172,6 +200,20 @@ model Clinic {
   refundMinMinutes        Int      @default(1440)
   // Aceptar OXXO y transferencia SPEI (sólo para citas con 3 días o más de anticipación).
   asyncPaymentsEnabled    Boolean  @default(false)
+  // Suscripción a Medora.
+  plan                    Plan               @default(CLINICA)
+  subscriptionStatus      SubscriptionStatus @default(TRIALING)
+  trialEndsAt             DateTime?          @db.Timestamptz(3)
+  currentPeriodEnd        DateTime?          @db.Timestamptz(3)
+  cancelAtPeriodEnd       Boolean            @default(false)
+  stripeCustomerId        String?            @unique @db.VarChar(255)
+  stripeSubscriptionId    String?            @unique @db.VarChar(255)
+  // Clínicas piloto o cortesía: sin cobro y con todo incluido.
+  billingExempt           Boolean            @default(false)
+  // Revisión de la cédula del médico responsable (alta autoservicio).
+  verification            ClinicVerification @default(PENDING)
+  verificationNote        String?            @db.VarChar(300)
+  verifiedAt              DateTime?          @db.Timestamptz(3)
   createdAt               DateTime @default(now()) @db.Timestamptz(3)
   updatedAt               DateTime @updatedAt @db.Timestamptz(3)
 
@@ -181,6 +223,8 @@ model Clinic {
   doctors        Doctor[]
   services       Service[]
   clinicPatients ClinicPatient[]
+  billing        ClinicBilling?
+  invoices       SubscriptionInvoice[]
   appointments   Appointment[]
 }
 
@@ -1067,4 +1111,44 @@ model ClinicalAccessLog {
 model Icd10 {
   code        String @id @db.VarChar(10)
   description String @db.VarChar(255)
+}
+
+// ---------------------------------------------------------------- Suscripción y facturación
+
+// Datos fiscales de la clínica para su factura CFDI 4.0.
+model ClinicBilling {
+  clinicId     String   @id @db.Uuid
+  rfc          String   @db.VarChar(13)
+  legalName    String   @db.VarChar(254)
+  fiscalRegime String   @db.VarChar(3)
+  zipCode      String   @db.VarChar(5)
+  cfdiUse      String   @default("G03") @db.VarChar(4)
+  email        String   @db.VarChar(254)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+}
+
+// Cada cobro de la suscripción (factura de Stripe) y su CFDI.
+model SubscriptionInvoice {
+  id              String     @id @default(uuid()) @db.Uuid
+  clinicId        String     @db.Uuid
+  stripeInvoiceId String     @unique @db.VarChar(255)
+  plan            Plan
+  amountCents     Int
+  periodStart     DateTime   @db.Timestamptz(3)
+  periodEnd       DateTime   @db.Timestamptz(3)
+  paidAt          DateTime   @db.Timestamptz(3)
+  // credit o debit: forma de pago del CFDI (04 o 28).
+  cardFunding     String?    @db.VarChar(10)
+  cfdiStatus      CfdiStatus @default(PENDING)
+  cfdiId          String?    @db.VarChar(64)
+  cfdiUuid        String?    @db.VarChar(40)
+  cfdiError       String?    @db.VarChar(500)
+  createdAt       DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime   @updatedAt @db.Timestamptz(3)
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+
+  @@index([clinicId, paidAt])
 }

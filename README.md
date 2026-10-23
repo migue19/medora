@@ -126,7 +126,9 @@ Entregado. Expediente por paciente con historia clínica por secciones de la NOM
 - Revisión de los lineamientos de la NOM-024-SSA3-2012 para la interoperabilidad futura.
 - **Terminado cuando**: un médico documenta la consulta, imprime la receta y la bitácora muestra quién vio cada expediente.
 
-### Sprint 12 · Suscripciones y facturación
+### Sprint 12 · Suscripciones y facturación ✅
+
+Entregado: planes Consultorio, Clínica y Plus con 14 días de prueba, cobro recurrente con Stripe, límites por plan, alta autoservicio en `/registro` con verificación manual de la cédula desde `/admin`, y facturas CFDI 4.0 de la suscripción con Facturama. Queda pendiente la facturación de consultas a los pacientes, que requiere el RFC y el CSD de cada clínica (Facturama multiemisor). Detalle en [SPRINT12_RESULTS.md](SPRINT12_RESULTS.md).
 
 - Planes para clínicas (número de médicos, recordatorios, telemedicina) con cobro recurrente y periodo de prueba.
 - Facturación CFDI 4.0 a la clínica por su suscripción, y facturación opcional de consultas a los pacientes, a través de un PAC (por ejemplo, Facturama).
@@ -318,6 +320,28 @@ Cómo funciona:
 - **Recetas:** PDF con los datos de la clínica, el médico y su cédula, el paciente (edad, sexo y alergias), medicamentos e indicaciones, más un QR que lleva a `/receta/{código}`. Ahí la farmacia confirma que es auténtica y no fue anulada, viendo sólo las iniciales del paciente.
 - **Adjuntos:** PDF, JPG o PNG de hasta 10 MB, cifrados con AES-256-GCM. La llave `RECORDS_ENCRYPTION_KEY` está en el `.env` del servidor y **debe respaldarse aparte**: los respaldos de la base no la incluyen, y sin ella los adjuntos no se pueden leer.
 
+## Suscripciones y facturación
+
+| Plan | Precio mensual (IVA incluido) | Médicos | Incluye |
+|---|---|---|---|
+| Consultorio | $499 | 1 | Agenda, reservas, recordatorios por correo, expediente y recetas, directorio, opiniones |
+| Clínica | $1,299 | 5 | Todo lo anterior + WhatsApp, videoconsultas, cobro en línea |
+| Plus | $2,499 | 15 | Todo lo anterior + archivos en el expediente y reportes |
+
+- **Alta y prueba:** las clínicas se registran en `/registro` y tienen 14 días sin tarjeta. Pueden suscribirse antes de que termine la prueba (los días restantes no se cobran) desde «Suscripción».
+- **Si la suscripción no está vigente:** prueba vencida o cancelada, o 7 días después de un cobro fallido, la clínica deja de recibir reservas en línea y sale del directorio. Su información sigue disponible en el panel.
+- **Límites:** médicos activos y funciones por plan. Al bajar de plan se apagan WhatsApp y el cobro en línea si el nuevo plan no los incluye, y no se puede bajar con más médicos activos de los que permite el nuevo plan.
+- **Verificación:** quien está en `SUPERADMIN_EMAILS` recibe un aviso con cada registro y verifica o rechaza la cédula en `/admin`, con un enlace al Registro Nacional de Profesionistas. Sin verificar, la clínica no aparece en el directorio ni cobra en línea. En `/admin` también se marcan las clínicas sin costo (cortesía).
+- **Stripe:**
+  - Los mismos `STRIPE_SECRET_KEY` y `STRIPE_WEBHOOK_SECRET` de los pagos. Agrega al webhook los eventos `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid` e `invoice.payment_failed`.
+  - Activa una vez el portal del cliente en *Settings → Billing → Customer portal*: es el botón «Cambiar tarjeta».
+  - Los productos y precios se crean solos la primera vez.
+- **CFDI 4.0 (Facturama, API de un solo emisor):**
+  1. Crea la cuenta en Facturama y sube tu CSD con el perfil fiscal.
+  2. Guarda las credenciales con `ssh -t root@82.180.139.70 /opt/medora/scripts/set-facturama.sh`.
+  3. Cada cobro se factura solo (clave 81112106, unidad E48, PUE, forma de pago 04 crédito o 28 débito según la tarjeta) y se envía al correo fiscal de la clínica con el PDF y el XML. Sin datos fiscales queda «sin factura» y la clínica puede pedirla dentro de 30 días.
+  4. `INVOICE_RESICO_RETENTION=true` agrega la retención de ISR del 1.25 % a personas morales: **confírmalo con tu contador**.
+
 ## Arranque con Docker Compose (local)
 
 Requisitos: Docker Desktop con Compose v2 y los puertos 6010/6011 libres. Estos puertos no chocan con Tavixo (6000/6001).
@@ -436,6 +460,9 @@ La API escucha en 127.0.0.1:6010 y Next en 127.0.0.1:6011. `WEB_ORIGIN` debe coi
 | GET | /api/clinic/icd10?q= · /api/clinic/clinical-audit | Personal clínico · propietario |
 | PATCH | /api/clinic/members/:id/clinical-access | Propietario |
 | GET | /api/public/prescriptions/:code | Público (verificación de recetas) |
+| GET · POST | /api/public/plans · /api/public/signup | Público (alta autoservicio; Origin y límite por IP) |
+| GET · POST · PUT | /api/clinic/subscription (checkout, plan, cancel, portal, billing, invoices/:id/cfdi, invoices/:id/pdf\|xml) | Propietario (cambios) y administración |
+| GET · PATCH | /api/admin/clinics | Administración de Medora (`SUPERADMIN_EMAILS`) |
 | POST | /api/public/reviews/inspect · /api/public/reviews | Público con el token de la invitación; Origin |
 | GET | /api/public/reviews/clinics/:slug/doctors/:doctorSlug?page | Público: opiniones publicadas (10 por página) |
 | POST | /api/patient/appointments/:id/review | Paciente: opinar sobre su cita atendida |

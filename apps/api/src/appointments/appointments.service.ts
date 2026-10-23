@@ -12,6 +12,7 @@ import { RemindersService } from '../notifications/reminders.service';
 import { JobsService } from '../jobs/jobs.service';
 import { ReviewsService } from '../reviews/reviews.service';
 import { APP_CONFIG, AppConfig } from '../config';
+import { canBookOnline } from '../billing/plans';
 import { PAYMENT_EXPIRE_JOB, PAYMENT_HOLD_MINUTES, requiresPayment, settleOnCancel } from '../payments/policy';
 
 /** Trabajo que ofrece un horario liberado a la lista de espera (lo atiende WaitlistService). */
@@ -217,7 +218,7 @@ export class AppointmentsService {
         }
 
         if (input.source === 'ONLINE') {
-          if (!clinic.bookingEnabled) throw new ForbiddenException('La clínica no acepta reservas en línea por ahora');
+          if (!canBookOnline(clinic)) throw new ForbiddenException('La clínica no acepta reservas en línea por ahora');
           await this.assertOnlineSlot(tx, clinic, doctor.id, service.durationMinutes, startsAt, now, null, offer?.id ?? null);
           const future = await tx.appointment.count({
             where: { clinicPatientId: input.clinicPatientId, status: { in: [...ACTIVE_STATUSES] }, startsAt: { gt: now } },
@@ -390,7 +391,7 @@ export class AppointmentsService {
         const now = new Date();
         if (current.startsAt <= now) throw new ConflictException('La cita ya comenzó');
         if (params.online) {
-          if (!clinic.bookingEnabled) throw new ForbiddenException('La clínica no acepta cambios en línea por ahora');
+          if (!canBookOnline(clinic)) throw new ForbiddenException('La clínica no acepta cambios en línea por ahora');
           if (current.startsAt.getTime() - now.getTime() < clinic.patientCancelMinMinutes * 60_000) {
             throw new ConflictException('Ya no es posible reprogramar en línea. Comunícate con la clínica.');
           }

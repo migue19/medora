@@ -6,6 +6,8 @@ export interface EmailAttachment {
   filename: string;
   contentType: string;
   content: string;
+  /** Contenido binario (PDF, XML de un CFDI) codificado en base64. */
+  encoding?: 'base64';
 }
 
 export interface OutgoingEmail {
@@ -49,7 +51,7 @@ export class SmtpTransport implements MailTransport {
       text: email.text,
       html: email.html,
       messageId: email.messageId,
-      attachments: email.attachments?.map((a) => ({ filename: a.filename, contentType: a.contentType, content: a.content })),
+      attachments: email.attachments?.map((a) => ({ filename: a.filename, contentType: a.contentType, content: a.content, encoding: a.encoding })),
     });
   }
 }

@@ -12,6 +12,8 @@ import { MemoryTransport, OutgoingEmail } from '../../src/mail/mail.transport';
 import { MemoryWhatsApp } from '../../src/notifications/whatsapp.transport';
 import { MemoryGateway } from '../../src/payments/gateway';
 import { MemoryVideo } from '../../src/video/video.provider';
+import { MemoryBilling } from '../../src/billing/billing.gateway';
+import { MemoryCfdi } from '../../src/billing/cfdi';
 
 export const ORIGIN = 'http://localhost:6011';
 export const TZ = 'America/Mexico_City';
@@ -33,6 +35,8 @@ export interface Harness {
   whatsapp: MemoryWhatsApp;
   payments: MemoryGateway;
   video: MemoryVideo;
+  billing: MemoryBilling;
+  cfdi: MemoryCfdi;
   jobs: JobsService;
   /** Ejecuta la cola y devuelve los correos enviados en esta corrida. */
   deliver(): Promise<OutgoingEmail[]>;
@@ -47,6 +51,8 @@ export async function startHarness(): Promise<Harness> {
   const whatsapp = new MemoryWhatsApp();
   const payments = new MemoryGateway();
   const video = new MemoryVideo();
+  const billing = new MemoryBilling();
+  const cfdi = new MemoryCfdi();
   const app = await createApp({
     databaseUrl,
     jwtSecret: new TextEncoder().encode('integration-secret-integration-secret-0123'),
@@ -66,15 +72,17 @@ export async function startHarness(): Promise<Harness> {
     payments: { secretKey: 'sk_test_integracion', webhookSecret: WEBHOOK_SECRET },
     video: { apiKey: 'daily-prueba' },
     recordsKey: Buffer.alloc(32, 7),
+    invoicing: { user: 'prueba', password: 'prueba', sandbox: true, expeditionPlace: '03100', series: 'MED', resicoRetention: false },
+    superadmins: ['admin@medora.test'],
     jobsPollMs: 0,
-  }, false, { mail, whatsapp, payments, video });
+  }, false, { mail, whatsapp, payments, video, billing, cfdi });
   await app.listen(0, '127.0.0.1');
   const { port } = app.getHttpServer().address() as AddressInfo;
   const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: databaseUrl, options: '-c TimeZone=UTC' }) });
   sharedPrisma = prisma;
   const jobs = app.get(JobsService);
   return {
-    app, base: `http://127.0.0.1:${port}`, prisma, mail, whatsapp, payments, video, jobs,
+    app, base: `http://127.0.0.1:${port}`, prisma, mail, whatsapp, payments, video, billing, cfdi, jobs,
     async deliver() {
       const before = mail.sent.length;
       await jobs.runOnce();
@@ -125,7 +133,8 @@ export async function resetDb(prisma: PrismaClient): Promise<void> {
 }
 
 export async function createClinicWithOwner(prisma: PrismaClient, slug: string) {
-  const clinic = await prisma.clinic.create({ data: { slug, name: `Clínica ${slug}` } });
+  // Exenta de cobro (como las clínicas piloto): las pruebas de planes crean sus propias clínicas.
+  const clinic = await prisma.clinic.create({ data: { slug, name: `Clínica ${slug}`, billingExempt: true, verification: 'VERIFIED' } });
   const email = `owner-${slug}@test.mx`;
   const password = 'propietario-seguro-1';
   const user = await prisma.user.create({ data: { email, name: `Dueño ${slug}`, passwordHash: await hashPassword(password) } });

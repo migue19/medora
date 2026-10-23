@@ -9,7 +9,7 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: '*',
       allow: ['/', '/c/'],
       // Panel, portal, API, widget y páginas de enlaces de un solo uso no se indexan.
-      disallow: ['/panel', '/paciente', '/api/', '/embed/', '/login', '/verificar', '/restablecer', '/recuperar', '/invitacion', '/cita', '/lista-espera', '/vincular', '/opinion', '/alta', '/consulta', '/expediente', '/receta', '/offline'],
+      disallow: ['/panel', '/paciente', '/api/', '/embed/', '/login', '/verificar', '/restablecer', '/recuperar', '/invitacion', '/cita', '/lista-espera', '/vincular', '/opinion', '/alta', '/consulta', '/expediente', '/receta', '/admin', '/offline'],
     },
     sitemap: `${siteUrl()}/sitemap.xml`,
   };

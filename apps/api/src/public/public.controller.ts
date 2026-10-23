@@ -14,6 +14,7 @@ import { clientIp } from '../common/http';
 import { PaymentsService } from '../payments/payments.service';
 import { VideoService } from '../video/video.service';
 import { MIN_CHARGE_CENTS } from '../payments/policy';
+import { canBookOnline, entitlements } from '../billing/plans';
 
 const emptyToNull = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? (value.trim() === '' ? null : value.trim()) : value;
@@ -87,7 +88,7 @@ export class PublicController {
       const services = await Promise.all(d.services.map(async ({ service: s }) => ({
         id: s.id, name: s.name, durationMinutes: s.durationMinutes, priceCents: s.priceCents, visitType: s.visitType,
         // Videoconsulta sólo si el servicio la ofrece y Medora tiene salas configuradas.
-        telemedicine: s.telemedicine && this.video.available,
+        telemedicine: s.telemedicine && this.video.available && entitlements(clinic).plan.features.telemedicine,
         priceByLocation: await pricesFor(this.prisma, s, d.id, locationIds),
       })));
       return { d, locationIds, services };
@@ -100,7 +101,7 @@ export class PublicController {
     return {
       clinic: {
         name: clinic.name, slug: clinic.slug, phone: clinic.phone, address: clinic.address,
-        timezone: clinic.timezone, bookingEnabled: clinic.bookingEnabled,
+        timezone: clinic.timezone, bookingEnabled: canBookOnline(clinic),
         patientCancelMinMinutes: clinic.patientCancelMinMinutes,
         // Pago en línea al reservar (null si la clínica no cobra en línea).
         payment: this.payments.publicPolicy(clinic) && { ...this.payments.publicPolicy(clinic)!, minChargeCents: MIN_CHARGE_CENTS },
@@ -130,7 +131,7 @@ export class PublicController {
   ) {
     publicLimiter.consume(`public:${clientIp(req)}`);
     const clinic = await this.clinic(slug);
-    if (!clinic.bookingEnabled) {
+    if (!canBookOnline(clinic)) {
       return { timezone: clinic.timezone, bookingEnabled: false, days: [] };
     }
     const result = await this.appointments.availability({

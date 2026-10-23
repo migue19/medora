@@ -5,6 +5,8 @@ import { PrismaService, Tx } from '../prisma.service';
 import { JobsService } from '../jobs/jobs.service';
 import { MailService } from '../mail/mail.service';
 import { AppointmentsService, SYSTEM_ACTOR, lockDoctor } from '../appointments/appointments.service';
+import { entitlements } from '../billing/plans';
+import { BillingService } from '../billing/billing.service';
 import { PAYMENT_GATEWAY, PaymentGateway, RefundError, verifyWebhook } from './gateway';
 import {
   MAX_HOLD_MINUTES, PAYMENT_CLOSE_JOB, PAYMENT_EXPIRE_JOB, PAYMENT_REFUND_JOB, VOUCHER_HOURS, depositCents, payMethods,
@@ -21,6 +23,7 @@ export class PaymentsService implements OnModuleInit {
     private readonly jobs: JobsService,
     private readonly mail: MailService,
     private readonly appointments: AppointmentsService,
+    private readonly billing: BillingService,
   ) {}
 
   onModuleInit() {
@@ -51,7 +54,7 @@ export class PaymentsService implements OnModuleInit {
     });
     if (!a) throw new NotFoundException('Cita no encontrada');
     const amount = depositCents(a.clinic, a.priceCents);
-    if (!amount || a.clinic.paymentMode === 'OFF') throw new ConflictException('Esta cita no se paga en línea');
+    if (!amount || a.clinic.paymentMode === 'OFF' || !entitlements(a.clinic).plan.features.payments) throw new ConflictException('Esta cita no se paga en línea');
     if (a.startsAt <= now) throw new ConflictException('La cita ya comenzó');
     if (a.status !== 'PENDING_PAYMENT' && a.status !== 'BOOKED') throw new ConflictException('La cita ya no está vigente');
     const payments = await this.prisma.payment.findMany({ where: { appointmentId: a.id }, orderBy: { createdAt: 'asc' } });
@@ -109,9 +112,22 @@ export class PaymentsService implements OnModuleInit {
       throw new BadRequestException('Firma inválida');
     }
     if (await this.prisma.paymentWebhookEvent.findUnique({ where: { id: event.id } })) return { received: true, duplicate: true };
-    const object = event.data.object as unknown as { id: string; payment_intent?: string | null; amount_refunded?: number };
+    const object = event.data.object as unknown as {
+      id: string; payment_intent?: string | null; amount_refunded?: number; mode?: string;
+      subscription?: string | { id: string } | null; metadata?: Record<string, string>;
+    };
     switch (event.type) {
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated':
+      case 'customer.subscription.deleted':
+      case 'invoice.paid':
+      case 'invoice.payment_failed':
+        await this.billing.handleEvent(event.type, object);
+        break;
       case 'checkout.session.completed':
+        if (object.mode === 'subscription') { await this.billing.handleEvent(event.type, object); break; }
+        await this.sync(object.id);
+        break;
       case 'checkout.session.async_payment_succeeded':
       case 'checkout.session.async_payment_failed':
       case 'checkout.session.expired':

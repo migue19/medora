@@ -15,6 +15,7 @@ import { Services } from './Services';
 import { Team } from './Team';
 import { ClinicSettings } from './ClinicSettings';
 import { Account } from './Account';
+import { Subscription, SubscriptionBanner } from './Subscription';
 
 type Role = StaffSessionData['membership']['role'];
 const TABS: { id: string; label: string; roles: Role[] }[] = [
@@ -27,6 +28,7 @@ const TABS: { id: string; label: string; roles: Role[] }[] = [
   { id: 'payments', label: 'Pagos', roles: ['OWNER', 'ADMIN'] },
   { id: 'team', label: 'Equipo', roles: ['OWNER', 'ADMIN'] },
   { id: 'clinic', label: 'Clínica', roles: ['OWNER', 'ADMIN'] },
+  { id: 'suscripcion', label: 'Suscripción', roles: ['OWNER', 'ADMIN'] },
   { id: 'account', label: 'Mi cuenta', roles: ['OWNER', 'ADMIN', 'RECEPTION', 'DOCTOR'] },
 ];
 
@@ -36,6 +38,11 @@ export default function Panel() {
   const [tab, setTab] = useState('agenda');
 
   useEffect(() => { if (ready && !session) router.replace('/login'); }, [ready, session, router]);
+  // Enlaces directos a una pestaña (p. ej. el regreso del pago de la suscripción: ?tab=suscripcion).
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get('tab');
+    if (t && TABS.some((x) => x.id === t)) setTab(t);
+  }, []);
 
   if (!session) return (<><Header /><main className="container section"><p className="muted">Cargando…</p></main></>);
 
@@ -55,6 +62,7 @@ export default function Panel() {
         <button className="ghost" onClick={logout}>Salir</button>
       </Header>
       <main className="container section">
+        {(role === 'OWNER' || role === 'ADMIN') && <SubscriptionBanner onOpen={() => setTab('suscripcion')} />}
         <nav className="tabs" role="tablist">
           {tabs.map((t) => (
             <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)}>{t.label}</button>
@@ -69,6 +77,7 @@ export default function Panel() {
         {tab === 'payments' && <Payments />}
         {tab === 'team' && <Team session={session} />}
         {tab === 'clinic' && <ClinicSettings />}
+        {tab === 'suscripcion' && <Subscription session={session} />}
         {tab === 'account' && <Account />}
       </main>
     </>

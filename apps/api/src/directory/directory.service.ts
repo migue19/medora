@@ -118,7 +118,10 @@ export class DirectoryService {
 
   /** Médico visible en el directorio: clínica participante y con reservas, servicio activo y horario en una sede activa. */
   private eligibleSql() {
-    return Prisma.sql`d.active AND c.active AND c."directoryEnabled" AND c."bookingEnabled"
+    return Prisma.sql`d.active AND c.active AND c."directoryEnabled" AND c."bookingEnabled" AND c.verification = 'VERIFIED'
+      AND (c."billingExempt" OR c."subscriptionStatus" = 'ACTIVE'
+        OR (c."subscriptionStatus" = 'TRIALING' AND (c."trialEndsAt" IS NULL OR c."trialEndsAt" > now()))
+        OR (c."subscriptionStatus" = 'PAST_DUE' AND (c."currentPeriodEnd" IS NULL OR c."currentPeriodEnd" > now() - interval '7 days')))
       AND EXISTS (SELECT 1 FROM "DoctorService" ds JOIN "Service" s ON s.id = ds."serviceId" WHERE ds."doctorId" = d.id AND s.active)
       AND EXISTS (SELECT 1 FROM "ScheduleRule" r JOIN "Location" l ON l.id = r."locationId" WHERE r."doctorId" = d.id AND l.active)`;
   }

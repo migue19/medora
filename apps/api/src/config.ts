@@ -1,3 +1,4 @@
+import type { InvoicingConfig } from './billing/cfdi';
 export interface AppConfig {
   databaseUrl: string;
   jwtSecret: Uint8Array;
@@ -16,6 +17,10 @@ export interface AppConfig {
   video: { apiKey: string } | null;
   /** Llave AES-256 (32 bytes) para cifrar los adjuntos del expediente. Sin ella no se aceptan adjuntos. */
   recordsKey: Buffer | null;
+  /** Timbrado de facturas CFDI 4.0 (Facturama). */
+  invoicing: InvoicingConfig | null;
+  /** Correos de quienes administran Medora (verifican clínicas). */
+  superadmins: string[];
   /** Intervalo del trabajador de la cola; 0 lo desactiva (pruebas). */
   jobsPollMs: number;
 }
@@ -68,6 +73,8 @@ export function loadConfig(): AppConfig {
     payments: loadPaymentsConfig(production),
     video: process.env.DAILY_API_KEY?.trim() ? { apiKey: process.env.DAILY_API_KEY.trim() } : null,
     recordsKey: loadRecordsKey(),
+    invoicing: loadInvoicingConfig(),
+    superadmins: (process.env.SUPERADMIN_EMAILS ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
     jobsPollMs: Number(process.env.JOBS_POLL_MS ?? 2000),
     databaseUrl: required('DATABASE_URL'),
     jwtSecret: new TextEncoder().encode(jwtSecret),
@@ -77,6 +84,18 @@ export function loadConfig(): AppConfig {
     host: process.env.HOST ?? '127.0.0.1',
     production,
     trustProxy: (process.env.TRUST_PROXY ?? 'true') === 'true',
+  };
+}
+
+function loadInvoicingConfig(): InvoicingConfig | null {
+  const user = process.env.FACTURAMA_USER?.trim();
+  if (!user) return null;
+  const expeditionPlace = required('INVOICE_EXPEDITION_ZIP');
+  if (!/^\d{5}$/.test(expeditionPlace)) throw new Error('INVOICE_EXPEDITION_ZIP debe ser un código postal de 5 dígitos');
+  return {
+    user, password: required('FACTURAMA_PASSWORD'), sandbox: (process.env.FACTURAMA_SANDBOX ?? 'true') !== 'false',
+    expeditionPlace, series: process.env.INVOICE_SERIES?.trim() || 'MED',
+    resicoRetention: process.env.INVOICE_RESICO_RETENTION === 'true',
   };
 }
 

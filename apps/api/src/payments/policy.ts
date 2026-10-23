@@ -3,6 +3,7 @@ import type { Actor } from '../appointments/appointments.service';
 import { JobsService } from '../jobs/jobs.service';
 import { Tx } from '../prisma.service';
 import type { PayMethod } from './gateway';
+import { entitlements } from '../billing/plans';
 
 /** Stripe no cobra menos de $10.00 MXN: debajo de eso no se pide pago en línea. */
 export const MIN_CHARGE_CENTS = 1000;
@@ -27,7 +28,7 @@ export function depositCents(clinic: Pick<Clinic, 'depositPercent'>, priceCents:
 
 /** La reserva en línea queda pendiente de pago (aparta el horario) en vez de agendada. */
 export function requiresPayment(paymentsAvailable: boolean, clinic: Clinic, priceCents: number): boolean {
-  return paymentsAvailable && clinic.paymentMode === 'REQUIRED' && depositCents(clinic, priceCents) !== null;
+  return paymentsAvailable && clinic.paymentMode === 'REQUIRED' && entitlements(clinic).plan.features.payments && depositCents(clinic, priceCents) !== null;
 }
 
 export function payMethods(clinic: Clinic, startsAt: Date, now: Date): PayMethod[] {

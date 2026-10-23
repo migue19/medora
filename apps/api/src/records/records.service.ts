@@ -6,6 +6,7 @@ import { createCipheriv, createDecipheriv, randomBytes, randomInt } from 'node:c
 import { APP_CONFIG, AppConfig } from '../config';
 import { PrismaService, Tx } from '../prisma.service';
 import type { StaffContext } from '../auth/guards';
+import { assertFeature } from '../billing/plans';
 
 export const MAX_FILE_BYTES = 10 * 1024 * 1024;
 /** Tipos de adjunto aceptados: estudios en PDF e imágenes. */
@@ -387,6 +388,7 @@ export class RecordsService {
   async upload(staff: StaffContext, clinicPatientId: string, file: { buffer: Buffer; originalname: string }, noteId: string | null, ip: string | null) {
     if (!this.config.recordsKey) throw new ConflictException('Los adjuntos no están habilitados en este servidor');
     await this.require(staff, clinicPatientId, 'write', ip);
+    assertFeature(await this.prisma.clinic.findUniqueOrThrow({ where: { id: staff.clinicId } }), 'attachments');
     if (!file.buffer.length || file.buffer.length > MAX_FILE_BYTES) throw new BadRequestException('El archivo debe pesar hasta 10 MB');
     const mimeType = Object.keys(FILE_TYPES).find((t) => FILE_TYPES[t](file.buffer));
     if (!mimeType) throw new BadRequestException('Sólo se aceptan PDF, JPG o PNG');

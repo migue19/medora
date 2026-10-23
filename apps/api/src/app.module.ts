@@ -19,6 +19,11 @@ import { PAYMENT_GATEWAY, PaymentGateway, createGateway } from './payments/gatew
 import { VIDEO_PROVIDER, VideoProvider, createVideo } from './video/video.provider';
 import { VideoService } from './video/video.service';
 import { RecordsService } from './records/records.service';
+import { BillingService } from './billing/billing.service';
+import { SignupService } from './billing/signup.service';
+import { AdminController, SignupController, SubscriptionController } from './billing/billing.controller';
+import { BILLING_GATEWAY, BillingGateway, createBilling } from './billing/billing.gateway';
+import { CFDI_PROVIDER, CfdiProvider, createCfdi } from './billing/cfdi';
 import { PrescriptionVerifyController, RecordsController } from './records/records.controller';
 import { PatientVideoController, StaffVideoController, VideoLinkController } from './video/video.controller';
 import { HealthController } from './health.controller';
@@ -45,6 +50,8 @@ export interface Transports {
   whatsapp?: WhatsAppTransport;
   payments?: PaymentGateway;
   video?: VideoProvider;
+  billing?: BillingGateway;
+  cfdi?: CfdiProvider;
 }
 
 export function buildAppModule(config: AppConfig = loadConfig(), transports: Transports = {}) {
@@ -56,6 +63,7 @@ export function buildAppModule(config: AppConfig = loadConfig(), transports: Tra
       PatientWaitlistController, LocationsController, DoctorPhotoController, SitemapController, DirectoryController,
       PatientPaymentsController, PaymentWebhookController, ClinicPaymentsController,
       VideoLinkController, PatientVideoController, StaffVideoController, RecordsController, PrescriptionVerifyController,
+      SignupController, SubscriptionController, AdminController,
       PublicReviewsController, PatientReviewsController, StaffReviewsController, OnboardingController,
     ],
     providers: [
@@ -64,8 +72,10 @@ export function buildAppModule(config: AppConfig = loadConfig(), transports: Tra
       { provide: WHATSAPP_TRANSPORT, useValue: transports.whatsapp ?? createWhatsApp(config.whatsapp) },
       { provide: PAYMENT_GATEWAY, useValue: transports.payments ?? createGateway(config.payments) },
       { provide: VIDEO_PROVIDER, useValue: transports.video ?? createVideo(config.video) },
+      { provide: BILLING_GATEWAY, useValue: transports.billing ?? createBilling(config.payments) },
+      { provide: CFDI_PROVIDER, useValue: transports.cfdi ?? createCfdi(config.invoicing) },
       PrismaService, TokensService, StaffGuard, PatientGuard, AppointmentsService,
-      AuthTokensService, JobsService, MailService, RemindersService, PatientsService, WaitlistService, ReviewsService, OnboardingService, DirectoryService, PaymentsService, VideoService, RecordsService,
+      AuthTokensService, JobsService, MailService, RemindersService, PatientsService, WaitlistService, ReviewsService, OnboardingService, DirectoryService, PaymentsService, VideoService, RecordsService, BillingService, SignupService,
     ],
   })
   class AppModule {}

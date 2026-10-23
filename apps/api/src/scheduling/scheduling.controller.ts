@@ -15,6 +15,7 @@ import { DateTime } from 'luxon';
 import { PrismaService, Tx } from '../prisma.service';
 import { Roles, Staff, StaffContext, StaffGuard } from '../auth/guards';
 import { lockDoctor } from '../appointments/appointments.service';
+import { assertDoctorSlot, assertFeature } from '../billing/plans';
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 const emptyToNull = ({ value }: { value: unknown }) =>
@@ -151,6 +152,7 @@ export class SchedulingController {
   @Roles('OWNER', 'ADMIN')
   async createService(@Staff() staff: StaffContext, @Body() dto: CreateServiceDto) {
     if (dto.durationMinutes % 5 !== 0) throw new BadRequestException('La duración debe ser múltiplo de 5 minutos');
+    if (dto.telemedicine) assertFeature(await this.prisma.clinic.findUniqueOrThrow({ where: { id: staff.clinicId } }), 'telemedicine');
     return this.uniqueName(() => this.prisma.service.create({ data: { ...dto, clinicId: staff.clinicId } }));
   }
 
@@ -159,6 +161,7 @@ export class SchedulingController {
   async updateService(
     @Staff() staff: StaffContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateServiceDto,
   ) {
+    if (dto.telemedicine) assertFeature(await this.prisma.clinic.findUniqueOrThrow({ where: { id: staff.clinicId } }), 'telemedicine');
     if (dto.durationMinutes !== undefined && dto.durationMinutes % 5 !== 0) {
       throw new BadRequestException('La duración debe ser múltiplo de 5 minutos');
     }
@@ -243,6 +246,7 @@ export class SchedulingController {
   async createDoctor(@Staff() staff: StaffContext, @Body() dto: DoctorDto) {
     return this.uniqueSlug(() => this.prisma.$transaction(async (tx) => {
       await this.assertDoctorLinks(tx, staff.clinicId, dto.membershipId ?? null, dto.serviceIds, null);
+      await assertDoctorSlot(tx, staff.clinicId);
       const doctor = await tx.doctor.create({
         data: {
           clinicId: staff.clinicId, displayName: dto.displayName, specialty: dto.specialty,
@@ -271,6 +275,7 @@ export class SchedulingController {
     return this.uniqueSlug(() => this.prisma.$transaction(async (tx) => {
       const doctor = await tx.doctor.findFirst({ where: { id, clinicId: staff.clinicId } });
       if (!doctor) throw new NotFoundException('Médico no encontrado');
+      if (dto.active === true && !doctor.active) await assertDoctorSlot(tx, staff.clinicId, id);
       await this.assertDoctorLinks(
         tx, staff.clinicId, dto.membershipId === undefined ? null : dto.membershipId, dto.serviceIds ?? [], id,
       );
