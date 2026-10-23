@@ -410,7 +410,18 @@ scripts/restore-check.sh
 docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner' < /var/backups/medora/medora-AAAAMMDD-HHMMSS.dump
 ```
 
-Los respaldos viven en el mismo VPS: protegen contra errores y borrados, no contra la pérdida del servidor. Pendiente: copia diaria fuera del VPS.
+### Copia externa (Google Drive)
+
+`scripts/offsite-backup.sh` sube cada día a las 03:30 (Ciudad de México) los respaldos recientes y el `.env` a Google Drive, cifrados con `rclone crypt` (contenido y nombres), conserva 30 días (`OFFSITE_KEEP_DAYS`) y comprueba que el último respaldo llegó íntegro. La configuración se hace una vez con `scripts/set-gdrive-backup.sh`. El permiso de Drive es `drive.file`, así que rclone sólo ve la carpeta `medora-respaldos` que él mismo crea.
+
+La contraseña de cifrado está en `/root/medora-offsite-password` y hay que guardarla fuera del servidor. Sin ella las copias no se pueden abrir. Para recuperar una copia desde otra máquina:
+
+```sh
+rclone authorize "drive" "eyJzY29wZSI6ImRyaXZlLmZpbGUifQ"   # y crear el remoto medora-gdrive con ese token
+rclone config create medora-cifrado crypt remote=medora-gdrive:medora-respaldos password="$(rclone obscure 'CONTRASEÑA')"
+rclone ls medora-cifrado:db
+rclone copy medora-cifrado:db/medora-AAAAMMDD-HHMMSS.dump .
+```
 
 ## Desarrollo sin Docker
 
