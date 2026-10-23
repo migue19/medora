@@ -20,5 +20,8 @@
     "db:migrate": "npm run db:migrate -w @medora/api",
     "db:seed": "npm run db:seed -w @medora/api",
     "verify:local": "bash scripts/verify-local.sh"
+  },
+  "overrides": {
+    "deepmerge-ts": "8.0.2"
   }
 }

@@ -31,9 +31,9 @@ echo "→ Typecheck"
 npm run build -w @medora/api >>work/verify.log 2>&1
 npm run typecheck >>work/verify.log 2>&1
 echo "→ Pruebas unitarias"
-npm test 2>&1 | tee -a work/verify.log | grep -E "^# (pass|fail)"
+npm test 2>&1 | tee -a work/verify.log | grep -E "^(# |ℹ )(pass|fail)"
 echo "→ Pruebas de integración"
-npm run test:integration 2>&1 | tee -a work/verify.log | grep -E "^# (pass|fail)"
+npm run test:integration 2>&1 | tee -a work/verify.log | grep -E "^(# |ℹ )(pass|fail)"
 echo "→ Build de producción"
 npm run build >>work/verify.log 2>&1
 echo "✓ Verificación completa. Log: work/verify.log"

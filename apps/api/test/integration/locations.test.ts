@@ -201,7 +201,8 @@ test('servicios sólo de primera vez o subsecuentes', async () => {
   assert.equal((await book(first.id, '10:00')).status, 409);
   assert.equal((await book(follow.id, '10:00')).status, 201);
   const profile = (await new Client(h.base).get(pub)).body;
-  assert.equal(profile.doctors[0].services.find((x: { id: string }) => x.id === first.id).visitType, 'FIRST');
+  const juan = profile.doctors.find((d: { id: string }) => d.id === doctorId);
+  assert.equal(juan.services.find((x: { id: string }) => x.id === first.id).visitType, 'FIRST');
 });
 
 test('perfil profesional y foto', async () => {

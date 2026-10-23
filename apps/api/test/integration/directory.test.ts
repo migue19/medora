@@ -73,9 +73,10 @@ test('catálogo: la base deduce especialidad y padecimientos del texto, y la bú
   await doctor('Dra. Marta Ruiz', { specialty: 'Medicina estética avanzada' });
 
   const listed = (await owner.get('/api/clinic/doctors')).body as { displayName: string; inCatalog: boolean }[];
-  assert.deepEqual(listed.map((d) => [d.displayName, d.inCatalog]), [
-    ['Dr. Luis Pérez', true], ['Dra. Ana López', true], ['Dra. Marta Ruiz', false],
-  ]);
+  // Sin depender del orden alfabético, que cambia con la intercalación (locale) de la base.
+  assert.deepEqual(Object.fromEntries(listed.map((d) => [d.displayName, d.inCatalog])), {
+    'Dr. Luis Pérez': true, 'Dra. Ana López': true, 'Dra. Marta Ruiz': false,
+  });
   const conds = await h.prisma.doctorCondition.findMany({ where: { doctorId: ana }, include: { condition: true } });
   assert.deepEqual(conds.map((c) => c.condition.slug), ['hipertension']);
 
