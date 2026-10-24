@@ -50,7 +50,7 @@ export function LinkRecord() {
           ) : (
             <>
               <p><strong>{info.clinic.name}</strong> tiene una ficha a nombre de <strong>{info.patientName}</strong> con teléfono terminado en <strong>{info.phoneEnd}</strong>{info.upcoming ? ` y ${info.upcoming} cita(s) próxima(s)` : ''}.</p>
-              <p className="muted small">Si es tuya, confírmalo para verla en tu cuenta de Medora. Tus datos de contacto de la cuenta reemplazarán a los de la ficha.</p>
+              <p className="muted small">Si es tuya, confírmalo para verla en tu cuenta de Tepahti. Tus datos de contacto de la cuenta reemplazarán a los de la ficha.</p>
               {error && <div className="alert error" role="alert">{error}</div>}
               <div className="row">
                 <button className="primary" disabled={busy} onClick={accept}>{busy ? 'Vinculando…' : 'Sí, es mía'}</button>

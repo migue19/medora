@@ -16,7 +16,7 @@ const EVENT_LABEL: Record<string, string> = {
   'appointment.paid': 'Pagada', 'appointment.refunded': 'Reembolsada',
 };
 
-/** API pública y webhooks para conectar Medora con otros sistemas (CRM, sitio web, contabilidad). */
+/** API pública y webhooks para conectar Tepahti con otros sistemas (CRM, sitio web, contabilidad). */
 export function Integrations({ tz }: { tz: string }) {
   const [data, setData] = useState<Overview | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -88,7 +88,7 @@ export function Integrations({ tz }: { tz: string }) {
 
       <div className="card stack">
         <h3 style={{ margin: 0 }}>Webhooks</h3>
-        <p className="small muted" style={{ margin: 0 }}>Medora avisa a tu sistema en cuanto pasa algo con una cita. Cada aviso va firmado: verifica el encabezado <code>Medora-Signature</code> con el secreto del webhook.</p>
+        <p className="small muted" style={{ margin: 0 }}>Tepahti avisa a tu sistema en cuanto pasa algo con una cita. Cada aviso va firmado: verifica el encabezado <code>Tepahti-Signature</code> con el secreto del webhook.</p>
         <form className="stack" onSubmit={createEndpoint}>
           <input name="url" type="url" required pattern="https://.*" maxLength={500} placeholder="https://tu-sistema.com/medora" aria-label="URL del webhook" />
           <fieldset className="row" style={{ border: 0, padding: 0, margin: 0 }}>
@@ -139,7 +139,7 @@ export function Integrations({ tz }: { tz: string }) {
             <li><code>POST /appointments/:id/cancel</code>: <code>{'{ reason }'}</code></li>
           </ul>
           <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{`curl ${base}/api/v1/appointments?from=2026-11-01&to=2026-11-30 \\\n  -H "Authorization: Bearer mdr_…"`}</pre>
-          <p style={{ margin: 0 }}>Webhook: <code>POST</code> con <code>{'{ id, type, createdAt, data: { appointment } }'}</code>. Firma: <code>Medora-Signature: t=…,v1=…</code>, donde <code>v1 = HMAC-SHA256(secreto, t + "." + cuerpo)</code>. Responde 2xx; si falla, se reintenta con espera creciente.</p>
+          <p style={{ margin: 0 }}>Webhook: <code>POST</code> con <code>{'{ id, type, createdAt, data: { appointment } }'}</code>. Firma: <code>Tepahti-Signature: t=…,v1=…</code>, donde <code>v1 = HMAC-SHA256(secreto, t + "." + cuerpo)</code>. Responde 2xx; si falla, se reintenta con espera creciente.</p>
         </div>
       </details>
     </div>

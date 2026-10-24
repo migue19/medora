@@ -1,4 +1,4 @@
-// Medora · service worker
+// Tepahti · service worker
 // Sólo guarda en caché la pantalla de desconexión y los iconos.
 // Nunca guarda respuestas de /api ni páginas con datos privados.
 const CACHE = 'medora-static-v2';
@@ -31,8 +31,8 @@ self.addEventListener('fetch', (event) => {
 // El aviso sólo trae lo necesario para decidir si abrir el panel; nada clínico.
 self.addEventListener('push', (event) => {
   let data = {};
-  try { data = event.data ? event.data.json() : {}; } catch { data = { title: 'Medora', body: event.data ? event.data.text() : '' }; }
-  event.waitUntil(self.registration.showNotification(data.title || 'Medora', {
+  try { data = event.data ? event.data.json() : {}; } catch { data = { title: 'Tepahti', body: event.data ? event.data.text() : '' }; }
+  event.waitUntil(self.registration.showNotification(data.title || 'Tepahti', {
     body: data.body || '', icon: '/icons/icon-192.png', badge: '/icons/icon-192.png', tag: data.tag, data: { url: data.url || '/panel' },
   }));
 });

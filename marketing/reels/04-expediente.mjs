@@ -64,5 +64,5 @@ await record('04-expediente', { staff: true }, async (r) => {
   await r.go(`/receta/${rx.code}`);
   await r.caption('La farmacia la <b>verifica</b> escaneando el QR', 3000);
 
-  await r.card('Consultas más ágiles.<br>Recetas verificables.', 'Expediente conforme a la NOM-004, con bitácora de quién lo consulta.', 'medora.nut.com.mx · 14 días gratis', 3800);
+  await r.card('Consultas más ágiles.<br>Recetas verificables.', 'Expediente conforme a la NOM-004, con bitácora de quién lo consulta.', '14 días gratis · link en el perfil', 3800);
 });

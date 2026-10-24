@@ -43,6 +43,6 @@ export class PushController {
   @Post('test')
   @HttpCode(204)
   async test(@Staff() s: StaffContext) {
-    await this.push.notify([s.membershipId], { title: 'Medora', body: 'Las notificaciones de este dispositivo funcionan.', url: '/panel', tag: 'prueba' }, `test:${s.membershipId}:${Date.now()}`);
+    await this.push.notify([s.membershipId], { title: 'Tepahti', body: 'Las notificaciones de este dispositivo funcionan.', url: '/panel', tag: 'prueba' }, `test:${s.membershipId}:${Date.now()}`);
   }
 }

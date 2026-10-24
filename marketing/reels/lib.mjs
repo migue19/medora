@@ -1,4 +1,4 @@
-// Utilidades para grabar reels verticales (1080×1920) de Medora con Playwright contra la demo local.
+// Utilidades para grabar reels verticales (1080×1920) de Tepahti con Playwright contra la demo local.
 import { chromium } from 'playwright';
 import { execFileSync } from 'node:child_process';
 import * as nodeCrypto from 'node:crypto';
@@ -14,18 +14,20 @@ export const creds = () => JSON.parse(readFileSync(join(ROOT, '.demo-credentials
 // 405×720 CSS px con escala 8/3 = 1080×1920 px reales.
 const VIEWPORT = { width: 405, height: 720 };
 const SCALE = 8 / 3;
-const BRAND = { primary: '#0f766e', strong: '#0b5b55', soft: '#dff3f0', ink: '#13201f' };
+const BRAND = { primary: '#0b6e5f', strong: '#09594d', soft: '#eef6f3', ink: '#15211f', leaf: '#7ddbb8' };
+// Logotipo de Tepahti (marketing/marca/tepahti/assets) incrustado en las tarjetas.
+const MARK_WHITE = readFileSync(join(here, '../marca/tepahti/assets/mark-white.svg'), 'utf8');
 
 const OVERLAY = `
 (() => {
   if (window.__reel) return;
   const css = \`
     #reel-cap{position:fixed;left:16px;right:16px;top:64px;z-index:2147483646;display:flex;justify-content:center;pointer-events:none}
-    #reel-cap span{background:${BRAND.ink}ee;color:#fff;font:800 25px/1.18 ui-sans-serif,system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+    #reel-cap span{background:${BRAND.ink}ee;color:#fff;font:800 25px/1.18 'Plus Jakarta Sans',ui-sans-serif,system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
       padding:12px 18px;border-radius:16px;text-align:center;box-shadow:0 8px 30px rgb(0 0 0/.25);letter-spacing:-.01em;
       transform:translateY(-12px) scale(.96);opacity:0;transition:all .35s cubic-bezier(.2,.8,.2,1)}
     #reel-cap span.on{transform:none;opacity:1}
-    #reel-cap b{color:#5eead4}
+    #reel-cap b{color:${BRAND.leaf}}
     .reel-tap{position:fixed;z-index:2147483647;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;
       background:${BRAND.primary}55;border:3px solid ${BRAND.primary};pointer-events:none;animation:reel-tap .6s ease-out forwards}
     @keyframes reel-tap{0%{transform:scale(.4);opacity:1}100%{transform:scale(1.6);opacity:0}}
@@ -50,19 +52,20 @@ const OVERLAY = `
 })();`;
 
 const CARD = (title, sub, small) => `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;800&display=swap" rel="stylesheet">
 <style>
   html,body{margin:0;height:100%}
   body{display:flex;flex-direction:column;justify-content:center;gap:22px;padding:0 30px;box-sizing:border-box;color:#fff;
-    font-family:ui-sans-serif,system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
-    background:radial-gradient(120% 80% at 20% 10%,#14b8a6 0%,${BRAND.primary} 45%,#062e2b 100%)}
-  .logo{display:flex;align-items:center;gap:12px;font-weight:800;font-size:28px;opacity:0;animation:in .5s .1s forwards}
-  .logo i{width:44px;height:44px;border-radius:12px;background:#fff;color:${BRAND.primary};display:grid;place-items:center;font-style:normal;font-size:30px;line-height:1}
+    font-family:'Plus Jakarta Sans',ui-sans-serif,system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+    background:radial-gradient(120% 80% at 20% 10%,#1e8f7b 0%,${BRAND.primary} 45%,#0a3f37 100%)}
+  .logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:34px;letter-spacing:-.04em;opacity:0;animation:in .5s .1s forwards}
+  .logo svg{width:52px;height:52px}
   h1{margin:0;font-size:44px;line-height:1.05;letter-spacing:-.03em;opacity:0;animation:in .6s .35s forwards}
-  p{margin:0;font-size:22px;line-height:1.3;opacity:0;animation:in .6s .8s forwards;color:#ccfbf1}
-  small{font-size:17px;opacity:0;animation:in .6s 1.2s forwards;color:#99f6e4}
+  p{margin:0;font-size:22px;line-height:1.3;opacity:0;animation:in .6s .8s forwards;color:#d7f1ea}
+  small{font-size:17px;opacity:0;animation:in .6s 1.2s forwards;color:#a8e3d3}
   @keyframes in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 </style></head><body>
-<div class="logo"><i>+</i>Medora</div><h1>${title}</h1>${sub ? `<p>${sub}</p>` : ''}${small ? `<small>${small}</small>` : ''}
+<div class="logo">${MARK_WHITE}tepahti</div><h1>${title}</h1>${sub ? `<p>${sub}</p>` : ''}${small ? `<small>${small}</small>` : ''}
 </body></html>`;
 
 export async function login(page, { patient, staff }) {
@@ -213,7 +216,7 @@ export function sql(query) {
   return outp.trim().split('\n').filter(Boolean).map((l) => l.split('\t'));
 }
 
-/** Crea el enlace de un recordatorio (como el que manda Medora) para la primera cita sin confirmar del día siguiente hábil. */
+/** Crea el enlace de un recordatorio (como el que manda Tepahti) para la primera cita sin confirmar del día siguiente hábil. */
 export function reminderLink() {
   const { createHash, randomBytes } = nodeCrypto;
   const [row] = sql(`

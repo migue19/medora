@@ -190,7 +190,7 @@ test('no se importa con pendientes indispensables y un fallo no deja nada a medi
   await assert.rejects(service.import(id), /pendientes/);
   assert.equal(await h.prisma.clinic.count({ where: { slug: 'clinica-del-valle' } }), 0);
 
-  // Propietario que ya usa Medora en otra clínica: entra con su contraseña; no se le cambia.
+  // Propietario que ya usa Tepahti en otra clínica: entra con su contraseña; no se le cambia.
   const other = await createClinicWithOwner(h.prisma, 'otra-clinica');
   const ok = fullData();
   ok.team[0].email = other.email;

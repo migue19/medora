@@ -104,7 +104,7 @@ test('exportación a CSV y Excel (plan Plus) y resumen semanal por correo', asyn
   const lines = text.replace(/^﻿/, '').trim().split('\r\n');
   assert.equal(lines.length, 1 + 7, 'encabezado y las 7 citas del periodo (con canceladas y apartadas)');
   assert.match(lines[0], /^Fecha,Hora,Médico,Sede,Paciente/);
-  assert.ok(lines.some((l) => l.includes('Directorio de Medora') && l.includes('Atendida')));
+  assert.ok(lines.some((l) => l.includes('Directorio de Tepahti') && l.includes('Atendida')));
   assert.ok(lines.some((l) => l.includes('Cancelada') && l.includes('Paciente,Prueba')));
   const x = await get('/api/clinic/reports/export/xlsx?from=2026-09-07&to=2026-09-13');
   assert.equal(x.headers.get('content-type'), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

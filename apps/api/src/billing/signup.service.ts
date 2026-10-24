@@ -72,7 +72,7 @@ export class SignupService {
     return { ok: true };
   }
 
-  // ---------------------------------------------------------------- administración de Medora
+  // ---------------------------------------------------------------- administración de Tepahti
 
   async isSuperadmin(userId: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });

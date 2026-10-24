@@ -15,13 +15,13 @@ interface Row {
 const SEP = 'https://www.cedulaprofesional.sep.gob.mx/cedula/presidencia/indexAvanzada.action';
 const VERIF: Record<string, string> = { PENDING: 'Por verificar', VERIFIED: 'Verificada', REJECTED: 'Rechazada' };
 
-/** Administración de Medora: verificación de cédulas y cortesías. */
+/** Administración de Tepahti: verificación de cédulas y cortesías. */
 export function Admin() {
   const { data: session, ready } = useSession(staffSession);
   const [rows, setRows] = useState<Row[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const load = useCallback(() => staffSession.get<Row[]>('/api/admin/clinics').then(setRows)
-    .catch((e) => setError(e instanceof ApiError && e.status === 403 ? 'Esta página es sólo para la administración de Medora.' : errorMessage(e))), []);
+    .catch((e) => setError(e instanceof ApiError && e.status === 403 ? 'Esta página es sólo para la administración de Tepahti.' : errorMessage(e))), []);
   useEffect(() => { if (session) void load(); }, [session, load]);
 
   async function review(r: Row, body: object) {

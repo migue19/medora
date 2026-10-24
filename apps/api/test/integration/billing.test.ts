@@ -71,7 +71,7 @@ test('alta autoservicio: clínica en prueba, cuenta activada por correo y cédul
   assert.equal(doctor.licenseNumber, '12345678');
   assert.ok(doctor.membershipId, 'el propietario es el médico');
   assert.equal((await owner.get('/api/clinic/subscription')).body.status, 'TRIALING');
-  // Aviso a la administración de Medora.
+  // Aviso a la administración de Tepahti.
   assert.ok(h.mail.sent.some((e) => e.to === 'admin@medora.test' && /Nueva clínica por verificar/.test(e.subject)));
 
   // Mismo correo: no crea nada y avisa al dueño de la cuenta (respuesta idéntica).
@@ -153,7 +153,7 @@ test('prueba vencida: deja de recibir reservas en línea hasta suscribirse; pago
   const req = h.cfdi.issued[0].req;
   assert.deepEqual([req.paymentForm, req.receiver.rfc, req.receiver.name, req.totalCents], ['28', 'CDS210101AB1', 'CONSULTORIO DRA SOFIA', 129_900]);
   const mail = h.mail.sent.slice(before).find((e) => e.to === 'facturas@consultorio.mx')!;
-  assert.match(mail.subject, /Tu factura de Medora/);
+  assert.match(mail.subject, /Tu factura de Tepahti/);
   assert.deepEqual(mail.attachments!.map((a) => [a.contentType, a.encoding]), [['application/pdf', 'base64'], ['application/xml', 'base64']]);
   const pdf = await fetch(`${h.base}/api/clinic/subscription/invoices/${inv.id}/pdf`, { headers: { authorization: `Bearer ${owner.token}` } });
   assert.equal((await pdf.text()).startsWith('%PDF'), true);
@@ -184,7 +184,7 @@ test('prueba vencida: deja de recibir reservas en línea hasta suscribirse; pago
   assert.equal((await owner.get('/api/clinic/patients')).status, 200);
 });
 
-test('administración de Medora: verificar o rechazar la cédula; sólo superadministradores', async () => {
+test('administración de Tepahti: verificar o rechazar la cédula; sólo superadministradores', async () => {
   const { clinic, owner } = await registerAndLogin();
   assert.equal((await owner.get('/api/admin/clinics')).status, 403);
   const adminClinic = await createClinicWithOwner(h.prisma, 'medora-hq');

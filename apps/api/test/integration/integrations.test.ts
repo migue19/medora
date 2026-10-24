@@ -99,9 +99,9 @@ test('webhooks de citas: firmados, filtrados por evento y con reintentos', async
   const patient = await registerPatient(h.base, 'Ana');
   const booked = (await patient.post(`/api/public/clinics/${SLUG}/appointments`, { requestId: randomUUID(), doctorId, serviceId, startsAt: localIso(nextMonday(), '11:00') })).body.appointment;
   await runAll();
-  assert.deepEqual(h.webhooks.received.map((r) => [r.url, r.headers['medora-event']]), [['https://hooks.example.com/medora', 'appointment.created']]);
+  assert.deepEqual(h.webhooks.received.map((r) => [r.url, r.headers['tepahti-event']]), [['https://hooks.example.com/medora', 'appointment.created']]);
   const req = h.webhooks.received[0];
-  const [, t, v1] = /^t=(\d+),v1=([0-9a-f]{64})$/.exec(req.headers['medora-signature'])!;
+  const [, t, v1] = /^t=(\d+),v1=([0-9a-f]{64})$/.exec(req.headers['tepahti-signature'])!;
   assert.equal(createHmac('sha256', all.secret).update(`${t}.${req.body}`).digest('hex'), v1, 'firma verificable con el secreto');
   const payload = JSON.parse(req.body);
   assert.deepEqual([payload.type, payload.data.appointment.id, payload.data.appointment.status, payload.data.appointment.source], ['appointment.created', booked.id, 'booked', 'online']);
@@ -111,7 +111,7 @@ test('webhooks de citas: firmados, filtrados por evento y con reintentos', async
   h.webhooks.respond = 503;
   await owner.post(`/api/clinic/appointments/${booked.id}/cancel`, { reason: 'Médico en urgencia' });
   await runAll();
-  assert.deepEqual(h.webhooks.received.map((r) => r.headers['medora-event']).sort(), ['appointment.cancelled', 'appointment.cancelled']);
+  assert.deepEqual(h.webhooks.received.map((r) => r.headers['tepahti-event']).sort(), ['appointment.cancelled', 'appointment.cancelled']);
   const failed = await h.prisma.webhookDelivery.findFirstOrThrow({ where: { endpointId: onlyCancel.id } });
   assert.deepEqual([failed.status, failed.attempts, failed.responseCode], ['FAILED', 1, 503]);
   const job = await h.prisma.job.findFirstOrThrow({ where: { type: 'webhook.deliver', dedupeKey: `webhook:${failed.id}` } });
@@ -163,7 +163,7 @@ test('Google Calendar: un evento personal bloquea la agenda al instante y las ci
   assert.ok(job.runAt.getTime() - notifiedAt < 60_000, 'la sincronización corre de inmediato');
   await h.jobs.runOnce();
   const busy = await h.prisma.externalBusy.findMany();
-  assert.deepEqual(busy.map((b) => b.externalId), ['dentista'], 'ni libres, ni rechazados, ni las citas de Medora');
+  assert.deepEqual(busy.map((b) => b.externalId), ['dentista'], 'ni libres, ni rechazados, ni las citas de Tepahti');
   const times = (await new Client(h.base).get(`/api/public/clinics/${SLUG}/doctors/${doctorId}/availability?serviceId=${serviceId}&from=${monday}&days=1`))
     .body.days[0].slots.map((s: { time: string }) => s.time);
   assert.ok(!times.includes('10:00') && !times.includes('10:30') && times.includes('11:00') && times.includes('09:30'));

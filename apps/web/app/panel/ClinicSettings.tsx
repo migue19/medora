@@ -69,7 +69,7 @@ export function ClinicSettings() {
         </div>
         <label className="check"><input type="checkbox" name="bookingEnabled" defaultChecked={clinic.bookingEnabled} />Aceptar reservas en línea</label>
         <label className="check"><input type="checkbox" name="reviewsEnabled" defaultChecked={clinic.reviewsEnabled} />Invitar a opinar tras cada cita atendida y mostrar las opiniones verificadas</label>
-        <label className="check"><input type="checkbox" name="directoryEnabled" defaultChecked={clinic.directoryEnabled} />Aparecer en el <a href="/directorio" target="_blank" rel="noreferrer">directorio de Medora</a> (búsqueda por especialidad, padecimiento y zona)</label>
+        <label className="check"><input type="checkbox" name="directoryEnabled" defaultChecked={clinic.directoryEnabled} />Aparecer en el <a href="/directorio" target="_blank" rel="noreferrer">directorio de Tepahti</a> (búsqueda por especialidad, padecimiento y zona)</label>
         <label className="check"><input type="checkbox" name="weeklyReport" defaultChecked={clinic.weeklyReport} />Enviarme cada lunes el resumen de la semana (citas, inasistencias, ocupación, ingresos)</label>
         <p className="muted small">Zona horaria: {clinic.timezone}</p>
         {msg && <div className={`alert ${msg.ok ? 'ok' : 'error'}`}>{msg.text}</div>}
@@ -102,8 +102,8 @@ function Payments({ clinic, onSaved }: { clinic: Clinic; onSaved: (c: Clinic) =>
   return (
     <form className="card stack" onSubmit={save}>
       <h3>Pagos en línea</h3>
-      {!clinic.paymentsAvailable && <div className="alert warn small">Los pagos en línea todavía no están activados en Medora.</div>}
-      <p className="small muted">Los pacientes pagan con Stripe al reservar. Medora recibe el dinero y te lo transfiere; verás cada cobro y reembolso en la pestaña «Pagos».</p>
+      {!clinic.paymentsAvailable && <div className="alert warn small">Los pagos en línea todavía no están activados en Tepahti.</div>}
+      <p className="small muted">Los pacientes pagan con Stripe al reservar. Tepahti recibe el dinero y te lo transfiere; verás cada cobro y reembolso en la pestaña «Pagos».</p>
       <fieldset className="stack" style={{ border: 0, padding: 0, margin: 0 }} disabled={!clinic.paymentsAvailable}>
         <label>Cobro al reservar en línea
           <select name="paymentMode" value={mode} onChange={(e) => setMode(e.target.value as Clinic['paymentMode'])}>

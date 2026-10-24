@@ -74,7 +74,7 @@ export class BillingService implements OnModuleInit {
 
   private async clinicFor(clinicId: string) {
     const clinic = await this.prisma.clinic.findUniqueOrThrow({ where: { id: clinicId } });
-    if (clinic.billingExempt) throw new ConflictException('Tu clínica tiene Medora sin costo; no necesita suscripción');
+    if (clinic.billingExempt) throw new ConflictException('Tu clínica tiene Tepahti sin costo; no necesita suscripción');
     return clinic;
   }
 
@@ -102,7 +102,7 @@ export class BillingService implements OnModuleInit {
 
   /** Página de pago de Stripe para suscribirse (conserva los días de prueba que queden). */
   async checkout(clinicId: string, plan: Plan, ownerEmail: string) {
-    if (!this.available) throw new ConflictException('El cobro en línea aún no está activado en Medora');
+    if (!this.available) throw new ConflictException('El cobro en línea aún no está activado en Tepahti');
     let clinic = await this.clinicFor(clinicId);
     if (clinic.stripeSubscriptionId && clinic.subscriptionStatus !== 'CANCELED') {
       throw new ConflictException('Ya tienes una suscripción: usa «Cambiar de plan»');
@@ -218,7 +218,7 @@ export class BillingService implements OnModuleInit {
       const r = await this.cfdi.issue({
         paymentForm: inv.cardFunding === 'debit' ? '28' : inv.cardFunding === 'credit' ? '04' : '04',
         receiver: { rfc: b.rfc, name: b.legalName, cfdiUse: b.cfdiUse, fiscalRegime: b.fiscalRegime, zipCode: b.zipCode },
-        description: `Suscripción mensual a Medora, plan ${PLANS[inv.plan].name}, del ${fmt(inv.periodStart)} al ${fmt(inv.periodEnd)}`,
+        description: `Suscripción mensual a Tepahti, plan ${PLANS[inv.plan].name}, del ${fmt(inv.periodStart)} al ${fmt(inv.periodEnd)}`,
         identification: `MEDORA-${inv.plan}`, totalCents: inv.amountCents,
       });
       await this.prisma.$transaction(async (tx) => {

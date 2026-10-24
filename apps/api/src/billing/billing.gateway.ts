@@ -47,7 +47,7 @@ const planFromKey = (key: string | null | undefined): Plan | null =>
   (Object.keys(PLANS) as Plan[]).find((p) => lookupKey(p) === key) ?? null;
 const date = (unix: number | null | undefined) => (unix ? new Date(unix * 1000) : null);
 
-/** Suscripciones con Stripe Billing (cuenta de Medora). Los precios se crean solos por su lookup_key. */
+/** Suscripciones con Stripe Billing (cuenta de Tepahti). Los precios se crean solos por su lookup_key. */
 export class StripeBilling implements BillingGateway {
   private readonly stripe: Stripe;
   private prices = new Map<Plan, string>();
@@ -64,7 +64,7 @@ export class StripeBilling implements BillingGateway {
     let id = found.data[0]?.id;
     if (!id) {
       const product = await this.stripe.products.create(
-        { name: `Medora · Plan ${PLANS[plan].name}`, metadata: { plan } }, { idempotencyKey: `producto-${key}` },
+        { name: `Tepahti · Plan ${PLANS[plan].name}`, metadata: { plan } }, { idempotencyKey: `producto-${key}` },
       );
       id = (await this.stripe.prices.create({
         product: product.id, currency: 'mxn', unit_amount: PLANS[plan].priceCents, recurring: { interval: 'month' },

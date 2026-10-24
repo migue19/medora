@@ -1,6 +1,12 @@
-# Medora · guía para Claude
+# Tepahti (antes Medora) · guía para Claude
 
 Agenda, reservas en línea, expediente y cobros para clínicas en México. Producción: https://medora.nut.com.mx (VPS 82.180.139.70, `/opt/medora`).
+
+## Marca
+
+- El producto se llama **Tepahti** (náhuatl, «curar a la gente»); antes se llamaba Medora y el repositorio, las carpetas, los contenedores y la base conservan ese nombre interno.
+- Identidad en `marketing/marca/tepahti` (paquete de Open Design: `DESIGN.md`, `tokens.css`, logos). Los colores de la app viven en `apps/web/app/globals.css` y deben coincidir con esos tokens.
+- Nunca cambiar identificadores internos con «medora» (emisor y audiencias de los JWT, la llave derivada `medora-calendar-tokens`, cookies): romperían sesiones y datos cifrados.
 
 ## Idioma
 
@@ -91,8 +97,8 @@ git archive HEAD | ssh root@82.180.139.70 'tar -x -C /opt/medora && cd /opt/medo
 
 ## Notas en Obsidian
 
-- Las notas del proyecto viven en la bóveda Development: `~/Documents/Development/Medora/`.
-- El índice es `Medora.md`, que enlaza a estas notas:
+- Las notas del proyecto viven en la bóveda Development: `~/Documents/Development/Tepahti/`.
+- El índice es `Tepahti.md`, que enlaza a estas notas:
   - `Estado y pendientes`
   - `Sprints`
   - `Arquitectura`

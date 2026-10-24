@@ -7,7 +7,7 @@ import { HelpSearch } from './HelpSearch';
 
 export const metadata: Metadata = {
   title: 'Centro de ayuda',
-  description: 'Guías paso a paso de Medora: agenda y reservas en línea, recordatorios, expediente clínico, recetas, cobros, videoconsultas y reportes.',
+  description: 'Guías paso a paso de Tepahti: agenda y reservas en línea, recordatorios, expediente clínico, recetas, cobros, videoconsultas y reportes.',
   alternates: { canonical: `${siteUrl()}/ayuda` },
 };
 
@@ -26,7 +26,7 @@ export default function Page() {
       <main className="container section stack" style={{ gap: 24 }}>
         <section className="stack help-hero">
           <h1>Centro de ayuda</h1>
-          <p className="muted" style={{ margin: 0 }}>Guías paso a paso para sacarle provecho a Medora en tu clínica.</p>
+          <p className="muted" style={{ margin: 0 }}>Guías paso a paso para sacarle provecho a Tepahti en tu clínica.</p>
           <HelpSearch entries={entries} />
         </section>
         <div className="help-grid">

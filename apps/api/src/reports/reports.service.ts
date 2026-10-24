@@ -9,7 +9,7 @@ export interface ReportFilter { from: string; to: string; doctorId?: string; loc
 /** Canal de origen de una cita: recepción (teléfono o mostrador) o el canal en línea. */
 export const ORIGIN_LABEL: Record<string, string> = {
   recepcion: 'Recepción (teléfono o mostrador)', web: 'Página de la clínica', widget: 'Sitio web de la clínica',
-  google: 'Google', instagram: 'Instagram', directorio: 'Directorio de Medora',
+  google: 'Google', instagram: 'Instagram', directorio: 'Directorio de Tepahti',
 };
 const STATUS_LABEL: Record<string, string> = {
   BOOKED: 'Agendada', COMPLETED: 'Atendida', NO_SHOW: 'No asistió', CANCELLED: 'Cancelada', PENDING_PAYMENT: 'Pendiente de pago',

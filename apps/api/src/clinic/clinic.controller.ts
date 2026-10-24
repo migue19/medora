@@ -37,7 +37,7 @@ class UpdateClinicDto {
   @Max(10080, { each: true }) reminderOffsets?: number[];
   @IsOptional() @IsBoolean() whatsappEnabled?: boolean;
   @IsOptional() @IsBoolean() reviewsEnabled?: boolean;
-  /** Aparecer en el directorio público de Medora. */
+  /** Aparecer en el directorio público de Tepahti. */
   @IsOptional() @IsBoolean() directoryEnabled?: boolean;
   /** Resumen semanal de indicadores por correo. */
   @IsOptional() @IsBoolean() weeklyReport?: boolean;
@@ -103,7 +103,7 @@ export class ClinicController {
       throw new ConflictException('Podrás aparecer en el directorio en cuanto verifiquemos la cédula del médico responsable');
     }
     if (dto.paymentMode && dto.paymentMode !== 'OFF' && !this.config.payments) {
-      throw new ConflictException('Los pagos en línea aún no están configurados en Medora');
+      throw new ConflictException('Los pagos en línea aún no están configurados en Tepahti');
     }
     const data = dto.reminderOffsets ? { ...dto, reminderOffsets: [...dto.reminderOffsets].sort((a, b) => b - a) } : dto;
     const clinic = await this.prisma.clinic.update({ where: { id: staff.clinicId }, data });

@@ -3,7 +3,7 @@ import { record } from './lib.mjs';
 
 await record('01-reservas-en-linea', { patient: true, staff: true }, async (r) => {
   const { page } = r;
-  await r.card('¿Tu recepción vive pegada al teléfono?', 'Así agendan tus pacientes con Medora 👇');
+  await r.card('¿Tu recepción vive pegada al teléfono?', 'Así agendan tus pacientes con Tepahti 👇');
 
   await r.go('/c/clinica-aurora');
   await r.caption('Tus pacientes agendan <b>solos, 24/7</b>', 1600);
@@ -31,5 +31,5 @@ await record('01-reservas-en-linea', { patient: true, staff: true }, async (r) =
   await r.caption('Tú la ves <b>al instante</b> en tu agenda', 600);
   await r.tap(page.getByText('Mariana López').first(), 2600);
 
-  await r.card('Menos llamadas.<br>Más pacientes.', 'Agenda en línea, recordatorios, expediente y cobros en un solo lugar.', 'medora.nut.com.mx · 14 días gratis', 3800);
+  await r.card('Menos llamadas.<br>Más pacientes.', 'Agenda en línea, recordatorios, expediente y cobros en un solo lugar.', '14 días gratis · link en el perfil', 3800);
 });

@@ -21,7 +21,7 @@ export function isPrivateAddress(ip: string): boolean {
   return v6 === '::1' || v6 === '::' || v6.startsWith('fc') || v6.startsWith('fd') || v6.startsWith('fe80');
 }
 
-/** La URL debe ser HTTPS y resolver sólo a direcciones públicas (evita que Medora llame a su propia red). */
+/** La URL debe ser HTTPS y resolver sólo a direcciones públicas (evita que Tepahti llame a su propia red). */
 export async function assertPublicHttps(url: string): Promise<void> {
   let u: URL;
   try { u = new URL(url); } catch { throw new Error('URL inválida'); }

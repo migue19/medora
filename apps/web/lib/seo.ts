@@ -99,10 +99,10 @@ export function clinicMetadata(p: PublicProfile, url: string, site: string): Met
   );
   const title = `${p.clinic.name} · Citas en línea`;
   return {
-    title: { absolute: `${title} | Medora` },
+    title: { absolute: `${title} | Tepahti` },
     description,
     alternates: { canonical: url },
-    openGraph: { type: 'website', url, title, description, siteName: 'Medora', locale: 'es_MX', images: [{ url: `${site}/icons/icon-512.png`, width: 512, height: 512 }] },
+    openGraph: { type: 'website', url, title, description, siteName: 'Tepahti', locale: 'es_MX', images: [{ url: `${site}/brand/og.png`, width: 1200, height: 630 }] },
     twitter: { card: 'summary', title, description },
   };
 }
@@ -119,7 +119,7 @@ export function doctorMetadata(p: PublicProfile, d: PublicDoctor, url: string, s
     title: { absolute: `${title} | ${p.clinic.name}` },
     description,
     alternates: { canonical: url },
-    openGraph: { type: 'profile', url, title, description, siteName: 'Medora', locale: 'es_MX', images: [{ url: image }] },
+    openGraph: { type: 'profile', url, title, description, siteName: 'Tepahti', locale: 'es_MX', images: [{ url: image }] },
     twitter: { card: d.photoUrl ? 'summary_large_image' : 'summary', title, description, images: [image] },
   };
 }

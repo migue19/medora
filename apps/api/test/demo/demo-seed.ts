@@ -114,7 +114,7 @@ async function main() {
   const app = await createApp({
     databaseUrl, jwtSecret: new TextEncoder().encode(randomBytes(32).toString('hex')), webOrigin: ORIGIN,
     cookieSecure: false, port: 0, host: '127.0.0.1', production: false, trustProxy: false, rateLimitEnabled: false,
-    mail: { from: 'Medora <no-reply@medora.example>', smtp: null },
+    mail: { from: 'Tepahti <no-reply@medora.example>', smtp: null },
     whatsapp: { token: 'demo', phoneNumberId: '0', template: 'recordatorio_cita', reviewTemplate: 'invitacion_opinion', language: 'es_MX', apiVersion: 'v25.0', defaultCountryCode: '52' },
     payments: { secretKey: 'sk_test_demo', webhookSecret: 'whsec_demo' },
     video: { apiKey: 'demo' },

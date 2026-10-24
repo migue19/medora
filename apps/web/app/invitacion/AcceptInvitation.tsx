@@ -64,7 +64,7 @@ export function AcceptInvitation() {
                 <p><strong>{info.clinic.name}</strong> te invita como <strong>{ROLE_LABEL[info.role] ?? info.role}</strong>.</p>
                 <p className="muted small">{info.name} · {info.email}</p>
                 {info.existingUser ? (
-                  <p className="muted small">Ya tienes una cuenta de Medora con este correo: entrarás con tu contraseña actual.</p>
+                  <p className="muted small">Ya tienes una cuenta de Tepahti con este correo: entrarás con tu contraseña actual.</p>
                 ) : (
                   <>
                     <label>Crea tu contraseña<PasswordInput name="password" required minLength={12} maxLength={200} autoComplete="new-password" /></label>

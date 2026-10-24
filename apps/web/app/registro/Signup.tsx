@@ -83,7 +83,7 @@ export function Signup() {
             <label>Especialidad<input name="specialty" required minLength={3} maxLength={120} placeholder="Pediatría" /></label>
             <label>Cédula profesional<input name="licenseNumber" required inputMode="numeric" pattern="\d{7,8}" maxLength={8} placeholder="7 u 8 dígitos" /></label>
           </div>
-          <label className="check"><input type="checkbox" name="acceptTerms" required />Acepto el <Link href="/privacidad" target="_blank">aviso de privacidad</Link> de Medora.</label>
+          <label className="check"><input type="checkbox" name="acceptTerms" required />Acepto el <Link href="/privacidad" target="_blank">aviso de privacidad</Link> de Tepahti.</label>
           {error && <div className="alert error" role="alert">{error}</div>}
           <div><button className="primary" disabled={busy}>{busy ? 'Registrando…' : 'Crear mi cuenta'}</button></div>
         </form>

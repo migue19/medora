@@ -20,7 +20,7 @@ const KIND: Record<string, ProviderKind> = { google: 'GOOGLE', microsoft: 'MICRO
 
 /**
  * Calendario personal del médico (Google Calendar u Outlook): sus eventos bloquean la agenda en línea en
- * menos de un minuto (notificaciones del proveedor) y sus citas de Medora se escriben en su calendario.
+ * menos de un minuto (notificaciones del proveedor) y sus citas de Tepahti se escriben en su calendario.
  */
 @Injectable()
 export class CalendarService implements OnModuleInit {
@@ -45,7 +45,7 @@ export class CalendarService implements OnModuleInit {
 
   private provider(kind: ProviderKind): CalendarProvider {
     const p = this.providers[kind];
-    if (!p || !this.config.recordsKey) throw new ConflictException('Esa conexión de calendario aún no está activada en Medora');
+    if (!p || !this.config.recordsKey) throw new ConflictException('Esa conexión de calendario aún no está activada en Tepahti');
     return p;
   }
 
@@ -293,7 +293,7 @@ export class CalendarService implements OnModuleInit {
     const externalId = await this.withToken(conn, (token) => provider.upsertEvent(token, link?.externalEventId ?? null, {
       appointmentId: a.id, start: a.startsAt, end: a.endsAt,
       title: `Cita: ${a.clinicPatient.name} · ${a.serviceName}${a.modality === 'VIDEO' ? ' (videoconsulta)' : ''}`,
-      description: `${a.clinic.name} · ${[a.location.name, a.location.address].filter(Boolean).join(', ')}\nAgenda en Medora: ${this.config.webOrigin}/panel`,
+      description: `${a.clinic.name} · ${[a.location.name, a.location.address].filter(Boolean).join(', ')}\nAgenda en Tepahti: ${this.config.webOrigin}/panel`,
     }));
     await this.prisma.appointmentCalendarEvent.upsert({
       where: { appointmentId_connectionId: { appointmentId, connectionId } }, update: { externalEventId: externalId },

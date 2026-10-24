@@ -155,7 +155,7 @@ function Visit({ mode }: { mode: Mode }) {
 
         {phase === 'lobby' && (
           <div className="card stack">
-            {!info.available ? <div className="alert warn">{doctor ? 'Las videoconsultas aún no están activadas en Medora.' : `Las videoconsultas no están disponibles por ahora. Comunícate con la clínica${info.clinic.phone ? ` al ${info.clinic.phone}` : ''}.`}</div>
+            {!info.available ? <div className="alert warn">{doctor ? 'Las videoconsultas aún no están activadas en Tepahti.' : `Las videoconsultas no están disponibles por ahora. Comunícate con la clínica${info.clinic.phone ? ` al ${info.clinic.phone}` : ''}.`}</div>
               : !active ? <div className="alert warn">{info.status === 'COMPLETED' ? 'Esta consulta ya se marcó como atendida.' : 'Esta cita ya no está vigente.'}</div>
               : !info.open ? (
                 <div className="alert">

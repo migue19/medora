@@ -63,7 +63,7 @@ function CalendarSection() {
   return (
     <div className="card stack">
       <h3 style={{ margin: 0 }}>Mi calendario</h3>
-      <p className="small muted" style={{ margin: 0 }}>Conecta tu calendario personal: tus eventos (cursos, consultas en otro lugar, vacaciones) bloquean tus horarios en línea en segundos, y tus citas de Medora aparecen en tu calendario. De tus eventos sólo guardamos el horario.</p>
+      <p className="small muted" style={{ margin: 0 }}>Conecta tu calendario personal: tus eventos (cursos, consultas en otro lugar, vacaciones) bloquean tus horarios en línea en segundos, y tus citas de Tepahti aparecen en tu calendario. De tus eventos sólo guardamos el horario.</p>
       {msg && <div className={`alert ${msg.ok ? 'ok' : 'error'}`} role="status">{msg.text}</div>}
       {s.providers.map((p) => (
         <div key={p.provider} className="row" style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
@@ -130,9 +130,9 @@ function PushSection() {
   return (
     <div className="card stack">
       <h3 style={{ margin: 0 }}>Avisos en este dispositivo</h3>
-      <p className="small muted" style={{ margin: 0 }}>Recibe un aviso cuando un paciente agenda o cancela en línea, o entra a la sala de videoconsulta. En iPhone, primero agrega Medora a tu pantalla de inicio (Compartir → Agregar a inicio).</p>
+      <p className="small muted" style={{ margin: 0 }}>Recibe un aviso cuando un paciente agenda o cancela en línea, o entra a la sala de videoconsulta. En iPhone, primero agrega Tepahti a tu pantalla de inicio (Compartir → Agregar a inicio).</p>
       {state === 'unsupported' && <p className="small">Este navegador no admite avisos.</p>}
-      {state === 'denied' && <p className="small">Los avisos están bloqueados para Medora en este navegador; actívalos en la configuración del sitio.</p>}
+      {state === 'denied' && <p className="small">Los avisos están bloqueados para Tepahti en este navegador; actívalos en la configuración del sitio.</p>}
       {state === 'off' && <div><button className="primary" onClick={enable}>Activar avisos</button></div>}
       {state === 'on' && <div className="row"><span className="badge COMPLETED">Activados</span><button className="ghost small" onClick={disable}>Desactivar</button></div>}
       {msg && <div className="alert error">{msg}</div>}

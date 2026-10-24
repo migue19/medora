@@ -42,7 +42,7 @@ export interface PaymentGateway {
 
 export const PAYMENT_GATEWAY = Symbol('PAYMENT_GATEWAY');
 
-/** Stripe Checkout (cuenta de Medora), en pesos mexicanos. */
+/** Stripe Checkout (cuenta de Tepahti), en pesos mexicanos. */
 export class StripeGateway implements PaymentGateway {
   private readonly stripe: Stripe;
 

@@ -123,8 +123,8 @@ export class IntegrationsService implements OnModuleInit {
     const t = Math.floor(Date.now() / 1000);
     const v1 = createHmac('sha256', secret).update(`${t}.${body}`).digest('hex');
     return {
-      'content-type': 'application/json', 'user-agent': 'Medora-Webhooks/1', 'medora-event': type,
-      'medora-delivery': deliveryId, 'medora-signature': `t=${t},v1=${v1}`,
+      'content-type': 'application/json', 'user-agent': 'Tepahti-Webhooks/1', 'tepahti-event': type,
+      'tepahti-delivery': deliveryId, 'tepahti-signature': `t=${t},v1=${v1}`,
     };
   }
 

@@ -28,7 +28,7 @@ export function VerifyEmailNotice({ email }: { email: string }) {
 
   return (
     <div className="alert warn stack" role="status">
-      <span>Confirma tu correo <strong>{email}</strong> para poder reservar. Busca el mensaje de Medora (revisa también spam).</span>
+      <span>Confirma tu correo <strong>{email}</strong> para poder reservar. Busca el mensaje de Tepahti (revisa también spam).</span>
       <div className="row">
         <button onClick={resend} disabled={busy}>Reenviar enlace</button>
         <button className="ghost" onClick={check} disabled={busy}>Ya lo confirmé</button>

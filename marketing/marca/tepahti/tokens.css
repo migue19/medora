@@ -1,0 +1,95 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * design-systems/tepahti/tokens.css
+ *
+ * Tepahti — «curar a la gente» en náhuatl. Software de agenda, expediente y
+ * cobros para clínicas en México: confiable como un consultorio, cálido como
+ * la atención de quien conoce a sus pacientes.
+ *
+ * Decisiones de marca:
+ *   - Jade (#0B6E5F) es el único color de acción: botones, enlaces, foco.
+ *   - Obsidiana (#15211F) para el texto; nunca negro puro.
+ *   - Papel (#F7F5F0) cálido como fondo de página; tarjetas en blanco.
+ *   - Cempasúchil (#F2A33A) sólo como acento puntual (destacados, ilustración),
+ *     nunca como texto sobre blanco ni como botón principal.
+ *   - Plus Jakarta Sans en todo: 800 para titulares, 400–600 para el cuerpo.
+ *   - Esquinas suaves (10–16 px): cercano, no infantil.
+ * ─────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Superficies */
+  --bg: #F7F5F0;             /* Papel — fondo de página */
+  --surface: #FFFFFF;        /* Tarjetas y paneles */
+  --surface-warm: #EEF6F3;   /* Jade muy claro — bloques destacados */
+
+  /* Texto */
+  --fg: #15211F;             /* Obsidiana — texto principal */
+  --fg-2: #33433F;           /* Texto secundario fuerte */
+  --muted: #5C6B68;          /* Descripciones y ayudas */
+  --meta: #687673;           /* Metadatos, marcas de tiempo */
+
+  /* Bordes */
+  --border: #DCE3E0;
+  --border-soft: #E9EEEC;
+
+  /* Acción */
+  --accent: #0B6E5F;         /* Jade */
+  --accent-on: #FFFFFF;
+  --accent-hover: #09594D;
+  --accent-active: #074A40;
+
+  /* Semánticos */
+  --success: #1F7A3A;
+  --warn: #9A5B00;
+  --danger: #B42318;
+
+  /* Tipografía */
+  --font-display: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-body: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-lg: 18px;
+  --text-xl: 22px;
+  --text-2xl: 28px;
+  --text-3xl: 38px;
+  --text-4xl: 56px;
+  --leading-body: 1.55;
+  --leading-tight: 1.08;
+  --tracking-display: -0.03em;
+
+  /* Espaciado */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --section-y-desktop: 96px;
+  --section-y-tablet: 72px;
+  --section-y-phone: 48px;
+
+  /* Forma y profundidad */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-pill: 999px;
+  --elev-flat: none;
+  --elev-ring: 0 0 0 1px var(--border);
+  --elev-raised: 0 1px 2px rgb(21 33 31 / 6%), 0 8px 24px rgb(21 33 31 / 8%);
+  --focus-ring: 0 0 0 3px rgb(11 110 95 / 35%);
+
+  /* Movimiento */
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --ease-standard: cubic-bezier(.2, .8, .2, 1);
+
+  /* Contenedor */
+  --container-max: 1120px;
+  --container-gutter-desktop: 32px;
+  --container-gutter-tablet: 24px;
+  --container-gutter-phone: 16px;
+}

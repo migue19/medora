@@ -223,7 +223,7 @@ function LinkForm({ defaultEmail, onSend, onCancel }: { defaultEmail: string; on
   return (
     <form className="card stack" onSubmit={(e) => { e.preventDefault(); onSend(email.trim()); }}>
       <h3>Vincular con cuenta en línea</h3>
-      <p className="small muted">Si el paciente ya tiene cuenta en Medora, le enviaremos a ese correo un enlace para confirmar que esta ficha es suya. Al confirmar, verá estas citas en su portal y, si ya había reservado en línea, sus fichas se fusionan.</p>
+      <p className="small muted">Si el paciente ya tiene cuenta en Tepahti, le enviaremos a ese correo un enlace para confirmar que esta ficha es suya. Al confirmar, verá estas citas en su portal y, si ya había reservado en línea, sus fichas se fusionan.</p>
       <label>Correo de su cuenta<input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
       <div className="row"><button className="primary">Enviar enlace</button><button type="button" onClick={onCancel}>Cancelar</button></div>
     </form>

@@ -139,12 +139,12 @@ export function Onboarding() {
       }</span></Header>
       <main className="container section stack">
         <div>
-          <h1>Alta de {d.clinic.name || 'tu clínica'} en Medora</h1>
+          <h1>Alta de {d.clinic.name || 'tu clínica'} en Tepahti</h1>
           <p className="muted">Llénalo a tu ritmo: se guarda solo y puedes volver con el mismo enlace. Lo marcado con <strong>*</strong> es indispensable; lo demás puede llegar después.</p>
         </div>
         {saveError && <div className="alert error" role="alert">{saveError}</div>}
         {state.status === 'SUBMITTED' && <div className="alert ok">Ya lo enviaste. Lo revisamos y te avisamos; aún puedes corregir y volver a enviar.</div>}
-        {locked && <div className="alert ok">Tu clínica ya está en Medora. Los cambios ahora se hacen desde el panel.</div>}
+        {locked && <div className="alert ok">Tu clínica ya está en Tepahti. Los cambios ahora se hacen desde el panel.</div>}
         <nav className="tabs" aria-label="Secciones del alta">
           {SECTIONS.map((s) => (
             <button key={s.id} type="button" role="tab" aria-selected={section === s.id} onClick={() => { setSection(s.id); window.scrollTo({ top: 0 }); }}>
@@ -586,7 +586,7 @@ function PrivacySection({ d, change, issues }: SectionProps) {
   return (
     <div className="card stack">
       <h2>Privacidad</h2>
-      <p className="small muted">Antes de atender pacientes reales por Medora, la clínica necesita un aviso de privacidad vigente (LFPDPPP) que mencione la reserva en línea, los recordatorios y las opiniones.</p>
+      <p className="small muted">Antes de atender pacientes reales por Tepahti, la clínica necesita un aviso de privacidad vigente (LFPDPPP) que mencione la reserva en línea, los recordatorios y las opiniones.</p>
       <Issues issues={issues} />
       <label>Enlace al aviso de privacidad<input value={p.noticeUrl} maxLength={500} placeholder="https://…" onChange={(e) => set({ noticeUrl: e.target.value })} /></label>
       <label>…o pega aquí el texto<textarea value={p.noticeText} maxLength={20000} onChange={(e) => set({ noticeText: e.target.value })} /></label>
@@ -595,7 +595,7 @@ function PrivacySection({ d, change, issues }: SectionProps) {
         <label>Su correo *<input type="email" value={p.officerEmail} maxLength={254} onChange={(e) => set({ officerEmail: e.target.value })} /></label>
       </div>
       <label className="check"><input type="checkbox" checked={p.approved} onChange={(e) => set({ approved: e.target.checked })} />* La dirección de la clínica autoriza publicar su página, sus médicos y las opiniones verificadas.</label>
-      <label className="check"><input type="checkbox" checked={p.directory} onChange={(e) => set({ directory: e.target.checked })} />Aparecer también en el directorio de Medora, donde los pacientes buscan médico por especialidad y zona.</label>
+      <label className="check"><input type="checkbox" checked={p.directory} onChange={(e) => set({ directory: e.target.checked })} />Aparecer también en el directorio de Tepahti, donde los pacientes buscan médico por especialidad y zona.</label>
     </div>
   );
 }
@@ -643,7 +643,7 @@ function ContactsSection({ d, change, issues, allIssues, status, token, beforeSu
               ))}
             </ul>
           </>
-        ) : <p>Todo lo indispensable está completo. Al enviarlo lo revisamos y cargamos su clínica en Medora.</p>}
+        ) : <p>Todo lo indispensable está completo. Al enviarlo lo revisamos y cargamos su clínica en Tepahti.</p>}
         <p className="small muted">No incluyan aquí datos de pacientes: las citas ya agendadas se capturan en el panel durante la prueba interna.</p>
         {msg && <div className={`alert ${msg.ok ? 'ok' : 'error'}`} role="status">{msg.text}</div>}
         <div><button type="button" className="primary" disabled={busy || required.length > 0 || status === 'IMPORTED'} onClick={submit}>

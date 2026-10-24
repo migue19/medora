@@ -3,7 +3,7 @@ import { record } from './lib.mjs';
 
 await record('06-directorio', { patient: true }, async (r) => {
   const { page } = r;
-  await r.card('Que nuevos pacientes<br>te encuentren.', 'Aparece en el directorio de Medora 👇');
+  await r.card('Que nuevos pacientes<br>te encuentren.', 'Aparece en el directorio de Tepahti 👇');
 
   await r.go('/directorio');
   await r.caption('Buscan por especialidad o <b>padecimiento</b>', 600);
@@ -24,5 +24,5 @@ await record('06-directorio', { patient: true }, async (r) => {
   await r.scrollTo(page.getByText('¡Tu cita quedó agendada!'), 400);
   await r.caption('<b>Sin comisión</b> por paciente: sólo tu plan mensual', 2600);
 
-  await r.card('Más pacientes nuevos.<br>Cero comisiones.', 'Directorio con opiniones verificadas y reserva en línea.', 'medora.nut.com.mx · 14 días gratis', 3800);
+  await r.card('Más pacientes nuevos.<br>Cero comisiones.', 'Directorio con opiniones verificadas y reserva en línea.', '14 días gratis · link en el perfil', 3800);
 });

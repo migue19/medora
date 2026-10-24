@@ -18,7 +18,7 @@ export function buildIcs(e: IcsEvent): string {
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Medora//Citas//ES',
+    'PRODID:-//Tepahti//Citas//ES',
     'CALSCALE:GREGORIAN',
     `METHOD:${e.method}`,
     'BEGIN:VEVENT',

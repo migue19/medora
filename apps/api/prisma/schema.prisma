@@ -1,4 +1,4 @@
-// Medora · Sprint 14
+// Tepahti · Sprint 14
 // Todas las entidades de negocio llevan clinicId y se consultan siempre
 // filtradas por la clínica obtenida de la sesión.
 
@@ -202,9 +202,9 @@ model Clinic {
   whatsappEnabled         Boolean  @default(false)
   // Invitar a opinar a los pacientes después de una cita atendida.
   reviewsEnabled          Boolean  @default(true)
-  // Aparecer en el directorio público de Medora (búsqueda entre clínicas).
+  // Aparecer en el directorio público de Tepahti (búsqueda entre clínicas).
   directoryEnabled        Boolean  @default(false)
-  // Pagos en línea (Stripe, cuenta de Medora).
+  // Pagos en línea (Stripe, cuenta de Tepahti).
   paymentMode             PaymentMode @default(OFF)
   // Anticipo: porcentaje del precio de la cita (100 = pago completo).
   depositPercent          Int      @default(100)
@@ -214,7 +214,7 @@ model Clinic {
   asyncPaymentsEnabled    Boolean  @default(false)
   // Resumen semanal de indicadores por correo a los propietarios (lunes por la mañana).
   weeklyReport            Boolean  @default(true)
-  // Suscripción a Medora.
+  // Suscripción a Tepahti.
   plan                    Plan               @default(CLINICA)
   subscriptionStatus      SubscriptionStatus @default(TRIALING)
   trialEndsAt             DateTime?          @db.Timestamptz(3)
@@ -868,7 +868,7 @@ model ReviewInvitation {
 }
 
 // Alta de una clínica nueva: formulario público con enlace privado que la clínica llena
-// (se guarda solo); al enviarlo, un comando lo revisa e importa a Medora.
+// (se guarda solo); al enviarlo, un comando lo revisa e importa a Tepahti.
 model ClinicOnboarding {
   id           String           @id @default(uuid()) @db.Uuid
   tokenHash    String           @unique @db.Char(64)
@@ -1270,7 +1270,7 @@ model ExternalBusy {
   @@index([doctorId, startsAt])
 }
 
-// Evento que Medora creó en el calendario del médico por una cita.
+// Evento que Tepahti creó en el calendario del médico por una cita.
 model AppointmentCalendarEvent {
   appointmentId   String @db.Uuid
   connectionId    String @db.Uuid

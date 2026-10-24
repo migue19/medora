@@ -5,7 +5,7 @@ async function main() {
   const config = loadConfig();
   const app = await createApp(config);
   await app.listen(config.port, config.host);
-  console.log(`Medora API escuchando en http://${config.host}:${config.port}`);
+  console.log(`Tepahti API escuchando en http://${config.host}:${config.port}`);
 }
 
 main().catch((err) => {

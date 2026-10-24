@@ -87,7 +87,7 @@ export class PublicController {
       const locationIds = [...new Set(d.scheduleRules.map((r) => r.locationId))];
       const services = await Promise.all(d.services.map(async ({ service: s }) => ({
         id: s.id, name: s.name, durationMinutes: s.durationMinutes, priceCents: s.priceCents, visitType: s.visitType,
-        // Videoconsulta sólo si el servicio la ofrece y Medora tiene salas configuradas.
+        // Videoconsulta sólo si el servicio la ofrece y Tepahti tiene salas configuradas.
         telemedicine: s.telemedicine && this.video.available && entitlements(clinic).plan.features.telemedicine,
         priceByLocation: await pricesFor(this.prisma, s, d.id, locationIds),
       })));

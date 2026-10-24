@@ -28,7 +28,7 @@ export default async function Home() {
         <section className="hero stack">
           <h1>Agenda médica en línea para tu clínica</h1>
           <p className="muted" style={{ maxWidth: 640 }}>
-            Medora permite que tus pacientes reserven, cancelen y reprogramen citas desde su teléfono,
+            Tepahti permite que tus pacientes reserven, cancelen y reprogramen citas desde su teléfono,
             mientras recepción y médicos ven su agenda en tiempo real, sin dobles reservas.
           </p>
           <div className="row">

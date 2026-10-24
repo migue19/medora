@@ -138,14 +138,14 @@ export class SubscriptionController {
   }
 }
 
-/** Administración de Medora: verificación de cédulas y clínicas exentas (correos en SUPERADMIN_EMAILS). */
+/** Administración de Tepahti: verificación de cédulas y clínicas exentas (correos en SUPERADMIN_EMAILS). */
 @Controller('api/admin')
 @UseGuards(StaffGuard)
 export class AdminController {
   constructor(private readonly signup: SignupService) {}
 
   private async assert(s: StaffContext) {
-    if (!(await this.signup.isSuperadmin(s.userId))) throw new ForbiddenException('Sólo para la administración de Medora');
+    if (!(await this.signup.isSuperadmin(s.userId))) throw new ForbiddenException('Sólo para la administración de Tepahti');
   }
 
   @Get('clinics')

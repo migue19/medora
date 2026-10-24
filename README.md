@@ -1,4 +1,4 @@
-# Medora · Sprint 7
+# Tepahti · Sprint 7
 
 Agenda y reservas de citas médicas en línea para clínicas y consultorios (SaaS multi-clínica). Monorepo npm con Next.js 16 / React 19 (PWA), NestJS 11, Prisma 6 y PostgreSQL 17. Node.js 24 LTS recomendado. Mismo stack y criterios de seguridad que Tavixo.
 
@@ -100,7 +100,7 @@ Entregado. `/directorio` busca entre las clínicas que activan «Aparecer en el 
 
 ### Sprint 9 · Pagos en línea ✅
 
-Entregado con Stripe Checkout (cuenta de Medora). Con pago obligatorio, la reserva en línea aparta el horario 35 min y el pago la confirma; si no llega, se cancela sola y el horario se libera. Los webhooks verifican la firma, se registran por id y consultan el estado real en Stripe, así que un evento repetido o fuera de orden no duplica nada. Reembolsos automáticos según la política de la clínica y pestaña «Pagos» para conciliar. Detalle en [SPRINT9_RESULTS.md](SPRINT9_RESULTS.md).
+Entregado con Stripe Checkout (cuenta de Tepahti). Con pago obligatorio, la reserva en línea aparta el horario 35 min y el pago la confirma; si no llega, se cancela sola y el horario se libera. Los webhooks verifican la firma, se registran por id y consultan el estado real en Stripe, así que un evento repetido o fuera de orden no duplica nada. Reembolsos automáticos según la política de la clínica y pestaña «Pagos» para conciliar. Detalle en [SPRINT9_RESULTS.md](SPRINT9_RESULTS.md).
 
 - Anticipo o pago completo al reservar con un proveedor para México (Stripe, Mercado Pago o Conekta), con tarjeta y OXXO o SPEI según el proveedor.
 - Políticas por clínica: pago obligatorio u opcional, ventana de cancelación con reembolso y cargo por inasistencia.
@@ -216,7 +216,7 @@ La API envía los correos por SMTP con nodemailer. Variables:
 | `SMTP_PORT` | `465` | 465 usa TLS directo; otro puerto usa STARTTLS obligatorio. |
 | `SMTP_USER` | `no-reply@nut.com.mx` | Buzón que envía. |
 | `SMTP_PASSWORD` | — | Contraseña del buzón. Sólo en `.env` del servidor. |
-| `MAIL_FROM` | `Medora <no-reply@nut.com.mx>` | Debe usar el mismo dominio del buzón (SPF/DKIM). |
+| `MAIL_FROM` | `Tepahti <no-reply@nut.com.mx>` | Debe usar el mismo dominio del buzón (SPF/DKIM). |
 | `JOBS_POLL_MS` | `2000` | Intervalo del trabajador de la cola. |
 
 Los enlaces de los correos llevan el token en el fragmento (`/verificar#…`, `/restablecer?tipo=paciente#…`, `/invitacion#…`): el navegador no lo envía al servidor ni en el Referer, y la página lo quita de la barra de direcciones al leerlo. Vigencias: verificación 24 h, recuperación 30 min, invitación 7 días.
@@ -272,7 +272,7 @@ Opcional. Sin `WHATSAPP_TOKEN` el canal queda desactivado y los recordatorios sa
 
 Opcional. Sin `STRIPE_SECRET_KEY` los pagos quedan desactivados y las clínicas no pueden activarlos.
 
-1. Cuenta de Stripe México de Medora. En *Developers → API keys* copia la llave secreta (`sk_test_…` para pruebas, `sk_live_…` para cobrar de verdad; también sirve una llave restringida `rk_…` con permisos de Checkout Sessions, Customers y Refunds).
+1. Cuenta de Stripe México de Tepahti. En *Developers → API keys* copia la llave secreta (`sk_test_…` para pruebas, `sk_live_…` para cobrar de verdad; también sirve una llave restringida `rk_…` con permisos de Checkout Sessions, Customers y Refunds).
 2. Para OXXO y SPEI, actívalos en *Settings → Payment methods*.
 3. En *Developers → Webhooks* agrega el endpoint `https://medora.nut.com.mx/api/payments/stripe/webhook` con los eventos `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `checkout.session.expired` y `charge.refunded`. Copia su *signing secret* (`whsec_…`).
 4. En el `.env` del servidor (entre comillas simples) y reinicia la API:
@@ -349,7 +349,7 @@ Cómo funciona:
 
 ## Integraciones
 
-- **API pública v1 y webhooks:** en el panel, «Integraciones». Ahí se crean las llaves (sólo consultar, o consultar y agendar), los webhooks firmados (`Medora-Signature: t=…,v1=HMAC-SHA256(secreto, t.cuerpo)`) y está la documentación de los endpoints. Los webhooks sólo aceptan URLs HTTPS públicas, se reintentan con espera creciente y se pausan tras 50 fallos seguidos.
+- **API pública v1 y webhooks:** en el panel, «Integraciones». Ahí se crean las llaves (sólo consultar, o consultar y agendar), los webhooks firmados (`Tepahti-Signature: t=…,v1=HMAC-SHA256(secreto, t.cuerpo)`) y está la documentación de los endpoints. Los webhooks sólo aceptan URLs HTTPS públicas, se reintentan con espera creciente y se pausan tras 50 fallos seguidos.
 - **Calendarios:** cada médico conecta su Google Calendar u Outlook en «Mi cuenta». Requiere `RECORDS_ENCRYPTION_KEY` (los tokens se guardan cifrados) y una app OAuth:
   - **Google Cloud:** activa la Google Calendar API. Pantalla de consentimiento con los alcances `openid`, `email` y `…/auth/calendar.events`. Cliente OAuth «Aplicación web» con la URI de redirección `https://medora.nut.com.mx/api/integrations/google/callback`. Variables `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET`. Mientras la app esté «en prueba», agrega a los médicos como usuarios de prueba (hasta 100). Para abrirla a todos, Google revisa los alcances sensibles.
   - **Microsoft Entra:** registro de app multiinquilino y cuentas personales. Redirección web `https://medora.nut.com.mx/api/integrations/microsoft/callback`, permisos delegados `Calendars.ReadWrite`, `User.Read` y `offline_access`, y un secreto de cliente. Variables `MICROSOFT_CLIENT_ID` y `MICROSOFT_CLIENT_SECRET`.
@@ -506,7 +506,7 @@ La API escucha en 127.0.0.1:6010 y Next en 127.0.0.1:6011. `WEB_ORIGIN` debe coi
 | GET | /api/public/prescriptions/:code | Público (verificación de recetas) |
 | GET · POST | /api/public/plans · /api/public/signup | Público (alta autoservicio; Origin y límite por IP) |
 | GET · POST · PUT | /api/clinic/subscription (checkout, plan, cancel, portal, billing, invoices/:id/cfdi, invoices/:id/pdf\|xml) | Propietario (cambios) y administración |
-| GET · PATCH | /api/admin/clinics | Administración de Medora (`SUPERADMIN_EMAILS`) |
+| GET · PATCH | /api/admin/clinics | Administración de Tepahti (`SUPERADMIN_EMAILS`) |
 | GET · POST | /api/v1/doctors · services · locations · availability · appointments (`POST`, `:id`, `:id/cancel`) | Llave de API (`Bearer mdr_…`) |
 | GET · POST · PATCH · DELETE | /api/clinic/integrations (keys, webhooks, webhooks/:id/ping) | Propietario o administración |
 | GET · POST · PATCH · DELETE | /api/clinic/calendar (`:provider/start`, `busy`) · /api/integrations/:provider/callback · notify | Médico · Google y Microsoft |

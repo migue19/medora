@@ -33,9 +33,9 @@ export const ARTICLES: Article[] = [
   {
     slug: 'registrar-tu-clinica', category: 'Primeros pasos',
     title: 'Registra tu clínica o consultorio',
-    summary: 'Crea tu cuenta, prueba Medora 14 días sin tarjeta y verifica tu cédula.',
+    summary: 'Crea tu cuenta, prueba Tepahti 14 días sin tarjeta y verifica tu cédula.',
     body: [
-      { p: 'Medora funciona para un consultorio con un solo médico o para clínicas con varios médicos y sedes. El registro toma unos minutos.' },
+      { p: 'Tepahti funciona para un consultorio con un solo médico o para clínicas con varios médicos y sedes. El registro toma unos minutos.' },
       { steps: [
         'Entra a **medora.nut.com.mx/registro** o toca **Prueba 14 días gratis** en la página de inicio.',
         'Escribe el **nombre de la clínica o consultorio** como quieres que lo vean tus pacientes.',
@@ -85,7 +85,7 @@ export const ARTICLES: Article[] = [
         'Escribe el **nombre a mostrar** (por ejemplo, «Dra. Sofía Ramírez»), la **especialidad** y la **cédula profesional**.',
         'Elige los **servicios que ofrece**.',
         'Completa su perfil: presentación, formación, certificaciones de consejo, idiomas, padecimientos que atiende y aseguradoras aceptadas. Todo esto aparece en su página pública.',
-        'Si el médico va a usar Medora, elige el **usuario vinculado** (primero invítalo desde **Equipo**).',
+        'Si el médico va a usar Tepahti, elige el **usuario vinculado** (primero invítalo desde **Equipo**).',
         'Toca **Guardar**.',
       ] },
       { img: 'medico-editar', alt: 'Formulario para editar el perfil profesional de un médico' },
@@ -110,7 +110,7 @@ export const ARTICLES: Article[] = [
         '**Enlace del mapa** de Google Maps para llegar.',
         '**Coordenadas**: permiten que te encuentren con «Cerca de mí» en el directorio.',
         '**Horario de atención** de la sede.',
-        '**Consultorios**: Medora evita que dos médicos tengan cita al mismo tiempo en el mismo consultorio.',
+        '**Consultorios**: Tepahti evita que dos médicos tengan cita al mismo tiempo en el mismo consultorio.',
       ] },
       { p: 'En el horario de cada médico eliges en qué sede (y consultorio) atiende cada bloque. Si un médico atiende en varias sedes, el paciente elige la sede al reservar.' },
     ],
@@ -201,7 +201,7 @@ export const ARTICLES: Article[] = [
   {
     slug: 'recordatorios-y-confirmacion', category: 'Agenda y citas',
     title: 'Recordatorios y confirmación de asistencia',
-    summary: 'Medora recuerda cada cita y el paciente confirma o cancela en un toque.',
+    summary: 'Tepahti recuerda cada cita y el paciente confirma o cancela en un toque.',
     body: [
       { img: 'recordatorios', alt: 'Configuración de recordatorios a pacientes' },
       { steps: [
@@ -221,13 +221,13 @@ export const ARTICLES: Article[] = [
   {
     slug: 'lista-de-espera', category: 'Agenda y citas',
     title: 'Lista de espera: llena los huecos de las cancelaciones',
-    summary: 'Cuando alguien cancela, Medora ofrece el horario al siguiente paciente de la lista.',
+    summary: 'Cuando alguien cancela, Tepahti ofrece el horario al siguiente paciente de la lista.',
     body: [
       { list: [
         'Desde la ficha de un paciente toca **Agregar a la lista de espera** y elige médico, servicio y, si quieres, un rango de fechas.',
         'El paciente también puede anotarse en línea cuando no encuentra horario («Anótate en la lista de espera»).',
       ] },
-      { p: 'Cuando se libera un horario compatible, Medora se lo **aparta 2 horas** al primero de la lista y le avisa por correo para que lo acepte. Si no responde o no le sirve, pasa al siguiente.' },
+      { p: 'Cuando se libera un horario compatible, Tepahti se lo **aparta 2 horas** al primero de la lista y le avisa por correo para que lo acepte. Si no responde o no le sirve, pasa al siguiente.' },
       { p: 'En la pestaña **Lista de espera** ves quién está anotado y los horarios apartados. Puedes **Agendar este horario** por el paciente o marcar **No le sirve**.' },
     ],
   },
@@ -291,7 +291,7 @@ export const ARTICLES: Article[] = [
         'Revisa el diagnóstico y agrega indicaciones generales.',
         'Toca **Emitir e imprimir**: se abre el PDF listo para imprimir o enviar.',
       ] },
-      { p: 'La receta lleva tus datos, tu cédula y un **código QR**. Al escanearlo, la farmacia ve una página de Medora que confirma que la receta es auténtica, con los medicamentos y sólo las iniciales del paciente.' },
+      { p: 'La receta lleva tus datos, tu cédula y un **código QR**. Al escanearlo, la farmacia ve una página de Tepahti que confirma que la receta es auténtica, con los medicamentos y sólo las iniciales del paciente.' },
       { tip: 'Una receta emitida no se modifica. Si hubo un error, **anúlala** indicando el motivo y emite una nueva; la anulada aparece como no válida al verificarla.' },
     ],
   },
@@ -299,7 +299,7 @@ export const ARTICLES: Article[] = [
   // ------------------------------------------------------------------ Crece tu consulta
   {
     slug: 'directorio', category: 'Crece tu consulta',
-    title: 'Aparece en el directorio de Medora',
+    title: 'Aparece en el directorio de Tepahti',
     summary: 'Pacientes nuevos te encuentran por especialidad, padecimiento o zona, sin comisión.',
     body: [
       { img: 'directorio', alt: 'Resultados del directorio con precio, opiniones y próximos horarios', mobile: true },
@@ -308,7 +308,7 @@ export const ARTICLES: Article[] = [
         'Completa en cada médico su especialidad y los padecimientos que atiende.',
         'Agrega colonia, ciudad y coordenadas a tus sedes para aparecer en «Cerca de mí».',
       ] },
-      { p: 'En el directorio cada médico muestra precio, opiniones verificadas, aseguradoras y su próximo horario libre. El paciente reserva directo contigo; **Medora no cobra comisión por paciente**.' },
+      { p: 'En el directorio cada médico muestra precio, opiniones verificadas, aseguradoras y su próximo horario libre. El paciente reserva directo contigo; **Tepahti no cobra comisión por paciente**.' },
     ],
   },
   {
@@ -405,8 +405,8 @@ export const ARTICLES: Article[] = [
         'En **Mi calendario** toca **Conectar** y autoriza con tu cuenta de Google.',
       ] },
       { list: [
-        'Tus eventos personales **bloquean tu agenda** en Medora en segundos: nadie podrá reservar a esa hora.',
-        'Tus citas de Medora **se copian a tu calendario**, con sus cambios y cancelaciones.',
+        'Tus eventos personales **bloquean tu agenda** en Tepahti en segundos: nadie podrá reservar a esa hora.',
+        'Tus citas de Tepahti **se copian a tu calendario**, con sus cambios y cancelaciones.',
       ] },
       { h: 'Avisos en tu celular o computadora' },
       { p: 'En **Mi cuenta → Avisos en este dispositivo** toca **Activar avisos**. Te avisamos cuando entra una cita en línea o un paciente cancela.' },
@@ -415,12 +415,12 @@ export const ARTICLES: Article[] = [
   {
     slug: 'integraciones-api', category: 'Cuenta y suscripción',
     title: 'API y webhooks para otros sistemas',
-    summary: 'Conecta Medora con tu CRM, tu sitio web o tu sistema contable.',
+    summary: 'Conecta Tepahti con tu CRM, tu sitio web o tu sistema contable.',
     body: [
       { img: 'integraciones', alt: 'Pestaña Integraciones con llaves de la API y webhooks' },
       { list: [
         '**Llaves de la API**: permiten consultar médicos, servicios, disponibilidad y citas, y opcionalmente agendar y cancelar. Trátalas como contraseñas.',
-        '**Webhooks**: Medora avisa a tu sistema cuando se crea, reprograma, cancela, confirma, atiende o paga una cita. Cada aviso va firmado.',
+        '**Webhooks**: Tepahti avisa a tu sistema cuando se crea, reprograma, cancela, confirma, atiende o paga una cita. Cada aviso va firmado.',
       ] },
       { p: 'La documentación completa está en **Integraciones → Documentación de la API**.' },
     ],

@@ -15,10 +15,10 @@ import { OnboardingData, Issue, check, clean } from './onboarding.schema';
 
 export const ONBOARDING_TTL_MS = 90 * 24 * 60 * 60_000;
 const ACTIVATION_TTL_MS = 7 * 24 * 60 * 60_000;
-/** Quien invita en nombre de Medora al importar (no es un usuario real). */
+/** Quien invita en nombre de Tepahti al importar (no es un usuario real). */
 const SYSTEM_ID = '00000000-0000-0000-0000-000000000000';
 
-const INVALID = 'El enlace del alta no es válido o ya venció. Pide uno nuevo a Medora.';
+const INVALID = 'El enlace del alta no es válido o ya venció. Pide uno nuevo a Tepahti.';
 
 @Injectable()
 export class OnboardingService {
@@ -71,7 +71,7 @@ export class OnboardingService {
   /** Guarda el borrador tal como esté; devuelve los pendientes. Una vez importada ya no se edita. */
   async save(token: string, raw: unknown) {
     const row = await this.byToken(token);
-    if (row.status === 'IMPORTED') throw new ConflictException('Esta alta ya se cargó en Medora; los cambios se hacen desde el panel.');
+    if (row.status === 'IMPORTED') throw new ConflictException('Esta alta ya se cargó en Tepahti; los cambios se hacen desde el panel.');
     const data = clean(raw);
     const saved = await this.prisma.clinicOnboarding.update({
       where: { id: row.id }, data: { data: data as unknown as Prisma.InputJsonValue },
@@ -82,7 +82,7 @@ export class OnboardingService {
   /** Envía para revisión: exige lo indispensable. Se puede seguir corrigiendo y volver a enviar hasta que se importe. */
   async submit(token: string) {
     const row = await this.byToken(token);
-    if (row.status === 'IMPORTED') throw new ConflictException('Esta alta ya se cargó en Medora.');
+    if (row.status === 'IMPORTED') throw new ConflictException('Esta alta ya se cargó en Tepahti.');
     const data = clean(row.data);
     const issues = (await this.issues(data)).filter((i) => i.required);
     if (issues.length) throw new BadRequestException({ message: 'Faltan datos indispensables', issues });
@@ -101,7 +101,7 @@ export class OnboardingService {
 
   async savePhoto(token: string, doctorKey: string, mimeType: string, bytes: Buffer) {
     const row = await this.byToken(token);
-    if (row.status === 'IMPORTED') throw new ConflictException('Esta alta ya se cargó en Medora.');
+    if (row.status === 'IMPORTED') throw new ConflictException('Esta alta ya se cargó en Tepahti.');
     if (!/^[A-Za-z0-9_-]{1,40}$/.test(doctorKey)) throw new BadRequestException('Médico inválido');
     const data = new Uint8Array(bytes);
     const photo = await this.prisma.onboardingPhoto.upsert({
@@ -140,7 +140,7 @@ export class OnboardingService {
   }
 
   /**
-   * Carga el alta en Medora en una sola transacción: clínica, sedes, consultorios, servicios, precios, médicos
+   * Carga el alta en Tepahti en una sola transacción: clínica, sedes, consultorios, servicios, precios, médicos
    * (perfil y foto), horarios y bloqueos. Después invita al equipo por correo; el propietario recibe un enlace
    * para elegir su contraseña. Si algo falla no queda nada a medias.
    */
@@ -236,7 +236,7 @@ export class OnboardingService {
         data: { email: owner.email, name: owner.name, passwordHash: `unset$${randomToken()}` },
       });
       await tx.membership.create({ data: { userId: user.id, clinicId: clinic.id, role: 'OWNER' } });
-      // Quien ya usa Medora en otra clínica entra con su contraseña de siempre; no se le cambia.
+      // Quien ya usa Tepahti en otra clínica entra con su contraseña de siempre; no se le cambia.
       const activation = existing ? null : await this.authTokens.issue(tx, 'STAFF_RESET_PASSWORD', { userId: user.id }, user.email, ACTIVATION_TTL_MS);
       await this.mail.ownerActivation(tx, { email: user.email, name: user.name, clinicName: clinic.name, slug: clinic.slug, token: activation });
 
@@ -251,7 +251,7 @@ export class OnboardingService {
         });
         await this.mail.staffInvitation(tx, {
           email: t.email, name: t.name, clinicName: clinic.name, timezone: clinic.timezone, role: t.role,
-          inviterName: 'Medora', token, expiresAt: invitation.expiresAt,
+          inviterName: 'Tepahti', token, expiresAt: invitation.expiresAt,
         });
       }
 

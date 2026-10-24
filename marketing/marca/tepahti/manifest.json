@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "od-design-system-project/v1",
+  "id": "tepahti",
+  "name": "Tepahti",
+  "category": "Health & Wellness",
+  "description": "Tepahti: plataforma de agenda, expediente y cobros para clínicas en México. Jade, obsidiana y cempasúchil; una «t» que brota en hoja.",
+  "source": {
+    "type": "user",
+    "origin": "Identidad creada para Tepahti (antes Medora), octubre de 2026"
+  },
+  "files": {
+    "design": "DESIGN.md",
+    "tokens": "tokens.css"
+  },
+  "craft": {
+    "applies": [],
+    "suggested": [
+      "color",
+      "typography",
+      "accessibility-baseline"
+    ],
+    "exemptions": []
+  },
+  "preview": {
+    "dir": "preview",
+    "pages": [
+      {
+        "path": "preview/brand.html",
+        "role": "brand",
+        "title": "Marca"
+      }
+    ]
+  }
+}

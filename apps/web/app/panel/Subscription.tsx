@@ -32,7 +32,7 @@ export function SubscriptionBanner({ onOpen }: { onOpen: () => void }) {
   if (!s.active) { text = s.status === 'TRIALING' ? 'Tu periodo de prueba terminó: los pacientes ya no pueden reservar en línea.' : 'Tu suscripción no está vigente: los pacientes ya no pueden reservar en línea.'; tone = 'error'; }
   else if (s.status === 'PAST_DUE') text = 'No pudimos cobrar tu suscripción. Actualiza tu tarjeta para no perder las reservas en línea.';
   else if (s.status === 'TRIALING' && !s.subscribed && left !== null && left <= 5) text = `Te quedan ${left} ${left === 1 ? 'día' : 'días'} de prueba.`;
-  else if (s.verification === 'PENDING') { text = 'Estamos verificando la cédula profesional (normalmente en un día hábil). Mientras, ya puedes usar Medora.'; tone = ''; }
+  else if (s.verification === 'PENDING') { text = 'Estamos verificando la cédula profesional (normalmente en un día hábil). Mientras, ya puedes usar Tepahti.'; tone = ''; }
   else if (s.verification === 'REJECTED') text = `No pudimos verificar la cédula${s.verificationNote ? `: ${s.verificationNote}` : ''}.`;
   if (!text) return null;
   return (
@@ -94,7 +94,7 @@ export function Subscription({ session }: { session: StaffSessionData }) {
             : <span className="badge CANCELLED">Cancelada</span>}
           {s.verification === 'VERIFIED' ? <span className="badge COMPLETED">Cédula verificada</span> : s.verification === 'PENDING' ? <span className="badge">Cédula en revisión</span> : <span className="badge CANCELLED">Cédula no verificada</span>}
         </div>
-        {s.exempt ? <p className="small muted" style={{ margin: 0 }}>Tu clínica tiene Medora con todo incluido, sin costo.</p> : (
+        {s.exempt ? <p className="small muted" style={{ margin: 0 }}>Tu clínica tiene Tepahti con todo incluido, sin costo.</p> : (
           <p className="small muted" style={{ margin: 0 }}>
             {s.status === 'TRIALING' && !s.subscribed && s.trialEndsAt && `Tu prueba termina el ${fmtDate(s.trialEndsAt, TZ)}. Suscríbete antes para no perder las reservas en línea; los días que queden no se cobran.`}
             {s.subscribed && s.currentPeriodEnd && (s.cancelAtPeriodEnd
@@ -135,7 +135,7 @@ export function Subscription({ session }: { session: StaffSessionData }) {
           })}
         </div>
       )}
-      {!s.available && !s.exempt && <p className="small muted">El cobro en línea de suscripciones aún no está activado en Medora.</p>}
+      {!s.available && !s.exempt && <p className="small muted">El cobro en línea de suscripciones aún no está activado en Tepahti.</p>}
 
       {!s.exempt && <BillingForm s={s} busy={busy} run={run} />}
 

@@ -39,7 +39,7 @@ export function Payments() {
         <label>Hasta<input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} /></label>
       </div>
       {msg && <div className={`alert ${msg.ok ? 'ok' : 'error'}`}>{msg.text}</div>}
-      {data && !data.available && <div className="alert warn">Los pagos en línea todavía no están activados en Medora.</div>}
+      {data && !data.available && <div className="alert warn">Los pagos en línea todavía no están activados en Tepahti.</div>}
       {data && (
         <>
           <div className="grid">

@@ -22,7 +22,7 @@ export const MAX_FUTURE_ONLINE_APPOINTMENTS = 3;
 /** Citas vigentes: agendadas o apartadas en espera de pago. */
 export const ACTIVE_STATUSES = ['BOOKED', 'PENDING_PAYMENT'] as const;
 /** Actor de los procesos automáticos (vencimiento de pagos). */
-export const SYSTEM_ACTOR = { kind: 'SYSTEM' as const, id: '00000000-0000-0000-0000-000000000000', name: 'Medora' };
+export const SYSTEM_ACTOR = { kind: 'SYSTEM' as const, id: '00000000-0000-0000-0000-000000000000', name: 'Tepahti' };
 export const MAX_AVAILABILITY_DAYS = 14;
 
 export interface Actor {

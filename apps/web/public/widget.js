@@ -1,5 +1,5 @@
 /*!
- * Medora · widget «Reservar cita» para el sitio web de la clínica.
+ * Tepahti · widget «Reservar cita» para el sitio web de la clínica.
  *
  *   <script src="https://medora.nut.com.mx/widget.js" data-clinica="mi-clinica" async></script>
  *
@@ -7,7 +7,7 @@
  *   data-medico="dra-ana-lopez"   abre directamente la agenda de un médico
  *   data-texto="Agenda tu cita"   texto del botón
  *   data-posicion="flotante"      botón fijo en la esquina (por omisión, donde se pega el script)
- *   data-color="#0f766e"          color del botón
+ *   data-color="#0b6e5f"          color del botón
  */
 (function () {
   'use strict';
@@ -15,7 +15,7 @@
   if (!script) return;
   var clinic = script.getAttribute('data-clinica') || script.getAttribute('data-clinic');
   if (!clinic || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(clinic)) {
-    console.warn('[Medora] Falta data-clinica con el identificador de la clínica.');
+    console.warn('[Tepahti] Falta data-clinica con el identificador de la clínica.');
     return;
   }
   var doctor = script.getAttribute('data-medico') || '';
@@ -24,7 +24,7 @@
   var path = '/' + clinic + (doctor ? '/' + doctor : '');
   var embedUrl = origin + '/embed' + path;
   var pageUrl = origin + '/c' + path + '?origen=widget';
-  var color = /^#[0-9a-fA-F]{3,8}$/.test(script.getAttribute('data-color') || '') ? script.getAttribute('data-color') : '#0f766e';
+  var color = /^#[0-9a-fA-F]{3,8}$/.test(script.getAttribute('data-color') || '') ? script.getAttribute('data-color') : '#0b6e5f';
   var floating = script.getAttribute('data-posicion') === 'flotante';
 
   // Enlace normal: funciona aunque falle el modal (y abre en otra pestaña con Ctrl/Cmd + clic).

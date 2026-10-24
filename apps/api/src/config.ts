@@ -11,7 +11,7 @@ export interface AppConfig {
   rateLimitEnabled?: boolean;
   mail: MailConfig;
   whatsapp: WhatsAppConfig | null;
-  /** Stripe (cuenta de Medora). Sin llaves, los pagos en línea quedan desactivados. */
+  /** Stripe (cuenta de Tepahti). Sin llaves, los pagos en línea quedan desactivados. */
   payments: PaymentsConfig | null;
   /** Daily (videoconsultas). Sin llave, la telemedicina queda desactivada. */
   video: { apiKey: string } | null;
@@ -19,7 +19,7 @@ export interface AppConfig {
   recordsKey: Buffer | null;
   /** Timbrado de facturas CFDI 4.0 (Facturama). */
   invoicing: InvoicingConfig | null;
-  /** Correos de quienes administran Medora (verifican clínicas). */
+  /** Correos de quienes administran Tepahti (verifican clínicas). */
   superadmins: string[];
   /** Apps OAuth para conectar calendarios (Google Cloud y Microsoft Entra). */
   /** Llaves VAPID de las notificaciones push (web-push generate-vapid-keys). */
@@ -146,7 +146,7 @@ function loadMailConfig(production: boolean): MailConfig {
   const host = process.env.SMTP_HOST?.trim();
   if (!host) {
     if (production) throw new Error('En producción se requiere SMTP_HOST para enviar correos');
-    return { from: process.env.MAIL_FROM?.trim() || 'Medora <no-reply@localhost>', smtp: null };
+    return { from: process.env.MAIL_FROM?.trim() || 'Tepahti <no-reply@localhost>', smtp: null };
   }
   const port = Number(process.env.SMTP_PORT ?? 465);
   return {

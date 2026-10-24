@@ -72,7 +72,7 @@ export async function startHarness(): Promise<Harness> {
     production: false,
     trustProxy: false,
     rateLimitEnabled: false,
-    mail: { from: 'Medora <no-reply@test.mx>', smtp: null },
+    mail: { from: 'Tepahti <no-reply@test.mx>', smtp: null },
     whatsapp: {
       token: 'prueba', phoneNumberId: '123', template: 'recordatorio_cita', reviewTemplate: 'invitacion_opinion',
       language: 'es_MX', apiVersion: 'v25.0',

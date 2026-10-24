@@ -19,6 +19,12 @@ function esc(value: string): string {
 
 interface Block { label: string; value: string }
 
+// Logotipo servido por la web (PNG: muchos clientes de correo no muestran SVG). Sin origen, texto.
+const ORIGIN = process.env.WEB_ORIGIN?.trim().replace(/\/$/, '');
+const LOGO = ORIGIN?.startsWith('https://')
+  ? `<img src="${ORIGIN}/brand/logo-email.png" width="114" height="36" alt="tepahti" style="display:block;border:0;height:36px;width:114px">`
+  : '<span style="font-weight:800;color:#15211f;font-size:22px;letter-spacing:-0.5px">tepahti</span>';
+
 /** Plantilla común: texto plano completo y HTML sencillo compatible con clientes de correo. */
 function layout(opts: {
   subject: string; greeting: string; paragraphs: string[]; details?: Block[];
@@ -30,37 +36,37 @@ function layout(opts: {
     ...(opts.details?.length ? [...opts.details.map((d) => `${d.label}: ${d.value}`), ''] : []),
     ...(opts.action ? [`${opts.action.label}: ${opts.action.url}`, ''] : []),
     ...(opts.footer ?? []),
-    '', '— Medora',
+    '', '— Tepahti',
   ].join('\n');
 
   const details = opts.details?.length
     ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:16px 0;border-collapse:collapse">${opts.details
-      .map((d) => `<tr><td style="padding:4px 16px 4px 0;color:#5b6472;vertical-align:top">${esc(d.label)}</td><td style="padding:4px 0;font-weight:600">${esc(d.value)}</td></tr>`)
+      .map((d) => `<tr><td style="padding:4px 16px 4px 0;color:#5c6b68;vertical-align:top">${esc(d.label)}</td><td style="padding:4px 0;font-weight:600">${esc(d.value)}</td></tr>`)
       .join('')}</table>`
     : '';
   const action = opts.action
-    ? `<p style="margin:24px 0"><a href="${esc(opts.action.url)}" style="background:#0f766e;color:#ffffff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block">${esc(opts.action.label)}</a></p>
-<p style="font-size:13px;color:#5b6472">Si el botón no funciona, copia este enlace en tu navegador:<br><span style="word-break:break-all">${esc(opts.action.url)}</span></p>`
+    ? `<p style="margin:24px 0"><a href="${esc(opts.action.url)}" style="background:#0b6e5f;color:#ffffff;padding:13px 22px;border-radius:10px;text-decoration:none;font-weight:600;display:inline-block">${esc(opts.action.label)}</a></p>
+<p style="font-size:13px;color:#5c6b68">Si el botón no funciona, copia este enlace en tu navegador:<br><span style="word-break:break-all">${esc(opts.action.url)}</span></p>`
     : '';
   const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${esc(opts.subject)}</title></head>
-<body style="margin:0;padding:0;background:#f4f6f8;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1d2530">
+<body style="margin:0;padding:0;background:#f7f5f0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#15211f">
 <div style="max-width:560px;margin:0 auto;padding:24px 16px">
-<div style="background:#ffffff;border-radius:12px;padding:28px 24px">
-<p style="margin:0 0 20px;font-weight:700;color:#0f766e;font-size:18px">Medora</p>
+<div style="background:#ffffff;border-radius:16px;padding:28px 24px;border:1px solid #dce3e0">
+<div style="margin:0 0 22px">${LOGO}</div>
 <p style="margin:0 0 16px">${esc(opts.greeting)}</p>
 ${opts.paragraphs.map((p) => `<p style="margin:0 0 12px;line-height:1.5">${esc(p)}</p>`).join('\n')}
 ${details}
 ${action}
-${(opts.footer ?? []).map((f) => `<p style="margin:12px 0 0;font-size:13px;color:#5b6472;line-height:1.5">${esc(f)}</p>`).join('\n')}
+${(opts.footer ?? []).map((f) => `<p style="margin:12px 0 0;font-size:13px;color:#5c6b68;line-height:1.5">${esc(f)}</p>`).join('\n')}
 </div>
-<p style="text-align:center;font-size:12px;color:#8a93a0;margin:16px 0 0">Correo automático de Medora. No respondas a este mensaje.</p>
+<p style="text-align:center;font-size:12px;color:#687673;margin:16px 0 0">Correo automático de Tepahti. No respondas a este mensaje.</p>
 </div></body></html>`;
   return { subject: opts.subject, text, html };
 }
 
 export function verifyEmail(p: { name: string; link: string }): RenderedEmail {
   return layout({
-    subject: 'Confirma tu correo en Medora',
+    subject: 'Confirma tu correo en Tepahti',
     greeting: `Hola, ${p.name}:`,
     paragraphs: ['Gracias por crear tu cuenta. Confirma tu correo para poder reservar citas en línea.'],
     action: { label: 'Confirmar mi correo', url: p.link },
@@ -70,7 +76,7 @@ export function verifyEmail(p: { name: string; link: string }): RenderedEmail {
 
 export function resetPassword(p: { name: string; link: string }): RenderedEmail {
   return layout({
-    subject: 'Restablece tu contraseña de Medora',
+    subject: 'Restablece tu contraseña de Tepahti',
     greeting: `Hola, ${p.name}:`,
     paragraphs: ['Recibimos una solicitud para restablecer tu contraseña. Al cambiarla se cerrarán todas tus sesiones.'],
     action: { label: 'Elegir una contraseña nueva', url: p.link },
@@ -83,9 +89,9 @@ export function staffInvitation(p: {
   timezone: string;
 }): RenderedEmail {
   return layout({
-    subject: `Te invitaron a ${p.clinicName} en Medora`,
+    subject: `Te invitaron a ${p.clinicName} en Tepahti`,
     greeting: `Hola, ${p.name}:`,
-    paragraphs: [`${p.inviterName} te invitó a unirte al equipo de ${p.clinicName} en Medora.`],
+    paragraphs: [`${p.inviterName} te invitó a unirte al equipo de ${p.clinicName} en Tepahti.`],
     details: [{ label: 'Rol', value: ROLE_LABEL[p.role] }, { label: 'Clínica', value: p.clinicName }],
     action: { label: 'Aceptar la invitación', url: p.link },
     footer: [`La invitación vence el ${DateTime.fromJSDate(p.expiresAt).setZone(p.timezone).setLocale('es').toFormat("d 'de' LLLL")}. Si no esperabas este correo, ignóralo.`],
@@ -242,10 +248,10 @@ export function patientLinkRequest(p: {
   patientName: string; clinicName: string; link: string;
 }): RenderedEmail {
   return layout({
-    subject: `${p.clinicName} quiere vincular tu expediente con tu cuenta de Medora`,
+    subject: `${p.clinicName} quiere vincular tu expediente con tu cuenta de Tepahti`,
     greeting: `Hola, ${p.patientName}:`,
     paragraphs: [
-      `${p.clinicName} tiene una ficha tuya de citas agendadas por teléfono y quiere unirla con tu cuenta de Medora.`,
+      `${p.clinicName} tiene una ficha tuya de citas agendadas por teléfono y quiere unirla con tu cuenta de Tepahti.`,
       'Al confirmar verás todas tus citas de esa clínica en «Mis citas» y podrás gestionarlas en línea.',
     ],
     action: { label: 'Confirmar vinculación', url: p.link },
@@ -293,11 +299,11 @@ export function reviewModerated(p: {
 
 export function ownerActivation(p: { name: string; clinicName: string; slug: string; link: string; site: string; existing: boolean }): RenderedEmail {
   return layout({
-    subject: p.existing ? `${p.clinicName} ya está en Medora` : `${p.clinicName} ya está en Medora: activa tu cuenta`,
+    subject: p.existing ? `${p.clinicName} ya está en Tepahti` : `${p.clinicName} ya está en Tepahti: activa tu cuenta`,
     greeting: `Hola, ${p.name}:`,
     paragraphs: [
       p.existing
-        ? `Cargamos la información de ${p.clinicName} y eres su propietario. Entra con tu correo y tu contraseña de Medora.`
+        ? `Cargamos la información de ${p.clinicName} y eres su propietario. Entra con tu correo y tu contraseña de Tepahti.`
         : `Cargamos la información de ${p.clinicName}. Eres la persona propietaria de la cuenta: elige tu contraseña para entrar al panel.`,
       `Para iniciar sesión usa el identificador de clínica «${p.slug}». Tu página de reservas es ${p.site}/c/${p.slug}.`,
     ],
@@ -312,7 +318,7 @@ export function onboardingSubmitted(p: { label: string; clinicName: string; cont
   return layout({
     subject: `Alta enviada: ${p.clinicName || p.label}`,
     greeting: 'Hola:',
-    paragraphs: [`${p.clinicName || p.label} terminó de llenar el alta de Medora y la envió para revisión.`],
+    paragraphs: [`${p.clinicName || p.label} terminó de llenar el alta de Tepahti y la envió para revisión.`],
     details: [{ label: 'Contacto', value: p.contact || 'sin dato' }, { label: 'Alta', value: p.id }],
     footer: ['Revísala e impórtala con el comando del alta (README, sección «Alta de clínicas»).'],
   });
@@ -338,7 +344,7 @@ export function subscriptionInvoiceEmail(p: {
 }): RenderedEmail {
   const fmt = (d: Date) => DateTime.fromJSDate(d, { zone: 'America/Mexico_City' }).setLocale('es').toFormat("d 'de' LLLL 'de' yyyy");
   return layout({
-    subject: `Tu factura de Medora · ${formatPrice(p.amountCents)}`,
+    subject: `Tu factura de Tepahti · ${formatPrice(p.amountCents)}`,
     greeting: `Hola, equipo de ${p.clinicName}:`,
     paragraphs: ['Gracias por tu pago. Adjuntamos la factura (CFDI 4.0) en PDF y XML.'],
     details: [
@@ -361,16 +367,16 @@ export function signupNotice(p: { clinicName: string; ownerName: string; email: 
       { label: 'Clínica', value: p.clinicName }, { label: 'Responsable', value: `${p.ownerName} <${p.email}>` },
       { label: 'Médico', value: p.doctorName }, { label: 'Cédula', value: p.licenseNumber },
     ],
-    action: { label: 'Revisar en Medora', url: p.adminLink },
+    action: { label: 'Revisar en Tepahti', url: p.adminLink },
   });
 }
 
 export function verificationResult(p: { clinicName: string; approved: boolean; note: string | null; panelLink: string }): RenderedEmail {
   return layout({
-    subject: p.approved ? `${p.clinicName} quedó verificada en Medora` : `Revisión de cédula de ${p.clinicName}`,
+    subject: p.approved ? `${p.clinicName} quedó verificada en Tepahti` : `Revisión de cédula de ${p.clinicName}`,
     greeting: 'Hola:',
     paragraphs: [p.approved
-      ? 'Verificamos la cédula profesional. Ya puedes aparecer en el directorio de Medora y cobrar en línea.'
+      ? 'Verificamos la cédula profesional. Ya puedes aparecer en el directorio de Tepahti y cobrar en línea.'
       : `No pudimos verificar la cédula profesional${p.note ? `: ${p.note}` : '.'} Corrígela en «Médicos» o responde a este correo.`],
     action: { label: 'Ir al panel', url: p.panelLink },
   });
@@ -378,7 +384,7 @@ export function verificationResult(p: { clinicName: string; approved: boolean; n
 
 export function signupActivation(p: { name: string; clinicName: string; slug: string; link: string; trialDays: number; planName: string }): RenderedEmail {
   return layout({
-    subject: `Activa tu cuenta de Medora · ${p.clinicName}`,
+    subject: `Activa tu cuenta de Tepahti · ${p.clinicName}`,
     greeting: `Hola, ${p.name}:`,
     paragraphs: [
       `Registramos ${p.clinicName} con el plan ${p.planName} y ${p.trialDays} días de prueba sin costo. Elige tu contraseña para entrar al panel.`,
@@ -392,10 +398,10 @@ export function signupActivation(p: { name: string; clinicName: string; slug: st
 
 export function accountExists(p: { name: string; loginLink: string; recoverLink: string }): RenderedEmail {
   return layout({
-    subject: 'Ya tienes una cuenta en Medora',
+    subject: 'Ya tienes una cuenta en Tepahti',
     greeting: `Hola, ${p.name}:`,
     paragraphs: [
-      'Alguien intentó registrar una clínica nueva con tu correo, que ya tiene cuenta en Medora. No creamos nada.',
+      'Alguien intentó registrar una clínica nueva con tu correo, que ya tiene cuenta en Tepahti. No creamos nada.',
       `Si fuiste tú, entra al panel con tu contraseña. Si la olvidaste, recupérala aquí: ${p.recoverLink}. Para abrir otra clínica con el mismo correo, responde a este mensaje.`,
     ],
     action: { label: 'Entrar al panel', url: p.loginLink },

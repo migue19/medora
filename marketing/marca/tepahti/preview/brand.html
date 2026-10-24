@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tepahti · Identidad</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 400 var(--text-base)/var(--leading-body) var(--font-body); }
+  .wrap { max-width: var(--container-max); margin: 0 auto; padding: 56px var(--container-gutter-desktop) 80px; }
+  h1, h2, h3 { font-family: var(--font-display); font-weight: 800; letter-spacing: var(--tracking-display); line-height: var(--leading-tight); margin: 0; }
+  .eyebrow { font-size: var(--text-xs); font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+  section { margin-top: 64px; }
+  section > h2 { font-size: var(--text-2xl); margin: 6px 0 20px; }
+  .grid { display: grid; gap: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 24px; }
+  .muted { color: var(--muted); }
+
+  /* Portada */
+  .hero { border-radius: 28px; padding: 64px; color: #fff; overflow: hidden; position: relative;
+    background: radial-gradient(120% 90% at 85% 0%, #1E8F7B 0%, var(--accent) 40%, #0A3F37 100%); }
+  .hero .lock { display: flex; align-items: center; gap: 22px; }
+  .hero .lock span { font: 800 92px/1 var(--font-display); letter-spacing: -.045em; }
+  .hero p { font-size: var(--text-xl); max-width: 640px; margin: 28px 0 0; color: #D7F1EA; }
+  .hero .meaning { position: absolute; right: 56px; bottom: 48px; text-align: right; color: #A8E3D3; font-size: var(--text-sm); }
+  .hero .meaning b { display: block; color: #fff; font-size: var(--text-lg); }
+
+  /* Logos */
+  .logos { grid-template-columns: 1.4fr 1fr 1fr 1fr; }
+  .tile { border-radius: var(--radius-lg); min-height: 200px; display: grid; place-items: center; border: 1px solid var(--border); position: relative; }
+  .tile small { position: absolute; left: 16px; bottom: 12px; font-size: var(--text-xs); color: var(--muted); }
+  .tile.dark { background: #15211F; border-color: #15211F; } .tile.dark small { color: #9FB1AE; }
+  .tile.jade { background: var(--accent); border-color: var(--accent); } .tile.jade small { color: #CDEDE5; }
+  .tile.paper { background: var(--surface); }
+  .wordmark { display: flex; align-items: center; gap: 12px; font: 800 44px/1 var(--font-display); letter-spacing: -.04em; }
+  .construct { display: grid; grid-template-columns: 220px 1fr; gap: 28px; align-items: center; }
+  .construct ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+
+  /* Color */
+  .colors { grid-template-columns: repeat(6, 1fr); }
+  .sw { border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--border); background: var(--surface); }
+  .sw div { height: 110px; }
+  .sw p { margin: 0; padding: 10px 12px 12px; font-size: var(--text-sm); }
+  .sw b { display: block; font-size: var(--text-base); }
+  .sw code { font: 500 12px var(--font-mono); color: var(--muted); }
+  .ratio { display: flex; height: 18px; border-radius: 999px; overflow: hidden; margin-top: 16px; border: 1px solid var(--border); }
+
+  /* Tipografía */
+  .type { grid-template-columns: 1.3fr 1fr; }
+  .specimen { font: 800 120px/1 var(--font-display); letter-spacing: -.05em; }
+  .scale div { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--border-soft); padding: 10px 0; gap: 16px; }
+  .scale span:last-child { font: 500 12px var(--font-mono); color: var(--meta); white-space: nowrap; }
+
+  /* Componentes */
+  .ui { grid-template-columns: 1fr 1fr; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; height: 44px; padding: 0 20px; border-radius: var(--radius-md); font: 600 var(--text-sm) var(--font-body); border: 1px solid var(--border); background: var(--surface); color: var(--fg); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-on); }
+  .btn.danger { color: var(--danger); border-color: #F1B8B2; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+  .slot { height: 40px; min-width: 76px; border-radius: 10px; border: 1.5px solid #9CCFC4; color: var(--accent); background: #fff; font: 600 14px var(--font-body); font-variant-numeric: tabular-nums; }
+  .slot.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .appt { display: grid; grid-template-columns: 64px 1fr; gap: 12px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-md); background: #fff; }
+  .appt time { font-weight: 800; font-variant-numeric: tabular-nums; }
+
+  /* Aplicaciones */
+  .apps { grid-template-columns: 300px 1fr 1fr; align-items: stretch; }
+  .phone { border-radius: 34px; padding: 34px 26px; color: #fff; background: radial-gradient(120% 80% at 20% 10%, #1E8F7B 0%, var(--accent) 45%, #0A3F37 100%); display: flex; flex-direction: column; justify-content: center; gap: 18px; min-height: 520px; }
+  .phone h3 { font-size: 40px; line-height: 1.02; }
+  .phone p { margin: 0; color: #D7F1EA; }
+  .mail { padding: 0; overflow: hidden; }
+  .mail header { padding: 18px 22px; border-bottom: 1px solid var(--border-soft); display: flex; align-items: center; gap: 10px; font: 800 20px var(--font-display); letter-spacing: -.03em; }
+  .mail .body { padding: 22px; }
+  .card-biz { background: #15211F; color: #fff; display: flex; flex-direction: column; justify-content: space-between; }
+  .card-biz .leaf { width: 46px; height: 6px; border-radius: 3px; background: #F2A33A; }
+  footer { margin-top: 64px; color: var(--muted); font-size: var(--text-sm); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <div class="lock"><img src="../assets/mark-white.svg" width="104" height="104" alt=""><span>tepahti</span></div>
+    <p>Agenda, expediente y cobros para clínicas en México. Tus pacientes agendan solos y tú te dedicas a curar.</p>
+    <div class="meaning"><b>te·PAH·ti</b>náhuatl: «curar a la gente»</div>
+  </div>
+
+  <section>
+    <div class="eyebrow">01 · Logotipo</div>
+    <h2>Una «t» que brota en hoja</h2>
+    <div class="grid logos">
+      <div class="tile paper"><div class="wordmark"><img src="../assets/mark.svg" width="58" height="58" alt="">tepahti</div><small>Principal, sobre claro</small></div>
+      <div class="tile dark"><img src="../assets/mark-white.svg" width="110" height="110" alt=""><small>Sobre obsidiana</small></div>
+      <div class="tile jade"><img src="../assets/mark-white.svg" width="110" height="110" alt=""><small>Sobre jade</small></div>
+      <div class="tile paper"><div class="row" style="gap:18px;align-items:end"><img src="../assets/icon.svg" width="96" height="96" alt=""><img src="../assets/icon.svg" width="48" height="48" alt=""><img src="../assets/icon.svg" width="24" height="24" alt=""></div><small>Ícono de app y favicon</small></div>
+    </div>
+    <div class="card construct" style="margin-top:16px">
+      <img src="../assets/mark.svg" width="200" height="200" alt="Símbolo de Tepahti">
+      <ol>
+        <li><b>La hoja</b> es <i>pahtli</i>: la medicina que crece. Representa a la clínica que cuida y al paciente que sana.</li>
+        <li><b>El cruce de la «t»</b> forma una cruz médica discreta, sin caer en el cliché del hospital.</li>
+        <li><b>Trazos redondeados de grosor uniforme:</b> amable, legible a 16 px y fácil de reproducir en bordado, sello o vinil.</li>
+        <li>Siempre en minúsculas: <b>tepahti</b>. Cercano, como el trato que queremos dar.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">02 · Color</div>
+    <h2>Jade, obsidiana y cempasúchil</h2>
+    <div class="grid colors">
+      <div class="sw"><div style="background:#0B6E5F"></div><p><b>Jade</b><code>#0B6E5F</code><br>Acción · 6.2:1</p></div>
+      <div class="sw"><div style="background:#15211F"></div><p><b>Obsidiana</b><code>#15211F</code><br>Texto · 15:1</p></div>
+      <div class="sw"><div style="background:#F7F5F0"></div><p><b>Papel</b><code>#F7F5F0</code><br>Fondo</p></div>
+      <div class="sw"><div style="background:#EEF6F3"></div><p><b>Jade niebla</b><code>#EEF6F3</code><br>Destacados</p></div>
+      <div class="sw"><div style="background:#34B38A"></div><p><b>Hoja</b><code>#34B38A</code><br>Logo, ilustración</p></div>
+      <div class="sw"><div style="background:#F2A33A"></div><p><b>Cempasúchil</b><code>#F2A33A</code><br>Acento puntual</p></div>
+    </div>
+    <div class="ratio" title="Proporción de uso"><span style="flex:70;background:#F7F5F0"></span><span style="flex:20;background:#15211F"></span><span style="flex:8;background:#0B6E5F"></span><span style="flex:2;background:#F2A33A"></span></div>
+    <p class="muted" style="margin:8px 0 0;font-size:14px">Proporción en pantalla: 70 % papel · 20 % obsidiana · 8 % jade · 2 % cempasúchil. El jade es el único color de acción.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">03 · Tipografía</div>
+    <h2>Plus Jakarta Sans, de titular a etiqueta</h2>
+    <div class="grid type">
+      <div class="card"><div class="specimen">Aa</div><p class="muted" style="margin:8px 0 0">Plus Jakarta Sans · 400 · 500 · 600 · 700 · 800 · licencia libre (OFL)</p>
+        <p style="font:800 30px/1.1 var(--font-display);letter-spacing:-.03em;margin:22px 0 8px">Tus pacientes agendan solos, 24/7.</p>
+        <p class="muted" style="margin:0">Recordatorios por WhatsApp y correo, expediente que no se altera y recetas que cualquier farmacia verifica con un QR.</p></div>
+      <div class="card scale">
+        <div><span style="font:800 56px/1 var(--font-display);letter-spacing:-.04em">Display</span><span>56 · 800</span></div>
+        <div><span style="font:800 38px/1 var(--font-display);letter-spacing:-.03em">Título 1</span><span>38 · 800</span></div>
+        <div><span style="font:800 28px/1 var(--font-display);letter-spacing:-.03em">Título 2</span><span>28 · 800</span></div>
+        <div><span style="font:700 22px/1.2 var(--font-display)">Título 3</span><span>22 · 700</span></div>
+        <div><span style="font-size:16px">Cuerpo de texto para leer con calma</span><span>16 · 400</span></div>
+        <div><span style="font:600 14px var(--font-body)">Etiqueta de campo</span><span>14 · 600</span></div>
+        <div><span style="font:500 13px var(--font-mono)">RX-BAPRNYUWLT</span><span>Mono · folios</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">04 · Interfaz</div>
+    <h2>Componentes</h2>
+    <div class="grid ui">
+      <div class="card" style="display:grid;gap:18px">
+        <div class="row"><button class="btn primary">Confirmar cita</button><button class="btn">Reprogramar</button><button class="btn danger">Cancelar</button></div>
+        <div class="row"><span class="badge" style="background:#EEF6F3;color:#0B6E5F">Agendada</span><span class="badge" style="background:#E4F5E9;color:#1F7A3A">Confirmada por el paciente</span><span class="badge" style="background:#FFF4D6;color:#9A5B00">No asistió</span><span class="badge" style="background:#FDECEA;color:#B42318">Cancelada</span><span class="badge" style="background:#FDF0DC;color:#8A4E00">En línea</span></div>
+        <div class="row"><button class="slot">09:00</button><button class="slot on">09:30</button><button class="slot">10:00</button><button class="slot">10:30</button><button class="slot">11:00</button></div>
+      </div>
+      <div class="appt"><time>10:30<br><span class="muted" style="font-weight:500">11:00</span></time>
+        <div><div class="row" style="gap:8px"><b>Ana Paula Mendoza</b><span class="badge" style="background:#EEF6F3;color:#0B6E5F">Agendada</span><span class="badge" style="background:#E4F5E9;color:#1F7A3A">Confirmada</span></div>
+        <div class="muted" style="font-size:14px;margin-top:4px">Consulta de cardiología · Dr. Andrés Morales · $1,200.00</div>
+        <div class="row" style="margin-top:12px"><button class="btn primary" style="height:38px">Expediente clínico</button><button class="btn" style="height:38px">Reprogramar</button></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">05 · Aplicaciones</div>
+    <h2>Redes, correo y papelería</h2>
+    <div class="grid apps">
+      <div class="phone"><img src="../assets/mark-white.svg" width="56" height="56" alt=""><h3>¿Tu recepción vive pegada al teléfono?</h3><p>Así agendan tus pacientes con Tepahti 👇</p></div>
+      <div class="card mail"><header><img src="../assets/mark.svg" width="30" height="30" alt="">tepahti</header>
+        <div class="body"><p style="margin:0 0 6px;font-weight:700;font-size:18px">Hola, Mariana:</p>
+        <p class="muted" style="margin:0 0 16px">Te recordamos tu cita en <b style="color:var(--fg)">Clínica Aurora</b> mañana, lunes 26 de octubre, a las 10:30 con el Dr. Andrés Morales.</p>
+        <div class="row"><button class="btn primary">Confirmar asistencia</button><button class="btn">Cancelar</button></div>
+        <p class="muted" style="font-size:12px;margin:18px 0 0">Enviado por Tepahti en nombre de Clínica Aurora.</p></div></div>
+      <div class="card card-biz"><div class="leaf"></div>
+        <div><div class="wordmark" style="font-size:34px;color:#fff"><img src="../assets/mark-white.svg" width="44" height="44" alt="">tepahti</div>
+        <p style="color:#9FB1AE;margin:14px 0 0;font-size:14px">Miguel Mexicano Herrera<br>Fundador · tepahti.com</p></div></div>
+    </div>
+  </section>
+
+  <footer>Tepahti · Identidad v1 · octubre de 2026 · Archivos en <code>assets/</code>, tokens en <code>tokens.css</code>, guía en <code>DESIGN.md</code>.</footer>
+</div>
+</body>
+</html>

@@ -35,7 +35,7 @@ export default async function Page({ params }: { params: Promise<{ code: string 
           <>
             {data.voided
               ? <div className="alert error" role="alert"><strong>Receta anulada</strong>{data.voidedAt ? ` el ${when(data.voidedAt)}` : ''}. No debe surtirse.</div>
-              : <div className="alert ok" role="status"><strong>Receta auténtica</strong>, emitida en Medora.</div>}
+              : <div className="alert ok" role="status"><strong>Receta auténtica</strong>, emitida en Tepahti.</div>}
             <div className="card stack" style={{ gap: 6 }}>
               <span><strong>Folio:</strong> {data.code}</span>
               <span><strong>Fecha:</strong> {when(data.issuedAt)}</span>

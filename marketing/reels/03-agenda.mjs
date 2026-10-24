@@ -24,5 +24,5 @@ await record('03-agenda', { staff: true }, async (r) => {
   await r.tap(page.getByRole('button', { name: 'Agendar cita' }), 1500);
   await r.caption('Y el paciente recibe su <b>confirmación al instante</b>', 2600);
 
-  await r.card('Adiós libreta.<br>Adiós empalmes.', 'Agenda en línea y por teléfono, con recordatorios automáticos.', 'medora.nut.com.mx · 14 días gratis', 3800);
+  await r.card('Adiós libreta.<br>Adiós empalmes.', 'Agenda en línea y por teléfono, con recordatorios automáticos.', '14 días gratis · link en el perfil', 3800);
 });
