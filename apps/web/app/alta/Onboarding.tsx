@@ -210,7 +210,7 @@ function ClinicSection({ d, change, issues }: SectionProps) {
         <label>Teléfono principal *<input value={d.clinic.phone} inputMode="tel" maxLength={30} onChange={(e) => set({ phone: e.target.value })} /></label>
         <label>Correo de la clínica *<input type="email" value={d.clinic.email} maxLength={254} onChange={(e) => set({ email: e.target.value })} /></label>
       </div>
-      <p className="small muted">Su página de reservas quedará en <strong>medora.nut.com.mx/c/{d.clinic.slug || slugify(d.clinic.name) || 'su-clinica'}</strong>. Sólo minúsculas, números y guiones.</p>
+      <p className="small muted">Su página de reservas quedará en <strong>tepahti.nut.com.mx/c/{d.clinic.slug || slugify(d.clinic.name) || 'su-clinica'}</strong>. Sólo minúsculas, números y guiones.</p>
       <div className="grid">
         <label>Sitio web<input value={d.clinic.website} maxLength={300} placeholder="https://…" onChange={(e) => set({ website: e.target.value })} /></label>
         <label>Instagram<input value={d.clinic.instagram} maxLength={300} placeholder="@clinica" onChange={(e) => set({ instagram: e.target.value })} /></label>

@@ -1,7 +1,7 @@
 /*!
  * Tepahti · widget «Reservar cita» para el sitio web de la clínica.
  *
- *   <script src="https://medora.nut.com.mx/widget.js" data-clinica="mi-clinica" async></script>
+ *   <script src="https://tepahti.nut.com.mx/widget.js" data-clinica="mi-clinica" async></script>
  *
  * Atributos opcionales:
  *   data-medico="dra-ana-lopez"   abre directamente la agenda de un médico

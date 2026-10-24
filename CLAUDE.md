@@ -1,8 +1,10 @@
 # Tepahti (antes Medora) · guía para Claude
 
-Agenda, reservas en línea, expediente y cobros para clínicas en México. Producción: https://medora.nut.com.mx (VPS 82.180.139.70, `/opt/medora`).
+Agenda, reservas en línea, expediente y cobros para clínicas en México. Producción: https://tepahti.nut.com.mx (VPS 82.180.139.70, `/opt/medora`).
 
 ## Marca
+
+- Dominio: **tepahti.nut.com.mx**. El anterior, medora.nut.com.mx, redirige todo ahí salvo `/api/`, que sigue respondiendo para el webhook de Stripe y los avisos de Google Calendar ya registrados con esa dirección (nginx en `/etc/nginx/sites-available/medora`).
 
 - El producto se llama **Tepahti** (náhuatl, «curar a la gente»); antes se llamaba Medora y el repositorio, las carpetas, los contenedores y la base conservan ese nombre interno.
 - Identidad en `marketing/marca/tepahti` (paquete de Open Design: `DESIGN.md`, `tokens.css`, logos). Los colores de la app viven en `apps/web/app/globals.css` y deben coincidir con esos tokens.

@@ -14,14 +14,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: API y web de medora.nut.com.mx
+      - name: API y web de tepahti.nut.com.mx
         run: |
           for i in 1 2 3; do
-            api=$(curl -s -m 20 -o /dev/null -w '%{http_code}' https://medora.nut.com.mx/api/health || true)
-            web=$(curl -s -m 20 -o /dev/null -w '%{http_code}' https://medora.nut.com.mx/ || true)
+            api=$(curl -s -m 20 -o /dev/null -w '%{http_code}' https://tepahti.nut.com.mx/api/health || true)
+            web=$(curl -s -m 20 -o /dev/null -w '%{http_code}' https://tepahti.nut.com.mx/ || true)
             echo "intento $i: api=$api web=$web"
             [ "$api" = 200 ] && [ "$web" = 200 ] && exit 0
             sleep 30
           done
-          echo "::error::Medora no responde (api=$api, web=$web)"
+          echo "::error::Tepahti no responde (api=$api, web=$web)"
           exit 1

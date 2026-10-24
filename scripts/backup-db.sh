@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Respaldo de PostgreSQL de Medora (formato custom de pg_dump) con retención por días.
+# Respaldo de PostgreSQL de Tepahti (formato custom de pg_dump) con retención por días.
 # Uso en el servidor, desde /opt/medora: scripts/backup-db.sh
 # Variables: BACKUP_DIR (/var/backups/medora), BACKUP_KEEP_DAYS (14).
 set -euo pipefail

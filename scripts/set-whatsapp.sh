@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Conecta WhatsApp Business (Cloud API de Meta) a Medora: guarda el token y el ID del número en .env sin mostrarlos,
+# Conecta WhatsApp Business (Cloud API de Meta) a Tepahti: guarda el token y el ID del número en .env sin mostrarlos,
 # comprueba con Meta que el número responde y reinicia la API. Uso, como root en el VPS: scripts/set-whatsapp.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."

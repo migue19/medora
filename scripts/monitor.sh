@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Monitoreo de Medora en el VPS (cron cada 5 min). Revisa la API, los contenedores, la cola de trabajos,
+# Monitoreo de Tepahti en el VPS (cron cada 5 min). Revisa la API, los contenedores, la cola de trabajos,
 # los respaldos, el certificado y el disco, y avisa por correo (SMTP del .env) cuando algo cambia:
 # al aparecer un problema, cada 24 h mientras siga y cuando se resuelve.
 # Destinatario: MONITOR_EMAIL o, si no existe, ONBOARDING_NOTIFY_EMAIL. Uso: scripts/monitor.sh [--prueba]
@@ -7,7 +7,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 env_get() { grep -E "^$1=" .env | tail -1 | cut -d= -f2- | sed -E "s/^\"(.*)\"\$/\\1/; s/^'(.*)'\$/\\1/"; }
-DOMAIN="${MONITOR_DOMAIN:-medora.nut.com.mx}"
+DOMAIN="${MONITOR_DOMAIN:-tepahti.nut.com.mx}"
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/medora}"
 STATE_DIR="${MONITOR_STATE_DIR:-/var/lib/medora-monitor}"
 LOG=/var/log/medora-backup.log
@@ -73,7 +73,7 @@ send() {
 now="$(date +%s)"
 report="$(printf -- '- %s\n' "${problems[@]+"${problems[@]}"}")"
 if [ "${1:-}" = --prueba ]; then
-  send "Medora · prueba del monitoreo" "El monitoreo de $DOMAIN funciona y puede enviarte avisos.
+  send "Tepahti · prueba del monitoreo" "El monitoreo de $DOMAIN funciona y puede enviarte avisos.
 
 Estado actual:
 ${report:-- Todo en orden}"
@@ -84,13 +84,13 @@ sig="$(printf '%s' "${problems[*]+"${problems[*]}"}" | sed -E 's/[0-9]+/N/g' | s
 prev_sig="$(cat "$STATE_DIR/sig" 2>/dev/null)"; prev_at="$(cat "$STATE_DIR/at" 2>/dev/null || echo 0)"
 if [ ${#problems[@]} -gt 0 ]; then
   if [ "$sig" != "$prev_sig" ] || [ $((now - prev_at)) -ge 86400 ]; then
-    send "⚠️ Medora: ${#problems[@]} problema(s) en $DOMAIN" "Se detectó en $(hostname) a las $(TZ=America/Mexico_City date '+%d/%m %H:%M') (Ciudad de México):
+    send "⚠️ Tepahti: ${#problems[@]} problema(s) en $DOMAIN" "Se detectó en $(hostname) a las $(TZ=America/Mexico_City date '+%d/%m %H:%M') (Ciudad de México):
 
 $report
 Revisa con: cd /opt/medora && docker compose ps && docker compose logs --tail=100 api" \
       && { echo "$sig" > "$STATE_DIR/sig"; echo "$now" > "$STATE_DIR/at"; }
   fi
 elif [ -n "$prev_sig" ]; then
-  send "✅ Medora: todo en orden otra vez" "Los problemas en $DOMAIN se resolvieron a las $(TZ=America/Mexico_City date '+%d/%m %H:%M')." \
+  send "✅ Tepahti: todo en orden otra vez" "Los problemas en $DOMAIN se resolvieron a las $(TZ=America/Mexico_City date '+%d/%m %H:%M')." \
     && rm -f "$STATE_DIR/sig" "$STATE_DIR/at"
 fi

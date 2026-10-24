@@ -6,8 +6,8 @@ set -euo pipefail
 
 MODE="${1:?Uso: acme-dns-hook.sh auth|cleanup}"
 TOKEN_FILE="${HOSTINGER_DNS_TOKEN_FILE:-/root/.hostinger-dns-token}"
-ZONE="${ACME_DNS_ZONE:-${CERTBOT_DOMAIN#*.}}"          # medora.nut.com.mx → nut.com.mx
-NAME="_acme-challenge.${CERTBOT_DOMAIN%."$ZONE"}"      # → _acme-challenge.medora
+ZONE="${ACME_DNS_ZONE:-${CERTBOT_DOMAIN#*.}}"          # tepahti.nut.com.mx → nut.com.mx
+NAME="_acme-challenge.${CERTBOT_DOMAIN%."$ZONE"}"      # → _acme-challenge.tepahti
 API="https://developers.hostinger.com/api/dns/v1/zones/$ZONE"
 
 api() {

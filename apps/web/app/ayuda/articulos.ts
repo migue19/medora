@@ -37,7 +37,7 @@ export const ARTICLES: Article[] = [
     body: [
       { p: 'Tepahti funciona para un consultorio con un solo médico o para clínicas con varios médicos y sedes. El registro toma unos minutos.' },
       { steps: [
-        'Entra a **medora.nut.com.mx/registro** o toca **Prueba 14 días gratis** en la página de inicio.',
+        'Entra a **tepahti.nut.com.mx/registro** o toca **Prueba 14 días gratis** en la página de inicio.',
         'Escribe el **nombre de la clínica o consultorio** como quieres que lo vean tus pacientes.',
         'Captura los datos del **médico responsable**: nombre, especialidad y **cédula profesional**.',
         'Escribe tu nombre, correo y teléfono, acepta el aviso de privacidad y envía el formulario.',
@@ -179,7 +179,7 @@ export const ARTICLES: Article[] = [
     title: 'Reservas en línea 24/7',
     summary: 'Tu página de reservas, el botón para tu sitio web y las reglas para reservar.',
     body: [
-      { p: 'Cada clínica tiene su página pública en **medora.nut.com.mx/c/tu-clinica** y cada médico la suya. Ahí tus pacientes ven médicos, precios y opiniones, eligen un horario libre y confirman con su cuenta.' },
+      { p: 'Cada clínica tiene su página pública en **tepahti.nut.com.mx/c/tu-clinica** y cada médico la suya. Ahí tus pacientes ven médicos, precios y opiniones, eligen un horario libre y confirman con su cuenta.' },
       { img: 'pagina-reservas', alt: 'Página de reservas de la clínica vista en un celular', mobile: true },
       { h: 'Reglas de reserva' },
       { p: 'En **Clínica → Datos y reglas de reserva** decides:' },
@@ -448,7 +448,7 @@ export const ARTICLES: Article[] = [
     body: [
       { img: 'portal-paciente', alt: 'Portal del paciente con sus próximas citas', mobile: true },
       { list: [
-        'En **medora.nut.com.mx/paciente** ves tus **próximas citas** y tu **historial**.',
+        'En **tepahti.nut.com.mx/paciente** ves tus **próximas citas** y tu **historial**.',
         'Puedes **reprogramar** o **cancelar** hasta el límite que fija tu clínica.',
         'El recordatorio que te llega antes de cada cita trae un enlace para **confirmar tu asistencia** o cancelar sin iniciar sesión.',
         'Si tu cita es por videoconsulta, entra con **Entrar a la videoconsulta**; la sala abre 15 minutos antes.',

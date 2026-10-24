@@ -239,7 +239,7 @@ FROM "Job" ORDER BY "createdAt" DESC LIMIT 20;
 - Widget para el sitio de la clínica (código listo en «Clínica → Compartir»):
 
 ```html
-<script src="https://medora.nut.com.mx/widget.js" data-clinica="mi-clinica" async></script>
+<script src="https://tepahti.nut.com.mx/widget.js" data-clinica="mi-clinica" async></script>
 <!-- opcionales: data-medico="ana-lopez" data-posicion="flotante" data-texto="Agenda tu cita" data-color="#0f766e" -->
 ```
 
@@ -253,7 +253,7 @@ Opcional. Sin `WHATSAPP_TOKEN` el canal queda desactivado y los recordatorios sa
 1. En Meta Business: app con el producto WhatsApp, número verificado y un **token de acceso permanente** de un usuario del sistema.
 2. Crear y aprobar la plantilla `recordatorio_cita` (categoría *Utilidad*, idioma *Español (MEX)*):
    - Cuerpo: `Hola {{1}}, te recordamos tu cita en {{2}} el {{3}} con {{4}}. Confírmanos tu asistencia o cancela desde el botón.`
-   - Botón de tipo URL dinámica: `https://medora.nut.com.mx/cita?t={{1}}` con el texto «Confirmar o cancelar».
+   - Botón de tipo URL dinámica: `https://tepahti.nut.com.mx/cita?t={{1}}` con el texto «Confirmar o cancelar».
 3. En el VPS corre `scripts/set-whatsapp.sh`: pide el token y el ID del número sin mostrarlos, comprueba con Meta que el número responde, los guarda en `.env` y reinicia la API. Equivale a definir estas variables:
 
 | Variable | Valor |
@@ -265,7 +265,7 @@ Opcional. Sin `WHATSAPP_TOKEN` el canal queda desactivado y los recordatorios sa
 | `WHATSAPP_DEFAULT_COUNTRY` | `52` (se antepone a teléfonos de 10 dígitos) |
 | `WHATSAPP_API_VERSION` | Versión de la Graph API (por omisión `v25.0`, vigente hasta julio de 2028) |
 
-4. Opcional, para invitar a opinar por WhatsApp: plantilla `invitacion_opinion` (Utilidad, `es_MX`), cuerpo `Hola {{1}}, ¿cómo te fue con {{2}} en {{3}}? Tu opinión ayuda a otros pacientes.` y botón URL dinámica `https://medora.nut.com.mx/opinion?t={{1}}`. Variable `WHATSAPP_REVIEW_TEMPLATE` si usas otro nombre.
+4. Opcional, para invitar a opinar por WhatsApp: plantilla `invitacion_opinion` (Utilidad, `es_MX`), cuerpo `Hola {{1}}, ¿cómo te fue con {{2}} en {{3}}? Tu opinión ayuda a otros pacientes.` y botón URL dinámica `https://tepahti.nut.com.mx/opinion?t={{1}}`. Variable `WHATSAPP_REVIEW_TEMPLATE` si usas otro nombre.
 5. En el panel, «Clínica → Recordatorios», activar «También por WhatsApp». Sólo reciben WhatsApp los pacientes con consentimiento: los de cuenta en línea lo activan en su registro o en «Mis citas»; para fichas telefónicas lo registra recepción.
 
 ## Pagos en línea (Stripe)
@@ -274,7 +274,7 @@ Opcional. Sin `STRIPE_SECRET_KEY` los pagos quedan desactivados y las clínicas 
 
 1. Cuenta de Stripe México de Tepahti. En *Developers → API keys* copia la llave secreta (`sk_test_…` para pruebas, `sk_live_…` para cobrar de verdad; también sirve una llave restringida `rk_…` con permisos de Checkout Sessions, Customers y Refunds).
 2. Para OXXO y SPEI, actívalos en *Settings → Payment methods*.
-3. En *Developers → Webhooks* agrega el endpoint `https://medora.nut.com.mx/api/payments/stripe/webhook` con los eventos `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `checkout.session.expired` y `charge.refunded`. Copia su *signing secret* (`whsec_…`).
+3. En *Developers → Webhooks* agrega el endpoint `https://tepahti.nut.com.mx/api/payments/stripe/webhook` con los eventos `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `checkout.session.expired` y `charge.refunded`. Copia su *signing secret* (`whsec_…`).
 4. En el `.env` del servidor (entre comillas simples) y reinicia la API:
 
 | Variable | Valor |
@@ -351,8 +351,8 @@ Cómo funciona:
 
 - **API pública v1 y webhooks:** en el panel, «Integraciones». Ahí se crean las llaves (sólo consultar, o consultar y agendar), los webhooks firmados (`Tepahti-Signature: t=…,v1=HMAC-SHA256(secreto, t.cuerpo)`) y está la documentación de los endpoints. Los webhooks sólo aceptan URLs HTTPS públicas, se reintentan con espera creciente y se pausan tras 50 fallos seguidos.
 - **Calendarios:** cada médico conecta su Google Calendar u Outlook en «Mi cuenta». Requiere `RECORDS_ENCRYPTION_KEY` (los tokens se guardan cifrados) y una app OAuth:
-  - **Google Cloud:** activa la Google Calendar API. Pantalla de consentimiento con los alcances `openid`, `email` y `…/auth/calendar.events`. Cliente OAuth «Aplicación web» con la URI de redirección `https://medora.nut.com.mx/api/integrations/google/callback`. Variables `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET`. Mientras la app esté «en prueba», agrega a los médicos como usuarios de prueba (hasta 100). Para abrirla a todos, Google revisa los alcances sensibles.
-  - **Microsoft Entra:** registro de app multiinquilino y cuentas personales. Redirección web `https://medora.nut.com.mx/api/integrations/microsoft/callback`, permisos delegados `Calendars.ReadWrite`, `User.Read` y `offline_access`, y un secreto de cliente. Variables `MICROSOFT_CLIENT_ID` y `MICROSOFT_CLIENT_SECRET`.
+  - **Google Cloud:** activa la Google Calendar API. Pantalla de consentimiento con los alcances `openid`, `email` y `…/auth/calendar.events`. Cliente OAuth «Aplicación web» con la URI de redirección `https://tepahti.nut.com.mx/api/integrations/google/callback`. Variables `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET`. Mientras la app esté «en prueba», agrega a los médicos como usuarios de prueba (hasta 100). Para abrirla a todos, Google revisa los alcances sensibles.
+  - **Microsoft Entra:** registro de app multiinquilino y cuentas personales. Redirección web `https://tepahti.nut.com.mx/api/integrations/microsoft/callback`, permisos delegados `Calendars.ReadWrite`, `User.Read` y `offline_access`, y un secreto de cliente. Variables `MICROSOFT_CLIENT_ID` y `MICROSOFT_CLIENT_SECRET`.
   - Guárdalas con `ssh -t root@82.180.139.70 /opt/medora/scripts/set-calendar-keys.sh`.
 - **Avisos push:** `VAPID_PUBLIC_KEY` y `VAPID_PRIVATE_KEY`, generadas en el servidor. El personal los activa en «Mi cuenta → Avisos en este dispositivo».
 
