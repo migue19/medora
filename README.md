@@ -254,7 +254,7 @@ Opcional. Sin `WHATSAPP_TOKEN` el canal queda desactivado y los recordatorios sa
 2. Crear y aprobar la plantilla `recordatorio_cita` (categoría *Utilidad*, idioma *Español (MEX)*):
    - Cuerpo: `Hola {{1}}, te recordamos tu cita en {{2}} el {{3}} con {{4}}. Confírmanos tu asistencia o cancela desde el botón.`
    - Botón de tipo URL dinámica: `https://medora.nut.com.mx/cita?t={{1}}` con el texto «Confirmar o cancelar».
-3. Variables en el `.env` del servidor y reiniciar la API:
+3. En el VPS corre `scripts/set-whatsapp.sh`: pide el token y el ID del número sin mostrarlos, comprueba con Meta que el número responde, los guarda en `.env` y reinicia la API. Equivale a definir estas variables:
 
 | Variable | Valor |
 |---|---|
@@ -263,6 +263,7 @@ Opcional. Sin `WHATSAPP_TOKEN` el canal queda desactivado y los recordatorios sa
 | `WHATSAPP_TEMPLATE` | `recordatorio_cita` |
 | `WHATSAPP_TEMPLATE_LANG` | `es_MX` |
 | `WHATSAPP_DEFAULT_COUNTRY` | `52` (se antepone a teléfonos de 10 dígitos) |
+| `WHATSAPP_API_VERSION` | Versión de la Graph API (por omisión `v25.0`, vigente hasta julio de 2028) |
 
 4. Opcional, para invitar a opinar por WhatsApp: plantilla `invitacion_opinion` (Utilidad, `es_MX`), cuerpo `Hola {{1}}, ¿cómo te fue con {{2}} en {{3}}? Tu opinión ayuda a otros pacientes.` y botón URL dinámica `https://medora.nut.com.mx/opinion?t={{1}}`. Variable `WHATSAPP_REVIEW_TEMPLATE` si usas otro nombre.
 5. En el panel, «Clínica → Recordatorios», activar «También por WhatsApp». Sólo reciben WhatsApp los pacientes con consentimiento: los de cuenta en línea lo activan en su registro o en «Mis citas»; para fichas telefónicas lo registra recepción.

@@ -137,7 +137,7 @@ function loadWhatsAppConfig(): WhatsAppConfig | null {
     template: process.env.WHATSAPP_TEMPLATE?.trim() || 'recordatorio_cita',
     reviewTemplate: process.env.WHATSAPP_REVIEW_TEMPLATE?.trim() || 'invitacion_opinion',
     language: process.env.WHATSAPP_TEMPLATE_LANG?.trim() || 'es_MX',
-    apiVersion: process.env.WHATSAPP_API_VERSION?.trim() || 'v21.0',
+    apiVersion: process.env.WHATSAPP_API_VERSION?.trim() || 'v25.0',
     defaultCountryCode: process.env.WHATSAPP_DEFAULT_COUNTRY?.trim() || '52',
   };
 }

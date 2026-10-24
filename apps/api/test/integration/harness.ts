@@ -75,7 +75,7 @@ export async function startHarness(): Promise<Harness> {
     mail: { from: 'Medora <no-reply@test.mx>', smtp: null },
     whatsapp: {
       token: 'prueba', phoneNumberId: '123', template: 'recordatorio_cita', reviewTemplate: 'invitacion_opinion',
-      language: 'es_MX', apiVersion: 'v21.0',
+      language: 'es_MX', apiVersion: 'v25.0',
       defaultCountryCode: '52',
     },
     payments: { secretKey: 'sk_test_integracion', webhookSecret: WEBHOOK_SECRET },
