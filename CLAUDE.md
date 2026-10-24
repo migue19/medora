@@ -84,11 +84,14 @@ Antes de dar por terminado un cambio en la API, correr typecheck y las pruebas d
 
 ```sh
 ssh root@82.180.139.70 /opt/medora/scripts/backup-db.sh
-git archive HEAD | ssh root@82.180.139.70 'tar -x -C /opt/medora && cd /opt/medora \
-  && docker compose build -q && docker compose --profile tools build -q tools \
+git archive HEAD | ssh root@82.180.139.70 'tar -x -C /opt/medora'
+ssh -n root@82.180.139.70 'cd /opt/medora && docker compose build -q \
+  && docker compose --profile tools build -q tools \
   && docker compose --profile tools run --rm -T tools npm run db:migrate </dev/null \
   && docker compose up -d api web'
 ```
+
+- Subir y compilar van en conexiones separadas, y la segunda con `ssh -n`: en una sola, la sesión SSH se quedaba abierta aunque el servidor ya hubiera terminado.
 
 - Se despliega lo que está en el commit (`git archive HEAD`). Primero se hace commit y después el despliegue.
 - Las llaves se cargan **por el usuario** con los scripts de `/opt/medora/scripts` (`set-stripe-keys.sh`, `set-daily-key.sh`, `set-facturama.sh`, `set-calendar-keys.sh`). Nunca se piden ni se escriben secretos en el chat.
