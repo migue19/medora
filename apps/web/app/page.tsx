@@ -67,6 +67,23 @@ export default async function Home() {
           <div className="card"><h3>Agenda para recepción</h3><p className="muted">Captura citas por teléfono, reprograma, cancela con motivo y registra asistencia.</p></div>
           <div className="card"><h3>Horarios y bloqueos</h3><p className="muted">Horario semanal por médico, vacaciones y bloqueos que se reflejan al instante.</p></div>
         </section>
+        <section className="about" aria-labelledby="por-que">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/mark.svg" alt="" width={72} height={72} />
+          <div className="stack" style={{ gap: 10 }}>
+            <h2 id="por-que" style={{ margin: 0 }}>¿Por qué «Tepahti»?</h2>
+            <p style={{ margin: 0 }}>
+              En náhuatl, <em>tepahtiani</em> es «el que cura a la gente», y <em>pahtli</em> es la medicina: la planta que sana.
+              Por eso nuestro logo es una «t» que brota en hoja. Elegimos el nombre porque eso es lo que hacen todos los días
+              los médicos y las clínicas que confían en nosotros.
+            </p>
+            <p style={{ margin: 0 }}>
+              <strong>Nuestro objetivo:</strong> que en México los médicos dediquen su tiempo a curar, no a la libreta, las llamadas
+              ni el papeleo. Tepahti se encarga de la agenda, los recordatorios, el expediente y los cobros, para que cada paciente
+              reciba una atención puntual, cercana y segura.
+            </p>
+          </div>
+        </section>
         <p className="small muted section">¿Dudas sobre cómo funciona? Visita el <Link href="/ayuda">centro de ayuda</Link> · <Link href="/privacidad">Aviso de privacidad</Link></p>
       </main>
     </>
