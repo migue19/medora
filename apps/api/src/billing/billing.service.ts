@@ -206,10 +206,15 @@ export class BillingService implements OnModuleInit {
     const inv = await this.prisma.subscriptionInvoice.findUnique({ where: { id: invoiceId }, include: { clinic: { include: { billing: true } } } });
     if (!inv || inv.cfdiStatus !== 'PENDING') return;
     const b = inv.clinic.billing;
-    if (!b || !this.config.invoicing) {
+    // Un cobro de Stripe en modo de prueba nunca se timbra ante el SAT con la cuenta real de Facturama.
+    const testCharge = Boolean(this.config.payments?.secretKey.startsWith('sk_test_')) && this.config.invoicing?.sandbox === false;
+    if (!b || !this.config.invoicing || testCharge) {
       await this.prisma.subscriptionInvoice.update({
         where: { id: inv.id },
-        data: { cfdiStatus: 'SKIPPED', cfdiError: !b ? 'Sin datos fiscales registrados' : 'La facturación no está configurada' },
+        data: {
+          cfdiStatus: 'SKIPPED',
+          cfdiError: !b ? 'Sin datos fiscales registrados' : testCharge ? 'Cobro de prueba: no se factura' : 'La facturación no está configurada',
+        },
       });
       return;
     }
