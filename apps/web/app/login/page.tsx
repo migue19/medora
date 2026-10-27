@@ -12,7 +12,12 @@ export default function StaffLogin() {
   const [error, setError] = useState<string | null>(null);
   const [slug, setSlug] = useState('');
   // Llega desde la invitación aceptada: /login?clinica=<slug>
-  useEffect(() => { setSlug(new URLSearchParams(window.location.search).get('clinica') ?? ''); }, []);
+  useEffect(() => {
+    const clinica = new URLSearchParams(window.location.search).get('clinica');
+    setSlug(clinica ?? '');
+    // Con la sesión todavía abierta (p. ej. al volver desde el logo), entra directo al panel.
+    if (!clinica) void staffSession.refresh().then((ok) => { if (ok) router.replace('/panel'); });
+  }, [router]);
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
