@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Header } from '@/components/Header';
+import { PanelLink } from '@/components/PanelLink';
 import { apiBase } from '@/lib/server-api';
 import { money } from '@/lib/format';
 import { CONTACT_EMAIL, CONTACT_PHONE, CONTACT_TEL, whatsappUrl } from '@/lib/contact';
@@ -23,7 +24,7 @@ export default async function Home() {
       <Header>
         <Link className="btn ghost" href="/directorio">Buscar médico</Link>
         <Link className="btn ghost" href="/paciente">Mis citas</Link>
-        <Link className="btn" href="/login">Acceso clínica</Link>
+        <PanelLink>Acceso clínica</PanelLink>
       </Header>
       <main className="container">
         <section className="hero stack">
@@ -34,7 +35,7 @@ export default async function Home() {
           </p>
           <div className="row">
             <Link className="btn primary" href="/registro">Prueba 14 días gratis</Link>
-            <Link className="btn" href="/login">Entrar al panel</Link>
+            <PanelLink>Entrar al panel</PanelLink>
             <Link className="btn" href="/paciente">Soy paciente</Link>
           </div>
         </section>
