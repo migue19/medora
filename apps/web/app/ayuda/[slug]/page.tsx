@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Header } from '@/components/Header';
+import { CONTACT_EMAIL, CONTACT_PHONE, CONTACT_TEL, whatsappUrl } from '@/lib/contact';
 import { jsonLd, siteUrl } from '@/lib/server-api';
 import { ArticleBody } from '../Article';
 import { ARTICLES, bySlug } from '../articulos';
@@ -56,7 +57,7 @@ export default async function Page({ params }: Props) {
             <ul className="help-links">{related.map((a) => <li key={a.slug}><Link href={`/ayuda/${a.slug}`}>{a.title}</Link></li>)}</ul>
           </aside>
         )}
-        <p className="small muted" style={{ marginTop: 24 }}>¿Te quedó alguna duda? Escríbenos a <a href="mailto:contacto@nut.com.mx">contacto@nut.com.mx</a>.</p>
+        <p className="small muted" style={{ marginTop: 24 }}>¿Te quedó alguna duda? Escríbenos por <a href={whatsappUrl('Hola, tengo una duda sobre Tepahti.')} target="_blank" rel="noopener">WhatsApp</a>, llámanos al <a href={CONTACT_TEL}>{CONTACT_PHONE}</a> o escribe a <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.</p>
       </main>
       {ld && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(ld) }} />}
     </>

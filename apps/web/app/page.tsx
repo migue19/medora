@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Header } from '@/components/Header';
 import { apiBase } from '@/lib/server-api';
 import { money } from '@/lib/format';
+import { CONTACT_EMAIL, CONTACT_PHONE, CONTACT_TEL, whatsappUrl } from '@/lib/contact';
 
 // Se arma al pedirla (los planes vienen de la API, en caché 1 h): no depende de que la API exista al compilar.
 export const dynamic = 'force-dynamic';
@@ -82,6 +83,17 @@ export default async function Home() {
               ni el papeleo. Tepahti se encarga de la agenda, los recordatorios, el expediente y los cobros, para que cada paciente
               reciba una atención puntual, cercana y segura.
             </p>
+          </div>
+        </section>
+        <section id="contacto" className="card stack section" aria-labelledby="contacto-titulo">
+          <h2 id="contacto-titulo" style={{ margin: 0 }}>¿Tienes dudas? Hablemos</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            Te explicamos cómo funciona, te ayudamos a configurar tu clínica o resolvemos cualquier pregunta.
+          </p>
+          <div className="row">
+            <a className="btn primary" href={whatsappUrl()} target="_blank" rel="noopener">Escríbenos por WhatsApp</a>
+            <a className="btn" href={CONTACT_TEL}>Llamar al {CONTACT_PHONE}</a>
+            <a className="btn ghost" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
           </div>
         </section>
         <p className="small muted section">¿Dudas sobre cómo funciona? Visita el <Link href="/ayuda">centro de ayuda</Link> · <Link href="/privacidad">Aviso de privacidad</Link></p>

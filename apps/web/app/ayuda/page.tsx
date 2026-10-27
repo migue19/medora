@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Header } from '@/components/Header';
+import { CONTACT_EMAIL, CONTACT_PHONE, CONTACT_TEL, whatsappUrl } from '@/lib/contact';
 import { siteUrl } from '@/lib/server-api';
 import { ARTICLES, CATEGORIES } from './articulos';
 import { HelpSearch } from './HelpSearch';
@@ -44,7 +45,7 @@ export default function Page() {
             </section>
           ))}
         </div>
-        <p className="small muted">¿No encontraste lo que buscabas? Escríbenos a <a href="mailto:contacto@nut.com.mx">contacto@nut.com.mx</a>.</p>
+        <p className="small muted">¿No encontraste lo que buscabas? Escríbenos por <a href={whatsappUrl('Hola, tengo una duda sobre Tepahti.')} target="_blank" rel="noopener">WhatsApp</a>, llámanos al <a href={CONTACT_TEL}>{CONTACT_PHONE}</a> o escribe a <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.</p>
       </main>
     </>
   );
